@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <title>LeMed Spa - Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: #0a0a0a;
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .header {
+      background: #000000;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .header button {
+      background: transparent;
+      color: white;
+      border: 1px solid #555;
+      padding: 8px 20px;
+      cursor: pointer;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: all 0.3s;
+    }
+
+    .header button:hover {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .login-box {
+      max-width: 400px;
+      margin: 80px auto;
+      background: #111111;
+      padding: 48px;
+      border: 1px solid #333;
+    }
+
+    .login-box h2 {
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 28px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #999;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #333;
+      background: #0a0a0a;
+      color: #ffffff;
+      font-size: 14px;
+      font-family: 'Montserrat', sans-serif;
+      transition: all 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #ffffff;
+    }
+
+    input::placeholder {
+      color: #555;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: 'Montserrat', sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #000000;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #cccccc;
+    }
+
+    .btn-secondary {
+      background: #333;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #444;
+    }
+
+    .btn-danger {
+      background: #8b0000;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #a00000;
+    }
+
+    .btn-success {
+      background: #1a472a;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #1e5631;
+    }
+
+    .btn-warning {
+      background: #5c4a1d;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #6d5722;
+    }
+
+    .alert {
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: none;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert.error {
+      background: #2a1010;
+      color: #ff6b6b;
+      border: 1px solid #8b0000;
+    }
+
+    .alert.success {
+      background: #102a10;
+      color: #6bff6b;
+      border: 1px solid #006600;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border: 1px solid #333;
+    }
+
+    .tab {
+      padding: 14px 28px;
+      background: transparent;
+      border: none;
+      border-right: 1px solid #333;
+      font-size: 12px;
+      color: #777;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .tab:last-child {
+      border-right: none;
+    }
+
+    .tab:hover {
+      color: #ffffff;
+      background: #1a1a1a;
+    }
+
+    .tab.active {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .card {
+      background: #111111;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+
+    .card h3 {
+      margin-bottom: 20px;
+      color: #ffffff;
+      font-size: 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 14px 12px;
+      border-bottom: 1px solid #222;
+      font-size: 13px;
+    }
+
+    th {
+      background: #0a0a0a;
+      font-weight: 600;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+    }
+
+    tr:hover {
+      background: #1a1a1a;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #111111;
+      padding: 24px;
+      border: 1px solid #333;
+    }
+
+    .stat-card .label {
+      color: #777;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .stat-card .value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      font-weight: 500;
+      color: #ffffff;
+      margin-top: 8px;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: flex-end;
+    }
+
+    .filter-bar .form-group {
+      margin-bottom: 0;
+      min-width: 140px;
+    }
+
+    .inline-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .inline-form .form-group {
+      flex: 1;
+      min-width: 120px;
+      margin-bottom: 0;
+    }
+
+    .inline-form button {
+      flex-shrink: 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge-blue {
+      background: #1a2a3a;
+      color: #6bb3ff;
+      border: 1px solid #2a4a6a;
+    }
+
+    .badge-green {
+      background: #1a2a1a;
+      color: #6bff6b;
+      border: 1px solid #2a4a2a;
+    }
+
+    .badge-purple {
+      background: #2a1a3a;
+      color: #b36bff;
+      border: 1px solid #4a2a6a;
+    }
+
+    .badge-orange {
+      background: #3a2a1a;
+      color: #ffb36b;
+      border: 1px solid #6a4a2a;
+    }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .actions button {
+      padding: 6px 12px;
+      font-size: 10px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #111111;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      border: 1px solid #333;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-content h3 {
+      margin-bottom: 24px;
+      font-size: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+    }
+
+    .back-link {
+      text-align: center;
+      margin-top: 32px;
+    }
+
+    .back-link a {
+      color: #777;
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: color 0.3s;
+    }
+
+    .back-link a:hover {
+      color: #ffffff;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #555;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+    }
+
+    .pay-type-badge {
+      font-size: 9px;
+      padding: 4px 10px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .pay-type-hourly {
+      background: #1a2a3a;
+      color: #6bb3ff;
+      border: 1px solid #2a4a6a;
+    }
+
+    .pay-type-commission {
+      background: #1a2a1a;
+      color: #6bff6b;
+      border: 1px solid #2a4a2a;
+    }
+
+    .pay-type-both {
+      background: #2a1a3a;
+      color: #b36bff;
+      border: 1px solid #4a2a6a;
+    }
+
+    .patient-detail {
+      background: #0a0a0a;
+      padding: 12px;
+      margin-top: 8px;
+      font-size: 12px;
+      border: 1px solid #222;
+    }
+
+    .patient-detail .patient-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    .patient-detail .patient-row:last-child {
+      border-bottom: none;
+    }
+
+    .tip-cash {
+      background: #3a3a1a;
+      color: #e6c84b;
+      padding: 2px 8px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tip-owed {
+      background: #3a1a1a;
+      color: #ff6b6b;
+      padding: 2px 8px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .earnings-total {
+      background: #1a2a1a;
+      color: #6bff6b;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #2a4a2a;
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .tab {
+        white-space: nowrap;
+        padding: 12px 16px;
+        font-size: 11px;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 10px 8px;
+      }
+
+      .filter-bar {
+        flex-direction: column;
+      }
+
+      .filter-bar .form-group {
+        width: 100%;
+      }
+
+      .inline-form {
+        flex-direction: column;
+      }
+
+      .inline-form .form-group {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen active">
+    <div class="login-box">
+      <h2>Admin Login</h2>
+      <div class="alert error" id="login-error">Invalid admin PIN</div>
+      <div class="form-group">
+        <label for="admin-pin">Admin PIN</label>
+        <input type="password" id="admin-pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Enter 4-digit PIN">
+      </div>
+      <button class="btn-primary" onclick="adminLogin()">Login</button>
+      <div class="back-link">
+        <a href="/">← Back to Employee App</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="admin-screen" class="screen">
+    <div class="header">
+      <h1>LeMed Spa Admin</h1>
+      <button onclick="adminLogout()">Logout</button>
+    </div>
+
+    <div class="container">
+      <div class="tabs">
+        <button class="tab active" onclick="showTab('time-entries')">Time Entries</button>
+        <button class="tab" onclick="showTab('employees')">Employees</button>
+        <button class="tab" onclick="showTab('reports')">Reports</button>
+      </div>
+
+      <!-- Time Entries Tab -->
+      <div id="tab-time-entries" class="tab-content">
+        <div class="card">
+          <h3>Filter Entries</h3>
+          <div class="filter-bar">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input type="date" id="filter-start">
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="filter-end">
+            </div>
+            <button class="btn-primary" onclick="loadTimeEntries()">Filter</button>
+            <button class="btn-secondary" onclick="clearFilters()">Clear</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>All Time Entries</h3>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Employee</th>
+                  <th>Time</th>
+                  <th>Hours</th>
+                  <th>Earnings</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="entries-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employees Tab -->
+      <div id="tab-employees" class="tab-content" style="display: none;">
+        <div class="card">
+          <h3>Add New Employee</h3>
+          <div class="inline-form">
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="new-emp-name" placeholder="Full name">
+            </div>
+            <div class="form-group">
+              <label>PIN (4 digits)</label>
+              <input type="text" id="new-emp-pin" maxlength="4" placeholder="1234">
+            </div>
+            <div class="form-group">
+              <label>Email (for invoices)</label>
+              <input type="email" id="new-emp-email" placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+              <label>Pay Type</label>
+              <select id="new-emp-pay-type">
+                <option value="hourly">Hourly Only</option>
+                <option value="commission">Commission - Services</option>
+                <option value="commission_products">Commission - Products</option>
+                <option value="both">Hourly + All Commissions</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Hourly Wage ($)</label>
+              <input type="number" id="new-emp-hourly" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <button class="btn-success" onclick="addEmployee()">Add</button>
+          </div>
+          <div class="alert error" id="emp-error" style="margin-top: 12px;"></div>
+        </div>
+
+        <div class="card">
+          <h3>All Employees</h3>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>PIN</th>
+                  <th>Email</th>
+                  <th>Pay Type</th>
+                  <th>Hourly Wage</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="employees-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reports Tab -->
+      <div id="tab-reports" class="tab-content" style="display: none;">
+        <div class="card">
+          <h3>Report Period</h3>
+          <div class="filter-bar">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input type="date" id="report-start">
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="report-end">
+            </div>
+            <button class="btn-primary" onclick="loadReport()">Generate</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="report-stats"></div>
+
+        <div class="card">
+          <h3>Earnings by Employee</h3>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Hours</th>
+                  <th>Hourly Pay</th>
+                  <th>Services $</th>
+                  <th>Tips</th>
+                  <th>Tips Owed</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="report-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Employee Modal -->
+  <div id="edit-modal" class="modal">
+    <div class="modal-content">
+      <h3>Edit Employee</h3>
+      <input type="hidden" id="edit-emp-id">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="edit-emp-name">
+      </div>
+      <div class="form-group">
+        <label>PIN (4 digits)</label>
+        <input type="text" id="edit-emp-pin" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label>Email (for invoice CC)</label>
+        <input type="email" id="edit-emp-email" placeholder="email@example.com">
+      </div>
+      <div class="form-group">
+        <label>Pay Type</label>
+        <select id="edit-emp-pay-type">
+          <option value="hourly">Hourly Only</option>
+          <option value="commission">Commission - Services</option>
+          <option value="commission_products">Commission - Products</option>
+          <option value="both">Hourly + All Commissions</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Hourly Wage ($)</label>
+        <input type="number" id="edit-emp-hourly" step="0.01" min="0">
+      </div>
+      <div class="alert error" id="edit-error"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveEmployee()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal">
+    <div class="modal-content">
+      <h3>Confirm Delete</h3>
+      <p id="delete-message" style="margin-bottom: 16px; color: #999;">Are you sure you want to delete this?</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn-danger" id="confirm-delete-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry Details Modal -->
+  <div id="details-modal" class="modal">
+    <div class="modal-content">
+      <h3>Entry Details</h3>
+      <div id="entry-details-content"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let deleteCallback = null;
+    let allEntries = [];
+
+    // Set default dates
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    document.getElementById('filter-start').valueAsDate = thirtyDaysAgo;
+    document.getElementById('filter-end').valueAsDate = today;
+    document.getElementById('report-start').valueAsDate = thirtyDaysAgo;
+    document.getElementById('report-end').valueAsDate = today;
+
+    document.getElementById('admin-pin').addEventListener('keypress', e => {
+      if (e.key === 'Enter') adminLogin();
+    });
+
+    async function adminLogin() {
+      const pin = document.getElementById('admin-pin').value;
+      const errorEl = document.getElementById('login-error');
+
+      try {
+        const response = await fetch('/api/admin/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          sessionStorage.setItem('adminAuth', 'true');
+          showScreen('admin-screen');
+          loadTimeEntries();
+          loadEmployees();
+        } else {
+          errorEl.classList.add('show');
+          document.getElementById('admin-pin').value = '';
+        }
+      } catch (error) {
+        errorEl.textContent = 'Connection error';
+        errorEl.classList.add('show');
+      }
+    }
+
+    function adminLogout() {
+      sessionStorage.removeItem('adminAuth');
+      showScreen('login-screen');
+      document.getElementById('admin-pin').value = '';
+    }
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    function showTab(tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabId).style.display = 'block';
+
+      if (tabId === 'employees') loadEmployees();
+      if (tabId === 'reports') loadReport();
+    }
+
+    async function loadTimeEntries() {
+      const startDate = document.getElementById('filter-start').value;
+      const endDate = document.getElementById('filter-end').value;
+
+      let url = '/api/admin/time-entries';
+      if (startDate && endDate) {
+        url += `?startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        allEntries = await response.json();
+
+        const tbody = document.getElementById('entries-table');
+
+        if (allEntries.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No entries found</td></tr>';
+        } else {
+          tbody.innerHTML = allEntries.map(entry => {
+            const hourlyEarnings = entry.hours * (entry.hourly_wage || 0);
+            let serviceEarnings = 0;
+            let tips = 0;
+
+            if (entry.clients && entry.clients.length > 0) {
+              entry.clients.forEach(c => {
+                serviceEarnings += c.amount_earned || 0;
+                tips += c.tip_amount || 0;
+              });
+            }
+
+            const totalEarnings = hourlyEarnings + serviceEarnings + tips;
+            const hasPatients = entry.clients && entry.clients.length > 0;
+
+            const timeRange = entry.start_time && entry.end_time
+              ? `${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}`
+              : '-';
+
+            return `
+              <tr>
+                <td><strong>${formatDate(entry.date)}</strong></td>
+                <td>${escapeHtml(entry.employee_name)}</td>
+                <td style="font-size: 12px;">${timeRange}${entry.break_minutes > 0 ? `<br><span style="color: #666;">(${entry.break_minutes}min break)</span>` : ''}</td>
+                <td><span class="badge badge-blue">${entry.hours.toFixed(1)}h</span></td>
+                <td>
+                  ${totalEarnings > 0 ? `<span class="earnings-total">$${totalEarnings.toFixed(2)}</span>` : '-'}
+                  ${hasPatients ? `<br><span style="font-size: 10px; color: #666;">${entry.clients.length} patient(s)</span>` : ''}
+                </td>
+                <td class="actions">
+                  ${hasPatients ? `<button class="btn-secondary" onclick="showEntryDetails(${entry.id})">Details</button>` : ''}
+                  <button class="btn-danger" onclick="confirmDeleteEntry(${entry.id})">Delete</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error loading entries:', error);
+      }
+    }
+
+    function showEntryDetails(entryId) {
+      const entry = allEntries.find(e => e.id === entryId);
+      if (!entry) return;
+
+      const hourlyEarnings = entry.hours * (entry.hourly_wage || 0);
+      let serviceEarnings = 0;
+      let tips = 0;
+      let tipsOwed = 0;
+
+      let patientsHtml = '';
+      if (entry.clients && entry.clients.length > 0) {
+        patientsHtml = '<div style="margin-top: 16px;"><strong style="color: #999; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Patients:</strong>';
+        entry.clients.forEach(c => {
+          serviceEarnings += c.amount_earned || 0;
+          tips += c.tip_amount || 0;
+          if (!c.tip_received_cash) tipsOwed += c.tip_amount || 0;
+
+          const tipStatus = c.tip_received_cash
+            ? '<span class="tip-cash">Cash</span>'
+            : '<span class="tip-owed">Owed</span>';
+
+          patientsHtml += `
+            <div class="patient-detail">
+              <div class="patient-row">
+                <span><strong>${escapeHtml(c.client_name)}</strong></span>
+                <span>${escapeHtml(c.procedure_name || 'Service')}</span>
+              </div>
+              <div class="patient-row">
+                <span>Earned: $${(c.amount_earned || 0).toFixed(2)}</span>
+                <span>Tip: $${(c.tip_amount || 0).toFixed(2)} ${tipStatus}</span>
+              </div>
+            </div>
+          `;
+        });
+        patientsHtml += '</div>';
+      }
+
+      const totalEarnings = hourlyEarnings + serviceEarnings + tips;
+
+      const detailsHtml = `
+        <div style="margin-bottom: 16px; color: #ccc; line-height: 1.8;">
+          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">EMPLOYEE:</strong> ${escapeHtml(entry.employee_name)}<br>
+          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">DATE:</strong> ${formatDate(entry.date)}<br>
+          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">TIME:</strong> ${entry.start_time ? formatTime(entry.start_time) : '-'} - ${entry.end_time ? formatTime(entry.end_time) : '-'}<br>
+          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">BREAK:</strong> ${entry.break_minutes || 0} minutes<br>
+          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">HOURS:</strong> ${entry.hours.toFixed(2)}
+        </div>
+        ${patientsHtml}
+        <div style="margin-top: 16px; padding: 16px; background: #1a2a1a; border: 1px solid #2a4a2a;">
+          <strong style="color: #6bff6b; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Earnings Breakdown:</strong><br><br>
+          <span style="color: #ccc;">Hourly Pay: $${hourlyEarnings.toFixed(2)}</span><br>
+          <span style="color: #ccc;">Service Earnings: $${serviceEarnings.toFixed(2)}</span><br>
+          <span style="color: #ccc;">Tips: $${tips.toFixed(2)} ${tipsOwed > 0 ? `<span style="color: #ff6b6b;">(${tipsOwed.toFixed(2)} owed)</span>` : ''}</span><br><br>
+          <strong style="font-size: 18px; font-family: 'Cormorant Garamond', serif;">Total: $${totalEarnings.toFixed(2)}</strong>
+        </div>
+        ${entry.description ? `<div style="margin-top: 12px; color: #999;"><strong style="font-size: 11px; letter-spacing: 0.05em;">NOTES:</strong> ${escapeHtml(entry.description)}</div>` : ''}
+      `;
+
+      document.getElementById('entry-details-content').innerHTML = detailsHtml;
+      document.getElementById('details-modal').classList.add('show');
+    }
+
+    function closeDetailsModal() {
+      document.getElementById('details-modal').classList.remove('show');
+    }
+
+    async function loadEmployees() {
+      try {
+        const response = await fetch('/api/admin/employees');
+        const employees = await response.json();
+
+        const tbody = document.getElementById('employees-table');
+
+        if (employees.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No employees yet</td></tr>';
+        } else {
+          tbody.innerHTML = employees.map(emp => {
+            const payTypeClass = `pay-type-${emp.pay_type || 'hourly'}`;
+            const payTypeLabels = {
+              'hourly': 'Hourly',
+              'commission': 'Comm - Services',
+              'commission_products': 'Comm - Products',
+              'both': 'Hourly + All Comm'
+            };
+            const payTypeLabel = payTypeLabels[emp.pay_type] || 'Hourly';
+
+            return `
+              <tr>
+                <td><strong>${escapeHtml(emp.name)}</strong></td>
+                <td><code style="background: #1a1a1a; padding: 4px 8px; font-size: 12px; color: #888; border: 1px solid #333;">${emp.pin}</code></td>
+                <td style="font-size: 11px; color: #888;">${emp.email || '-'}</td>
+                <td><span class="pay-type-badge ${payTypeClass}">${payTypeLabel}</span></td>
+                <td>${emp.hourly_wage > 0 ? `$${parseFloat(emp.hourly_wage).toFixed(2)}/hr` : '-'}</td>
+                <td class="actions">
+                  <button class="btn-warning" onclick="editEmployee(${emp.id}, '${escapeHtml(emp.name)}', '${emp.pin}', '${escapeHtml(emp.email || '')}', '${emp.pay_type || 'hourly'}', ${emp.hourly_wage || 0})">Edit</button>
+                  <button class="btn-danger" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')">Delete</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error loading employees:', error);
+      }
+    }
+
+    async function addEmployee() {
+      const name = document.getElementById('new-emp-name').value.trim();
+      const pin = document.getElementById('new-emp-pin').value.trim();
+      const email = document.getElementById('new-emp-email').value.trim();
+      const payType = document.getElementById('new-emp-pay-type').value;
+      const hourlyWage = parseFloat(document.getElementById('new-emp-hourly').value) || 0;
+      const errorEl = document.getElementById('emp-error');
+
+      errorEl.classList.remove('show');
+
+      if (!name || !pin) {
+        errorEl.textContent = 'Please enter name and PIN';
+        errorEl.classList.add('show');
+        return;
+      }
+
+      if (!/^\d{4}$/.test(pin)) {
+        errorEl.textContent = 'PIN must be exactly 4 digits';
+        errorEl.classList.add('show');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/admin/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, pin, email, payType, hourlyWage })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('new-emp-name').value = '';
+          document.getElementById('new-emp-pin').value = '';
+          document.getElementById('new-emp-email').value = '';
+          document.getElementById('new-emp-pay-type').value = 'hourly';
+          document.getElementById('new-emp-hourly').value = '';
+          loadEmployees();
+        } else {
+          errorEl.textContent = data.message || 'Error adding employee';
+          errorEl.classList.add('show');
+        }
+      } catch (error) {
+        errorEl.textContent = 'Connection error';
+        errorEl.classList.add('show');
+      }
+    }
+
+    function editEmployee(id, name, pin, email, payType, hourlyWage) {
+      document.getElementById('edit-emp-id').value = id;
+      document.getElementById('edit-emp-name').value = name;
+      document.getElementById('edit-emp-pin').value = pin;
+      document.getElementById('edit-emp-email').value = email || '';
+      document.getElementById('edit-emp-pay-type').value = payType || 'hourly';
+      document.getElementById('edit-emp-hourly').value = hourlyWage || '';
+      document.getElementById('edit-error').classList.remove('show');
+      document.getElementById('edit-modal').classList.add('show');
+    }
+
+    async function saveEmployee() {
+      const id = document.getElementById('edit-emp-id').value;
+      const name = document.getElementById('edit-emp-name').value.trim();
+      const pin = document.getElementById('edit-emp-pin').value.trim();
+      const email = document.getElementById('edit-emp-email').value.trim();
+      const payType = document.getElementById('edit-emp-pay-type').value;
+      const hourlyWage = parseFloat(document.getElementById('edit-emp-hourly').value) || 0;
+      const errorEl = document.getElementById('edit-error');
+
+      errorEl.classList.remove('show');
+
+      if (!name || !pin) {
+        errorEl.textContent = 'Please enter name and PIN';
+        errorEl.classList.add('show');
+        return;
+      }
+
+      if (!/^\d{4}$/.test(pin)) {
+        errorEl.textContent = 'PIN must be exactly 4 digits';
+        errorEl.classList.add('show');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/employees/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, pin, email, payType, hourlyWage })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          closeEditModal();
+          loadEmployees();
+        } else {
+          errorEl.textContent = data.message || 'Error updating employee';
+          errorEl.classList.add('show');
+        }
+      } catch (error) {
+        errorEl.textContent = 'Connection error';
+        errorEl.classList.add('show');
+      }
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.remove('show');
+    }
+
+    function confirmDeleteEntry(id) {
+      document.getElementById('delete-message').textContent = 'Are you sure you want to delete this time entry?';
+      deleteCallback = () => deleteEntry(id);
+      document.getElementById('delete-modal').classList.add('show');
+    }
+
+    function confirmDeleteEmployee(id, name) {
+      document.getElementById('delete-message').textContent = `Are you sure you want to delete "${name}"? This will also delete all their time entries.`;
+      deleteCallback = () => deleteEmployee(id);
+      document.getElementById('delete-modal').classList.add('show');
+    }
+
+    async function deleteEntry(id) {
+      try {
+        await fetch(`/api/admin/time-entries/${id}`, { method: 'DELETE' });
+        loadTimeEntries();
+        closeDeleteModal();
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+      }
+    }
+
+    async function deleteEmployee(id) {
+      try {
+        await fetch(`/api/admin/employees/${id}`, { method: 'DELETE' });
+        loadEmployees();
+        closeDeleteModal();
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+      }
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').classList.remove('show');
+      deleteCallback = null;
+    }
+
+    document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+      if (deleteCallback) deleteCallback();
+    });
+
+    async function loadReport() {
+      const startDate = document.getElementById('report-start').value;
+      const endDate = document.getElementById('report-end').value;
+
+      try {
+        let url = '/api/admin/time-entries';
+        if (startDate && endDate) {
+          url += `?startDate=${startDate}&endDate=${endDate}`;
+        }
+
+        const response = await fetch(url);
+        const entries = await response.json();
+
+        // Calculate totals
+        let totalHours = 0;
+        let totalHourlyPay = 0;
+        let totalServices = 0;
+        let totalTips = 0;
+        let totalTipsOwed = 0;
+
+        // Group by employee
+        const byEmployee = {};
+
+        entries.forEach(e => {
+          const empName = e.employee_name;
+          if (!byEmployee[empName]) {
+            byEmployee[empName] = {
+              hours: 0,
+              hourlyPay: 0,
+              services: 0,
+              tips: 0,
+              tipsOwed: 0,
+              hourlyWage: e.hourly_wage || 0
+            };
+          }
+
+          byEmployee[empName].hours += e.hours;
+          const hourlyEarnings = e.hours * (e.hourly_wage || 0);
+          byEmployee[empName].hourlyPay += hourlyEarnings;
+          totalHourlyPay += hourlyEarnings;
+          totalHours += e.hours;
+
+          if (e.clients) {
+            e.clients.forEach(c => {
+              byEmployee[empName].services += c.amount_earned || 0;
+              byEmployee[empName].tips += c.tip_amount || 0;
+              totalServices += c.amount_earned || 0;
+              totalTips += c.tip_amount || 0;
+              if (!c.tip_received_cash) {
+                byEmployee[empName].tipsOwed += c.tip_amount || 0;
+                totalTipsOwed += c.tip_amount || 0;
+              }
+            });
+          }
+        });
+
+        const grandTotal = totalHourlyPay + totalServices + totalTips;
+
+        // Render stats
+        document.getElementById('report-stats').innerHTML = `
+          <div class="stat-card">
+            <div class="label">Total Hours</div>
+            <div class="value">${totalHours.toFixed(1)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Hourly Pay</div>
+            <div class="value">$${totalHourlyPay.toFixed(0)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Services</div>
+            <div class="value">$${totalServices.toFixed(0)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Tips</div>
+            <div class="value">$${totalTips.toFixed(0)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Tips Owed</div>
+            <div class="value" style="color: ${totalTipsOwed > 0 ? '#ff6b6b' : '#ffffff'};">$${totalTipsOwed.toFixed(0)}</div>
+          </div>
+          <div class="stat-card" style="background: #1a2a1a; border-color: #2a4a2a;">
+            <div class="label" style="color: #6bff6b;">Grand Total</div>
+            <div class="value" style="color: #6bff6b;">$${grandTotal.toFixed(0)}</div>
+          </div>
+        `;
+
+        // Render table
+        const tbody = document.getElementById('report-table');
+        const employeeList = Object.entries(byEmployee).sort((a, b) =>
+          (b[1].hourlyPay + b[1].services + b[1].tips) - (a[1].hourlyPay + a[1].services + a[1].tips)
+        );
+
+        if (employeeList.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No data for this period</td></tr>';
+        } else {
+          tbody.innerHTML = employeeList.map(([name, data]) => {
+            const total = data.hourlyPay + data.services + data.tips;
+            return `
+              <tr>
+                <td><strong>${escapeHtml(name)}</strong></td>
+                <td>${data.hours.toFixed(1)}h</td>
+                <td>$${data.hourlyPay.toFixed(2)}</td>
+                <td>$${data.services.toFixed(2)}</td>
+                <td>$${data.tips.toFixed(2)}</td>
+                <td style="color: ${data.tipsOwed > 0 ? '#ff6b6b' : '#666'};">$${data.tipsOwed.toFixed(2)}</td>
+                <td><span class="earnings-total">$${total.toFixed(2)}</span></td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error loading report:', error);
+      }
+    }
+
+    function clearFilters() {
+      document.getElementById('filter-start').valueAsDate = thirtyDaysAgo;
+      document.getElementById('filter-end').valueAsDate = today;
+      loadTimeEntries();
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatTime(timeStr) {
+      if (!timeStr) return '';
+      const [hours, minutes] = timeStr.split(':');
+      const h = parseInt(hours);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${minutes} ${ampm}`;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Check if already logged in
+    if (sessionStorage.getItem('adminAuth')) {
+      showScreen('admin-screen');
+      loadTimeEntries();
+      loadEmployees();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>LeMed Spa - Time Tracker</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: #0a0a0a;
+      color: #ffffff;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .header {
+      background: #000000;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .header button {
+      background: transparent;
+      color: white;
+      border: 1px solid #444;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: all 0.3s;
+    }
+
+    .header button:hover {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .login-box {
+      max-width: 380px;
+      margin: 60px auto;
+      background: #111111;
+      padding: 40px 32px;
+      border: 1px solid #333;
+    }
+
+    .login-box h2 {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 28px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .login-subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 32px;
+      letter-spacing: 0.1em;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #888;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid #333;
+      background: #0a0a0a;
+      color: #ffffff;
+      font-size: 16px;
+      font-family: 'Montserrat', sans-serif;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #ffffff;
+    }
+
+    input::placeholder {
+      color: #444;
+    }
+
+    button {
+      padding: 14px 28px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: 'Montserrat', sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #000000;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-primary:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+    }
+
+    .btn-secondary:hover {
+      background: #333;
+    }
+
+    .btn-danger {
+      background: #8b0000;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #a00000;
+    }
+
+    .btn-success {
+      background: #1a472a;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #1e5631;
+    }
+
+    .btn-small {
+      padding: 8px 16px;
+      font-size: 10px;
+    }
+
+    .alert {
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-weight: 500;
+      font-size: 13px;
+      display: none;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert.error {
+      background: #2a1010;
+      color: #ff6b6b;
+      border: 1px solid #8b0000;
+    }
+
+    .alert.success {
+      background: #102a10;
+      color: #6bff6b;
+      border: 1px solid #006600;
+    }
+
+    .card {
+      background: #111111;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+
+    .card h3 {
+      margin-bottom: 20px;
+      color: #ffffff;
+      font-size: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Date Picker Styles */
+    .date-picker-container {
+      background: #111;
+      border: 1px solid #333;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .date-display {
+      text-align: center;
+      padding: 16px;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      margin-bottom: 16px;
+    }
+
+    .date-display .day-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px;
+      color: #888;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .date-display .full-date {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+
+    .date-scroll-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .date-scroll-btn {
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 20px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .date-scroll-btn:hover {
+      background: #333;
+    }
+
+    .date-scroll-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .date-wheel {
+      flex: 1;
+      height: 120px;
+      overflow: hidden;
+      position: relative;
+      background: #0a0a0a;
+      border: 1px solid #333;
+    }
+
+    .date-wheel-inner {
+      position: absolute;
+      width: 100%;
+      transition: transform 0.3s ease;
+    }
+
+    .date-wheel-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #555;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .date-wheel-item.selected {
+      color: #fff;
+      font-weight: 600;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    }
+
+    .date-wheel-item.future {
+      color: #333;
+      cursor: not-allowed;
+    }
+
+    .date-wheel::before,
+    .date-wheel::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 40px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .date-wheel::before {
+      top: 0;
+      background: linear-gradient(to bottom, #0a0a0a, transparent);
+    }
+
+    .date-wheel::after {
+      bottom: 0;
+      background: linear-gradient(to top, #0a0a0a, transparent);
+    }
+
+    /* Time inputs */
+    .time-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .time-row.three-col {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .calculated-hours {
+      background: #1a2a1a;
+      border: 1px solid #2a4a2a;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .calculated-hours .label {
+      font-size: 10px;
+      color: #6bff6b;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .calculated-hours .value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      color: #fff;
+    }
+
+    /* Patient entries */
+    .patient-entries {
+      margin-top: 24px;
+      border-top: 1px solid #333;
+      padding-top: 24px;
+    }
+
+    .patient-entry {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .patient-entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .patient-entry-title {
+      font-size: 12px;
+      color: #888;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .remove-patient {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 18px;
+    }
+
+    .remove-patient:hover {
+      color: #ff6b6b;
+    }
+
+    .patient-entry .form-group {
+      margin-bottom: 12px;
+    }
+
+    .patient-entry .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      background: #111;
+      border: 1px solid #333;
+      cursor: pointer;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #fff;
+    }
+
+    .checkbox-group span {
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* Product sales section */
+    .product-sales {
+      margin-top: 24px;
+      border-top: 1px solid #333;
+      padding-top: 24px;
+    }
+
+    .product-entry {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    /* Pay Period Summary */
+    .pay-period-card {
+      background: #111;
+      border: 1px solid #333;
+      margin-bottom: 20px;
+    }
+
+    .pay-period-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #333;
+    }
+
+    .pay-period-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pay-period-nav button {
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+    }
+
+    .pay-period-nav button:hover {
+      background: #333;
+    }
+
+    .pay-period-nav button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .pay-period-dates {
+      font-size: 13px;
+      color: #888;
+      letter-spacing: 0.05em;
+    }
+
+    .pay-period-label {
+      font-size: 10px;
+      color: #666;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .pay-period-body {
+      padding: 20px;
+    }
+
+    .pay-period-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .pay-stat {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .pay-stat .label {
+      font-size: 9px;
+      color: #666;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .pay-stat .value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px;
+      color: #fff;
+    }
+
+    .pay-stat.total {
+      grid-column: span 2;
+      background: #1a2a1a;
+      border-color: #2a4a2a;
+    }
+
+    .pay-stat.total .value {
+      color: #6bff6b;
+      font-size: 32px;
+    }
+
+    .invoice-status {
+      text-align: center;
+      padding: 12px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+
+    .invoice-status.submitted {
+      background: #1a2a1a;
+      color: #6bff6b;
+      border: 1px solid #2a4a2a;
+    }
+
+    .invoice-status.pending {
+      background: #2a2a1a;
+      color: #ffcc6b;
+      border: 1px solid #4a4a2a;
+    }
+
+    /* Conflict Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #111111;
+      padding: 32px;
+      max-width: 420px;
+      width: 100%;
+      border: 1px solid #333;
+    }
+
+    .modal-content h3 {
+      margin-bottom: 16px;
+      font-size: 20px;
+      color: #ff6b6b;
+    }
+
+    .modal-content p {
+      color: #999;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+    }
+
+    /* Invoice Preview Modal */
+    .invoice-preview {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+
+    .invoice-table th,
+    .invoice-table td {
+      padding: 10px 8px;
+      text-align: left;
+      border-bottom: 1px solid #333;
+    }
+
+    .invoice-table th {
+      background: #0a0a0a;
+      color: #888;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .invoice-table td {
+      color: #ccc;
+    }
+
+    .invoice-table tfoot td {
+      font-weight: 600;
+      border-top: 2px solid #333;
+    }
+
+    /* PIN Change Modal */
+    .pin-change-form .form-group {
+      margin-bottom: 16px;
+    }
+
+    /* Recent entries */
+    .entries-list {
+      margin-top: 24px;
+    }
+
+    .entry-item {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .entry-date {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .entry-details {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .entry-earnings {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #6bff6b;
+    }
+
+    /* Footer */
+    .admin-link {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid #222;
+    }
+
+    .admin-link a {
+      color: #555;
+      text-decoration: none;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .admin-link a:hover {
+      color: #888;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .container {
+        padding: 16px;
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .time-row {
+        grid-template-columns: 1fr;
+      }
+
+      .time-row.three-col {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .pay-period-stats {
+        grid-template-columns: 1fr;
+      }
+
+      .pay-stat.total {
+        grid-column: span 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen active">
+    <div class="login-box">
+      <h2>LeMed Spa</h2>
+      <p class="login-subtitle">Time Tracker</p>
+      <div class="alert error" id="login-error">Invalid PIN</div>
+      <div class="form-group">
+        <label for="pin-input">Enter Your PIN</label>
+        <input type="password" id="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="4-digit PIN">
+      </div>
+      <button class="btn-primary" onclick="login()">Clock In</button>
+      <div class="admin-link">
+        <a href="/admin">Admin Access</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App Screen -->
+  <div id="main-screen" class="screen">
+    <div class="header">
+      <h1 id="employee-name">Employee</h1>
+      <div class="header-actions">
+        <button onclick="showPinChangeModal()">Change PIN</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Pay Period Summary -->
+      <div class="pay-period-card" id="pay-period-card">
+        <div class="pay-period-header">
+          <div class="pay-period-nav">
+            <button onclick="changePeriod(-1)" id="prev-period-btn">&larr;</button>
+            <div>
+              <div class="pay-period-label">Pay Period</div>
+              <div class="pay-period-dates" id="period-dates">Loading...</div>
+            </div>
+            <button onclick="changePeriod(1)" id="next-period-btn">&rarr;</button>
+          </div>
+        </div>
+        <div class="pay-period-body">
+          <div class="pay-period-stats">
+            <div class="pay-stat">
+              <div class="label">Hours Worked</div>
+              <div class="value" id="period-hours">0.0</div>
+            </div>
+            <div class="pay-stat">
+              <div class="label">Wages</div>
+              <div class="value" id="period-wages">$0</div>
+            </div>
+            <div class="pay-stat">
+              <div class="label">Commissions</div>
+              <div class="value" id="period-commissions">$0</div>
+            </div>
+            <div class="pay-stat">
+              <div class="label">Tips</div>
+              <div class="value" id="period-tips">$0</div>
+            </div>
+            <div class="pay-stat total">
+              <div class="label">Total Payable</div>
+              <div class="value" id="period-total">$0</div>
+            </div>
+          </div>
+          <div id="invoice-status"></div>
+          <button class="btn-primary" id="submit-invoice-btn" onclick="showInvoicePreview()" style="margin-top: 12px;">Submit for Payment</button>
+        </div>
+      </div>
+
+      <!-- Time Entry Form -->
+      <div class="card" id="time-entry-card">
+        <h3>Log Time</h3>
+
+        <!-- Date Picker -->
+        <div class="date-picker-container">
+          <div class="date-display">
+            <div class="day-name" id="selected-day-name">Friday</div>
+            <div class="full-date" id="selected-full-date">February 6th, 2026</div>
+          </div>
+          <div class="date-scroll-container">
+            <button class="date-scroll-btn" onclick="scrollDate(-1)">&uarr;</button>
+            <div class="date-wheel" id="date-wheel">
+              <div class="date-wheel-inner" id="date-wheel-inner"></div>
+            </div>
+            <button class="date-scroll-btn" onclick="scrollDate(1)" id="date-scroll-down">&darr;</button>
+          </div>
+        </div>
+
+        <!-- Time Inputs -->
+        <div class="time-row">
+          <div class="form-group">
+            <label>Start Time</label>
+            <input type="time" id="start-time" onchange="calculateHours()">
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input type="time" id="end-time" onchange="calculateHours()">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Break Time (minutes)</label>
+          <input type="number" id="break-minutes" value="0" min="0" step="5" onchange="calculateHours()">
+        </div>
+
+        <div class="calculated-hours">
+          <div class="label">Hours Worked</div>
+          <div class="value" id="calculated-hours">0.00</div>
+        </div>
+
+        <!-- Patient Entries (for commission workers) -->
+        <div class="patient-entries" id="patient-section" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">Patients</h3>
+            <button class="btn-secondary btn-small" onclick="addPatientEntry()">+ Add Patient</button>
+          </div>
+          <div id="patient-entries-container"></div>
+        </div>
+
+        <!-- Product Sales (for product commission workers) -->
+        <div class="product-sales" id="product-section" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">Product Sales</h3>
+            <button class="btn-secondary btn-small" onclick="addProductEntry()">+ Add Sale</button>
+          </div>
+          <div id="product-entries-container"></div>
+        </div>
+
+        <div class="alert error" id="entry-error"></div>
+        <div class="alert success" id="entry-success"></div>
+
+        <button class="btn-primary" onclick="submitEntry()" id="submit-entry-btn">Save Entry</button>
+      </div>
+
+      <!-- Recent Entries -->
+      <div class="card">
+        <h3>Recent Entries</h3>
+        <div class="entries-list" id="entries-list">
+          <p style="color: #666; text-align: center; padding: 20px;">No entries yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conflict Modal -->
+  <div id="conflict-modal" class="modal">
+    <div class="modal-content">
+      <h3>Entry Conflict</h3>
+      <p id="conflict-message">An entry already exists for this date. Do you want to delete the existing entry and replace it with this new one?</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeConflictModal()">Cancel</button>
+        <button class="btn-danger" onclick="overrideEntry()">Delete & Override</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice Preview Modal -->
+  <div id="invoice-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <h3 style="color: #fff;">Submit Invoice</h3>
+      <div class="invoice-preview" id="invoice-preview"></div>
+      <p style="font-size: 12px; color: #888; margin: 16px 0;">This will send an invoice to lea@lemedspa.com and ops@lemedspa.com</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeInvoiceModal()">Cancel</button>
+        <button class="btn-success" onclick="submitInvoice()">Confirm & Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN Change Modal -->
+  <div id="pin-modal" class="modal">
+    <div class="modal-content">
+      <h3 style="color: #fff;">Change PIN</h3>
+      <div class="pin-change-form">
+        <div class="form-group">
+          <label>Current PIN</label>
+          <input type="password" id="current-pin" maxlength="4" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label>New PIN</label>
+          <input type="password" id="new-pin" maxlength="4" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label>Confirm New PIN</label>
+          <input type="password" id="confirm-pin" maxlength="4" inputmode="numeric">
+        </div>
+        <div class="alert error" id="pin-error"></div>
+        <div class="alert success" id="pin-success"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closePinModal()">Cancel</button>
+        <button class="btn-primary" onclick="changePin()">Change PIN</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentEmployee = null;
+    let currentPin = '';
+    let selectedDate = new Date();
+    let periodOffset = 0;
+    let currentPayPeriod = null;
+    let conflictEntryId = null;
+    let pendingEntry = null;
+    let patientCount = 0;
+    let productCount = 0;
+
+    // Initialize
+    document.getElementById('pin-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter') login();
+    });
+
+    // Check for saved session
+    const savedEmployee = sessionStorage.getItem('employee');
+    const savedPin = sessionStorage.getItem('pin');
+    if (savedEmployee) {
+      currentEmployee = JSON.parse(savedEmployee);
+      currentPin = savedPin;
+      showMainScreen();
+    }
+
+    // Login
+    async function login() {
+      const pin = document.getElementById('pin-input').value;
+      const errorEl = document.getElementById('login-error');
+      errorEl.classList.remove('show');
+
+      try {
+        const response = await fetch('/api/verify-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          currentEmployee = data.employee;
+          currentPin = pin;
+          sessionStorage.setItem('employee', JSON.stringify(currentEmployee));
+          sessionStorage.setItem('pin', pin);
+          showMainScreen();
+        } else {
+          errorEl.classList.add('show');
+          document.getElementById('pin-input').value = '';
+        }
+      } catch (error) {
+        errorEl.textContent = 'Connection error';
+        errorEl.classList.add('show');
+      }
+    }
+
+    function logout() {
+      currentEmployee = null;
+      currentPin = '';
+      sessionStorage.removeItem('employee');
+      sessionStorage.removeItem('pin');
+      document.getElementById('pin-input').value = '';
+      document.getElementById('login-screen').classList.add('active');
+      document.getElementById('main-screen').classList.remove('active');
+    }
+
+    function showMainScreen() {
+      document.getElementById('login-screen').classList.remove('active');
+      document.getElementById('main-screen').classList.add('active');
+      document.getElementById('employee-name').textContent = currentEmployee.name;
+
+      // Show/hide sections based on pay type
+      const payType = currentEmployee.pay_type;
+      const showPatients = payType === 'commission' || payType === 'both';
+      const showProducts = payType === 'commission_products' || payType === 'both';
+
+      document.getElementById('patient-section').style.display = showPatients ? 'block' : 'none';
+      document.getElementById('product-section').style.display = showProducts ? 'block' : 'none';
+
+      initializeDatePicker();
+      loadPayPeriod();
+      loadEntries();
+    }
+
+    // Date Picker
+    function initializeDatePicker() {
+      selectedDate = new Date();
+      updateDateDisplay();
+      buildDateWheel();
+    }
+
+    function updateDateDisplay() {
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+      const dayName = days[selectedDate.getDay()];
+      const month = months[selectedDate.getMonth()];
+      const date = selectedDate.getDate();
+      const year = selectedDate.getFullYear();
+
+      const suffix = getOrdinalSuffix(date);
+
+      document.getElementById('selected-day-name').textContent = dayName;
+      document.getElementById('selected-full-date').textContent = `${month} ${date}${suffix}, ${year}`;
+    }
+
+    function getOrdinalSuffix(n) {
+      const s = ['th', 'st', 'nd', 'rd'];
+      const v = n % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
+    }
+
+    function buildDateWheel() {
+      const container = document.getElementById('date-wheel-inner');
+      container.innerHTML = '';
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Show 30 days back and forward
+      for (let i = -30; i <= 30; i++) {
+        const date = new Date(selectedDate);
+        date.setDate(selectedDate.getDate() + i);
+
+        const item = document.createElement('div');
+        item.className = 'date-wheel-item';
+
+        if (date > today) {
+          item.classList.add('future');
+        }
+
+        if (i === 0) {
+          item.classList.add('selected');
+        }
+
+        const dayAbbr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+        item.textContent = `${dayAbbr} ${date.getMonth() + 1}/${date.getDate()}`;
+        item.dataset.offset = i;
+
+        item.onclick = () => {
+          if (date <= today) {
+            selectDateByOffset(i);
+          }
+        };
+
+        container.appendChild(item);
+      }
+
+      // Position to show selected in middle
+      container.style.transform = `translateY(${-30 * 40 + 40}px)`;
+
+      updateScrollButtons();
+    }
+
+    function scrollDate(direction) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const newDate = new Date(selectedDate);
+      newDate.setDate(newDate.getDate() + direction);
+
+      if (newDate <= today) {
+        selectedDate = newDate;
+        updateDateDisplay();
+        buildDateWheel();
+      }
+    }
+
+    function selectDateByOffset(offset) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const newDate = new Date(selectedDate);
+      newDate.setDate(newDate.getDate() + offset);
+
+      if (newDate <= today) {
+        selectedDate = newDate;
+        updateDateDisplay();
+        buildDateWheel();
+      }
+    }
+
+    function updateScrollButtons() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const downBtn = document.getElementById('date-scroll-down');
+      const nextDay = new Date(selectedDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      downBtn.disabled = nextDay > today;
+    }
+
+    // Time Calculation
+    function calculateHours() {
+      const startTime = document.getElementById('start-time').value;
+      const endTime = document.getElementById('end-time').value;
+      const breakMinutes = parseInt(document.getElementById('break-minutes').value) || 0;
+
+      if (startTime && endTime) {
+        const start = new Date(`2000-01-01T${startTime}`);
+        let end = new Date(`2000-01-01T${endTime}`);
+
+        if (end < start) {
+          end.setDate(end.getDate() + 1);
+        }
+
+        const diffMs = end - start;
+        const diffHours = (diffMs / (1000 * 60 * 60)) - (breakMinutes / 60);
+        const hours = Math.max(0, diffHours);
+
+        document.getElementById('calculated-hours').textContent = hours.toFixed(2);
+        return hours;
+      }
+
+      document.getElementById('calculated-hours').textContent = '0.00';
+      return 0;
+    }
+
+    // Patient Entries
+    function addPatientEntry() {
+      patientCount++;
+      const container = document.getElementById('patient-entries-container');
+
+      const entry = document.createElement('div');
+      entry.className = 'patient-entry';
+      entry.id = `patient-${patientCount}`;
+      entry.innerHTML = `
+        <div class="patient-entry-header">
+          <span class="patient-entry-title">Patient #${patientCount}</span>
+          <button class="remove-patient" onclick="removePatientEntry(${patientCount})">&times;</button>
+        </div>
+        <div class="form-group">
+          <label>Patient Name</label>
+          <input type="text" class="patient-name" placeholder="Enter patient name">
+        </div>
+        <div class="form-group">
+          <label>Services</label>
+          <input type="text" class="patient-services" placeholder="Services performed">
+        </div>
+        <div class="time-row">
+          <div class="form-group">
+            <label>Earnings ($)</label>
+            <input type="number" class="patient-earnings" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Tip ($)</label>
+            <input type="number" class="patient-tip" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" class="patient-notes" placeholder="Optional notes">
+        </div>
+        <label class="checkbox-group">
+          <input type="checkbox" class="tip-cash">
+          <span>Tip received in cash (already paid out)</span>
+        </label>
+      `;
+
+      container.appendChild(entry);
+    }
+
+    function removePatientEntry(id) {
+      const entry = document.getElementById(`patient-${id}`);
+      if (entry) entry.remove();
+    }
+
+    // Product Sales
+    function addProductEntry() {
+      productCount++;
+      const container = document.getElementById('product-entries-container');
+
+      const entry = document.createElement('div');
+      entry.className = 'product-entry';
+      entry.id = `product-${productCount}`;
+      entry.innerHTML = `
+        <div class="patient-entry-header">
+          <span class="patient-entry-title">Sale #${productCount}</span>
+          <button class="remove-patient" onclick="removeProductEntry(${productCount})">&times;</button>
+        </div>
+        <div class="form-group">
+          <label>Product Name</label>
+          <input type="text" class="product-name" placeholder="Product sold">
+        </div>
+        <div class="time-row">
+          <div class="form-group">
+            <label>Sale Amount ($)</label>
+            <input type="number" class="product-amount" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Commission ($)</label>
+            <input type="number" class="product-commission" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" class="product-notes" placeholder="Optional notes">
+        </div>
+      `;
+
+      container.appendChild(entry);
+    }
+
+    function removeProductEntry(id) {
+      const entry = document.getElementById(`product-${id}`);
+      if (entry) entry.remove();
+    }
+
+    // Check for conflicts
+    async function checkConflict() {
+      const dateStr = formatDate(selectedDate);
+
+      try {
+        const response = await fetch('/api/check-conflict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: currentEmployee.id,
+            date: dateStr
+          })
+        });
+
+        return await response.json();
+      } catch (error) {
+        console.error('Error checking conflict:', error);
+        return { hasConflict: false };
+      }
+    }
+
+    // Submit Entry
+    async function submitEntry() {
+      const hours = calculateHours();
+
+      if (hours <= 0) {
+        showError('entry-error', 'Please enter valid start and end times');
+        return;
+      }
+
+      // Check for conflict
+      const conflict = await checkConflict();
+
+      if (conflict.hasConflict) {
+        conflictEntryId = conflict.existingEntry.id;
+        pendingEntry = gatherEntryData(hours);
+
+        const existingHours = conflict.existingEntry.hours;
+        const existingTime = conflict.existingEntry.start_time && conflict.existingEntry.end_time
+          ? `${formatTime12(conflict.existingEntry.start_time)} - ${formatTime12(conflict.existingEntry.end_time)}`
+          : `${existingHours} hours`;
+
+        document.getElementById('conflict-message').innerHTML = `
+          <strong>An entry already exists for ${formatDateDisplay(selectedDate)}:</strong><br><br>
+          Existing entry: ${existingTime} (${existingHours.toFixed(2)} hours)<br><br>
+          Do you want to <strong>delete the existing entry</strong> and replace it with your new entry?
+        `;
+
+        document.getElementById('conflict-modal').classList.add('show');
+        return;
+      }
+
+      // No conflict, submit directly
+      await saveEntry(gatherEntryData(hours));
+    }
+
+    function gatherEntryData(hours) {
+      const clients = [];
+      document.querySelectorAll('.patient-entry').forEach(entry => {
+        const name = entry.querySelector('.patient-name').value.trim();
+        if (name) {
+          clients.push({
+            clientName: name,
+            procedure: entry.querySelector('.patient-services').value.trim(),
+            notes: entry.querySelector('.patient-notes').value.trim(),
+            amountEarned: parseFloat(entry.querySelector('.patient-earnings').value) || 0,
+            tipAmount: parseFloat(entry.querySelector('.patient-tip').value) || 0,
+            tipReceivedCash: entry.querySelector('.tip-cash').checked
+          });
+        }
+      });
+
+      const productSales = [];
+      document.querySelectorAll('.product-entry').forEach(entry => {
+        const name = entry.querySelector('.product-name').value.trim();
+        if (name) {
+          productSales.push({
+            productName: name,
+            saleAmount: parseFloat(entry.querySelector('.product-amount').value) || 0,
+            commissionAmount: parseFloat(entry.querySelector('.product-commission').value) || 0,
+            notes: entry.querySelector('.product-notes').value.trim()
+          });
+        }
+      });
+
+      return {
+        employeeId: currentEmployee.id,
+        date: formatDate(selectedDate),
+        startTime: document.getElementById('start-time').value,
+        endTime: document.getElementById('end-time').value,
+        breakMinutes: parseInt(document.getElementById('break-minutes').value) || 0,
+        hours,
+        clients,
+        productSales
+      };
+    }
+
+    async function overrideEntry() {
+      closeConflictModal();
+
+      // Delete existing entry
+      try {
+        await fetch(`/api/time-entry/${conflictEntryId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employeeId: currentEmployee.id })
+        });
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+      }
+
+      // Save new entry
+      await saveEntry(pendingEntry);
+
+      conflictEntryId = null;
+      pendingEntry = null;
+    }
+
+    async function saveEntry(entryData) {
+      try {
+        const response = await fetch('/api/time-entry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entryData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          showSuccess('entry-success', 'Entry saved successfully!');
+          clearForm();
+          loadPayPeriod();
+          loadEntries();
+        } else {
+          showError('entry-error', data.message || 'Failed to save entry');
+        }
+      } catch (error) {
+        showError('entry-error', 'Connection error');
+      }
+    }
+
+    function closeConflictModal() {
+      document.getElementById('conflict-modal').classList.remove('show');
+    }
+
+    function clearForm() {
+      document.getElementById('start-time').value = '';
+      document.getElementById('end-time').value = '';
+      document.getElementById('break-minutes').value = '0';
+      document.getElementById('calculated-hours').textContent = '0.00';
+      document.getElementById('patient-entries-container').innerHTML = '';
+      document.getElementById('product-entries-container').innerHTML = '';
+      patientCount = 0;
+      productCount = 0;
+    }
+
+    // Pay Period
+    async function loadPayPeriod() {
+      try {
+        const response = await fetch(`/api/pay-period/${currentEmployee.id}?offset=${periodOffset}`);
+        currentPayPeriod = await response.json();
+
+        updatePayPeriodDisplay();
+      } catch (error) {
+        console.error('Error loading pay period:', error);
+      }
+    }
+
+    function updatePayPeriodDisplay() {
+      if (!currentPayPeriod) return;
+
+      const startDate = new Date(currentPayPeriod.periodStart + 'T00:00:00');
+      const endDate = new Date(currentPayPeriod.periodEnd + 'T00:00:00');
+
+      const formatPeriodDate = (d) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${months[d.getMonth()]} ${d.getDate()}`;
+      };
+
+      document.getElementById('period-dates').textContent =
+        `${formatPeriodDate(startDate)} - ${formatPeriodDate(endDate)}, ${endDate.getFullYear()}`;
+
+      document.getElementById('period-hours').textContent = currentPayPeriod.totalHours.toFixed(1);
+      document.getElementById('period-wages').textContent = `$${currentPayPeriod.totalWages.toFixed(0)}`;
+      document.getElementById('period-commissions').textContent = `$${(currentPayPeriod.totalCommissions + currentPayPeriod.totalProductCommissions).toFixed(0)}`;
+      document.getElementById('period-tips').textContent = `$${currentPayPeriod.totalTips.toFixed(0)}`;
+      document.getElementById('period-total').textContent = `$${currentPayPeriod.totalPayable.toFixed(2)}`;
+
+      // Invoice status
+      const statusEl = document.getElementById('invoice-status');
+      const submitBtn = document.getElementById('submit-invoice-btn');
+
+      if (currentPayPeriod.invoiceSubmitted) {
+        statusEl.className = 'invoice-status submitted';
+        statusEl.textContent = `Invoice submitted on ${new Date(currentPayPeriod.invoiceDate).toLocaleDateString()}`;
+        submitBtn.style.display = 'none';
+      } else if (periodOffset > 0) {
+        statusEl.className = 'invoice-status';
+        statusEl.textContent = '';
+        submitBtn.style.display = 'none';
+      } else {
+        statusEl.className = 'invoice-status pending';
+        statusEl.textContent = 'Invoice not yet submitted';
+        submitBtn.style.display = 'block';
+      }
+
+      // Disable forward button if at current period
+      document.getElementById('next-period-btn').disabled = periodOffset >= 0;
+    }
+
+    function changePeriod(direction) {
+      // Don't allow going to future periods
+      if (direction > 0 && periodOffset >= 0) return;
+
+      periodOffset += direction;
+      loadPayPeriod();
+    }
+
+    // Invoice
+    async function showInvoicePreview() {
+      if (!currentPayPeriod || currentPayPeriod.invoiceSubmitted) return;
+
+      const preview = document.getElementById('invoice-preview');
+      preview.innerHTML = `
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th style="text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Hours Worked (${currentPayPeriod.totalHours.toFixed(2)} hrs @ $${currentPayPeriod.hourlyWage}/hr)</td>
+              <td style="text-align: right;">$${currentPayPeriod.totalWages.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Service Commissions</td>
+              <td style="text-align: right;">$${currentPayPeriod.totalCommissions.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Product Commissions</td>
+              <td style="text-align: right;">$${currentPayPeriod.totalProductCommissions.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td>Tips</td>
+              <td style="text-align: right;">$${currentPayPeriod.totalTips.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="color: #ff6b6b;">Less: Cash Tips Already Received</td>
+              <td style="text-align: right; color: #ff6b6b;">-$${currentPayPeriod.totalCashTips.toFixed(2)}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td><strong>TOTAL PAYABLE</strong></td>
+              <td style="text-align: right; color: #6bff6b;"><strong>$${currentPayPeriod.totalPayable.toFixed(2)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+        <p style="font-size: 11px; color: #666; margin-top: 12px;">
+          Pay Period: ${currentPayPeriod.periodStart} to ${currentPayPeriod.periodEnd}
+        </p>
+      `;
+
+      document.getElementById('invoice-modal').classList.add('show');
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoice-modal').classList.remove('show');
+    }
+
+    async function submitInvoice() {
+      if (!currentPayPeriod) return;
+
+      try {
+        const response = await fetch('/api/submit-invoice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: currentEmployee.id,
+            periodStart: currentPayPeriod.periodStart,
+            periodEnd: currentPayPeriod.periodEnd,
+            totalHours: currentPayPeriod.totalHours,
+            totalWages: currentPayPeriod.totalWages,
+            totalCommissions: currentPayPeriod.totalCommissions,
+            totalTips: currentPayPeriod.totalTips,
+            totalCashTips: currentPayPeriod.totalCashTips,
+            totalProductCommissions: currentPayPeriod.totalProductCommissions,
+            totalPayable: currentPayPeriod.totalPayable
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          closeInvoiceModal();
+          loadPayPeriod();
+          alert('Invoice submitted successfully! An email has been sent.');
+        } else {
+          alert(data.message || 'Failed to submit invoice');
+        }
+      } catch (error) {
+        alert('Connection error');
+      }
+    }
+
+    // PIN Change
+    function showPinChangeModal() {
+      document.getElementById('current-pin').value = '';
+      document.getElementById('new-pin').value = '';
+      document.getElementById('confirm-pin').value = '';
+      document.getElementById('pin-error').classList.remove('show');
+      document.getElementById('pin-success').classList.remove('show');
+      document.getElementById('pin-modal').classList.add('show');
+    }
+
+    function closePinModal() {
+      document.getElementById('pin-modal').classList.remove('show');
+    }
+
+    async function changePin() {
+      const currentPinVal = document.getElementById('current-pin').value;
+      const newPinVal = document.getElementById('new-pin').value;
+      const confirmPinVal = document.getElementById('confirm-pin').value;
+
+      if (!/^\d{4}$/.test(newPinVal)) {
+        showError('pin-error', 'New PIN must be exactly 4 digits');
+        return;
+      }
+
+      if (newPinVal !== confirmPinVal) {
+        showError('pin-error', 'New PINs do not match');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/change-pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId: currentEmployee.id,
+            currentPin: currentPinVal,
+            newPin: newPinVal
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          currentPin = newPinVal;
+          sessionStorage.setItem('pin', newPinVal);
+          showSuccess('pin-success', 'PIN changed successfully!');
+          setTimeout(closePinModal, 1500);
+        } else {
+          showError('pin-error', data.message || 'Failed to change PIN');
+        }
+      } catch (error) {
+        showError('pin-error', 'Connection error');
+      }
+    }
+
+    // Load Entries
+    async function loadEntries() {
+      try {
+        const response = await fetch(`/api/time-entries/${currentEmployee.id}`);
+        const entries = await response.json();
+
+        const container = document.getElementById('entries-list');
+
+        if (entries.length === 0) {
+          container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No entries yet</p>';
+          return;
+        }
+
+        container.innerHTML = entries.slice(0, 10).map(entry => {
+          const date = new Date(entry.date + 'T00:00:00');
+          const dateStr = formatDateDisplay(date);
+
+          const timeStr = entry.start_time && entry.end_time
+            ? `${formatTime12(entry.start_time)} - ${formatTime12(entry.end_time)}`
+            : `${entry.hours.toFixed(1)} hours`;
+
+          let totalEarnings = entry.hours * (currentEmployee.hourly_wage || 0);
+
+          if (entry.clients) {
+            entry.clients.forEach(c => {
+              totalEarnings += (c.amount_earned || 0) + (c.tip_amount || 0);
+            });
+          }
+
+          if (entry.productSales) {
+            entry.productSales.forEach(p => {
+              totalEarnings += p.commission_amount || 0;
+            });
+          }
+
+          return `
+            <div class="entry-item">
+              <div class="entry-date">${dateStr}</div>
+              <div class="entry-details">${timeStr} (${entry.hours.toFixed(2)} hours)</div>
+              ${totalEarnings > 0 ? `<div class="entry-earnings">$${totalEarnings.toFixed(2)}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Error loading entries:', error);
+      }
+    }
+
+    // Utility Functions
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+
+    function formatDateDisplay(date) {
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+      const dayName = days[date.getDay()];
+      const month = months[date.getMonth()];
+      const day = date.getDate();
+      const suffix = getOrdinalSuffix(day);
+
+      return `${dayName}, ${month} ${day}${suffix}`;
+    }
+
+    function formatTime12(timeStr) {
+      if (!timeStr) return '';
+      const [hours, minutes] = timeStr.split(':');
+      const h = parseInt(hours);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${minutes} ${ampm}`;
+    }
+
+    function showError(id, message) {
+      const el = document.getElementById(id);
+      el.textContent = message;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 5000);
+    }
+
+    function showSuccess(id, message) {
+      const el = document.getElementById(id);
+      el.textContent = message;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed'));
+    }
+  </script>
+</body>
+</html>
