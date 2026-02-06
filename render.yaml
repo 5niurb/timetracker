@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lemedspa-timetracker
+    name: lm-paytrack
     runtime: node
     buildCommand: npm install
     startCommand: node server.js

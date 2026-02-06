@@ -1,7 +1,7 @@
 {
-  "name": "Time Tracker",
-  "short_name": "TimeTracker",
-  "description": "Employee time tracking app",
+  "name": "LM PayTrack",
+  "short_name": "PayTrack",
+  "description": "LeMed Spa employee time tracking and payroll",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
