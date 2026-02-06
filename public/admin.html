@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#000000">
-  <title>LeMed Spa - Admin</title>
+  <title>LM PayTrack - Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -479,16 +479,34 @@
       border: 1px solid #2a4a6a;
     }
 
-    .pay-type-commission {
+    .pay-type-commission_services {
       background: #1a2a1a;
       color: #6bff6b;
       border: 1px solid #2a4a2a;
     }
 
-    .pay-type-both {
+    .pay-type-commission_sales {
+      background: #3a2a1a;
+      color: #ffb36b;
+      border: 1px solid #6a4a2a;
+    }
+
+    .pay-type-hourly_services {
       background: #2a1a3a;
       color: #b36bff;
       border: 1px solid #4a2a6a;
+    }
+
+    .pay-type-hourly_sales {
+      background: #3a3a1a;
+      color: #e6c84b;
+      border: 1px solid #5a5a2a;
+    }
+
+    .pay-type-hourly_all {
+      background: #1a3a3a;
+      color: #6bffff;
+      border: 1px solid #2a5a5a;
     }
 
     .patient-detail {
@@ -585,11 +603,11 @@
   <!-- Login Screen -->
   <div id="login-screen" class="screen active">
     <div class="login-box">
-      <h2>Admin Login</h2>
-      <div class="alert error" id="login-error">Invalid admin PIN</div>
+      <h2>Admin Access</h2>
+      <div class="alert error" id="login-error">Invalid admin password</div>
       <div class="form-group">
-        <label for="admin-pin">Admin PIN</label>
-        <input type="password" id="admin-pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Enter 4-digit PIN">
+        <label for="admin-password">Admin Password</label>
+        <input type="password" id="admin-password" autocomplete="off" placeholder="Enter admin password">
       </div>
       <button class="btn-primary" onclick="adminLogin()">Login</button>
       <div class="back-link">
@@ -601,7 +619,7 @@
   <!-- Admin Dashboard -->
   <div id="admin-screen" class="screen">
     <div class="header">
-      <h1>LeMed Spa Admin</h1>
+      <h1>LM PayTrack Admin</h1>
       <button onclick="adminLogout()">Logout</button>
     </div>
 
@@ -668,13 +686,21 @@
               <input type="email" id="new-emp-email" placeholder="email@example.com">
             </div>
             <div class="form-group">
-              <label>Pay Type</label>
-              <select id="new-emp-pay-type">
-                <option value="hourly">Hourly Only</option>
-                <option value="commission">Commission - Services</option>
-                <option value="commission_products">Commission - Products</option>
-                <option value="both">Hourly + All Commissions</option>
-              </select>
+              <label>Pay Components</label>
+              <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #0a0a0a; border: 1px solid #333;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                  <input type="checkbox" id="new-emp-hourly-check" style="width: 18px; height: 18px;">
+                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Hourly</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                  <input type="checkbox" id="new-emp-services-check" style="width: 18px; height: 18px;">
+                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Service Commissions & Tips</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                  <input type="checkbox" id="new-emp-sales-check" style="width: 18px; height: 18px;">
+                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Sales Commissions</span>
+                </label>
+              </div>
             </div>
             <div class="form-group">
               <label>Hourly Wage ($)</label>
@@ -734,6 +760,7 @@
                   <th>Hours</th>
                   <th>Hourly Pay</th>
                   <th>Services $</th>
+                  <th>Sales $</th>
                   <th>Tips</th>
                   <th>Tips Owed</th>
                   <th>Total</th>
@@ -765,13 +792,21 @@
         <input type="email" id="edit-emp-email" placeholder="email@example.com">
       </div>
       <div class="form-group">
-        <label>Pay Type</label>
-        <select id="edit-emp-pay-type">
-          <option value="hourly">Hourly Only</option>
-          <option value="commission">Commission - Services</option>
-          <option value="commission_products">Commission - Products</option>
-          <option value="both">Hourly + All Commissions</option>
-        </select>
+        <label>Pay Components</label>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #0a0a0a; border: 1px solid #333;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="edit-emp-hourly-check" style="width: 18px; height: 18px;">
+            <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Hourly</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="edit-emp-services-check" style="width: 18px; height: 18px;">
+            <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Service Commissions & Tips</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="edit-emp-sales-check" style="width: 18px; height: 18px;">
+            <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Sales Commissions</span>
+          </label>
+        </div>
       </div>
       <div class="form-group">
         <label>Hourly Wage ($)</label>
@@ -822,19 +857,19 @@
     document.getElementById('report-start').valueAsDate = thirtyDaysAgo;
     document.getElementById('report-end').valueAsDate = today;
 
-    document.getElementById('admin-pin').addEventListener('keypress', e => {
+    document.getElementById('admin-password').addEventListener('keypress', e => {
       if (e.key === 'Enter') adminLogin();
     });
 
     async function adminLogin() {
-      const pin = document.getElementById('admin-pin').value;
+      const password = document.getElementById('admin-password').value;
       const errorEl = document.getElementById('login-error');
 
       try {
         const response = await fetch('/api/admin/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin })
+          body: JSON.stringify({ password })
         });
 
         const data = await response.json();
@@ -846,7 +881,7 @@
           loadEmployees();
         } else {
           errorEl.classList.add('show');
-          document.getElementById('admin-pin').value = '';
+          document.getElementById('admin-password').value = '';
         }
       } catch (error) {
         errorEl.textContent = 'Connection error';
@@ -857,7 +892,7 @@
     function adminLogout() {
       sessionStorage.removeItem('adminAuth');
       showScreen('login-screen');
-      document.getElementById('admin-pin').value = '';
+      document.getElementById('admin-password').value = '';
     }
 
     function showScreen(screenId) {
@@ -898,6 +933,7 @@
             const hourlyEarnings = entry.hours * (entry.hourly_wage || 0);
             let serviceEarnings = 0;
             let tips = 0;
+            let salesCommissions = 0;
 
             if (entry.clients && entry.clients.length > 0) {
               entry.clients.forEach(c => {
@@ -906,8 +942,14 @@
               });
             }
 
-            const totalEarnings = hourlyEarnings + serviceEarnings + tips;
-            const hasPatients = entry.clients && entry.clients.length > 0;
+            if (entry.productSales && entry.productSales.length > 0) {
+              entry.productSales.forEach(p => {
+                salesCommissions += p.commission_amount || 0;
+              });
+            }
+
+            const totalEarnings = hourlyEarnings + serviceEarnings + tips + salesCommissions;
+            const hasDetails = (entry.clients && entry.clients.length > 0) || (entry.productSales && entry.productSales.length > 0);
 
             const timeRange = entry.start_time && entry.end_time
               ? `${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}`
@@ -921,10 +963,11 @@
                 <td><span class="badge badge-blue">${entry.hours.toFixed(1)}h</span></td>
                 <td>
                   ${totalEarnings > 0 ? `<span class="earnings-total">$${totalEarnings.toFixed(2)}</span>` : '-'}
-                  ${hasPatients ? `<br><span style="font-size: 10px; color: #666;">${entry.clients.length} patient(s)</span>` : ''}
+                  ${entry.clients && entry.clients.length > 0 ? `<br><span style="font-size: 10px; color: #666;">${entry.clients.length} service(s)</span>` : ''}
+                  ${entry.productSales && entry.productSales.length > 0 ? `<br><span style="font-size: 10px; color: #666;">${entry.productSales.length} sale(s)</span>` : ''}
                 </td>
                 <td class="actions">
-                  ${hasPatients ? `<button class="btn-secondary" onclick="showEntryDetails(${entry.id})">Details</button>` : ''}
+                  ${hasDetails ? `<button class="btn-secondary" onclick="showEntryDetails(${entry.id})">Details</button>` : ''}
                   <button class="btn-danger" onclick="confirmDeleteEntry(${entry.id})">Delete</button>
                 </td>
               </tr>
@@ -944,10 +987,11 @@
       let serviceEarnings = 0;
       let tips = 0;
       let tipsOwed = 0;
+      let salesCommissions = 0;
 
-      let patientsHtml = '';
+      let servicesHtml = '';
       if (entry.clients && entry.clients.length > 0) {
-        patientsHtml = '<div style="margin-top: 16px;"><strong style="color: #999; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Patients:</strong>';
+        servicesHtml = '<div style="margin-top: 16px;"><strong style="color: #999; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Services:</strong>';
         entry.clients.forEach(c => {
           serviceEarnings += c.amount_earned || 0;
           tips += c.tip_amount || 0;
@@ -957,7 +1001,7 @@
             ? '<span class="tip-cash">Cash</span>'
             : '<span class="tip-owed">Owed</span>';
 
-          patientsHtml += `
+          servicesHtml += `
             <div class="patient-detail">
               <div class="patient-row">
                 <span><strong>${escapeHtml(c.client_name)}</strong></span>
@@ -970,10 +1014,30 @@
             </div>
           `;
         });
-        patientsHtml += '</div>';
+        servicesHtml += '</div>';
       }
 
-      const totalEarnings = hourlyEarnings + serviceEarnings + tips;
+      let salesHtml = '';
+      if (entry.productSales && entry.productSales.length > 0) {
+        salesHtml = '<div style="margin-top: 16px;"><strong style="color: #999; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Sales:</strong>';
+        entry.productSales.forEach(p => {
+          salesCommissions += p.commission_amount || 0;
+          salesHtml += `
+            <div class="patient-detail">
+              <div class="patient-row">
+                <span><strong>${escapeHtml(p.product_name)}</strong></span>
+                <span>Sale: $${(p.sale_amount || 0).toFixed(2)}</span>
+              </div>
+              <div class="patient-row">
+                <span>Commission: $${(p.commission_amount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          `;
+        });
+        salesHtml += '</div>';
+      }
+
+      const totalEarnings = hourlyEarnings + serviceEarnings + tips + salesCommissions;
 
       const detailsHtml = `
         <div style="margin-bottom: 16px; color: #ccc; line-height: 1.8;">
@@ -983,11 +1047,13 @@
           <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">BREAK:</strong> ${entry.break_minutes || 0} minutes<br>
           <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">HOURS:</strong> ${entry.hours.toFixed(2)}
         </div>
-        ${patientsHtml}
+        ${servicesHtml}
+        ${salesHtml}
         <div style="margin-top: 16px; padding: 16px; background: #1a2a1a; border: 1px solid #2a4a2a;">
           <strong style="color: #6bff6b; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Earnings Breakdown:</strong><br><br>
           <span style="color: #ccc;">Hourly Pay: $${hourlyEarnings.toFixed(2)}</span><br>
           <span style="color: #ccc;">Service Earnings: $${serviceEarnings.toFixed(2)}</span><br>
+          <span style="color: #ccc;">Sales Commissions: $${salesCommissions.toFixed(2)}</span><br>
           <span style="color: #ccc;">Tips: $${tips.toFixed(2)} ${tipsOwed > 0 ? `<span style="color: #ff6b6b;">(${tipsOwed.toFixed(2)} owed)</span>` : ''}</span><br><br>
           <strong style="font-size: 18px; font-family: 'Cormorant Garamond', serif;">Total: $${totalEarnings.toFixed(2)}</strong>
         </div>
@@ -1016,9 +1082,11 @@
             const payTypeClass = `pay-type-${emp.pay_type || 'hourly'}`;
             const payTypeLabels = {
               'hourly': 'Hourly',
-              'commission': 'Comm - Services',
-              'commission_products': 'Comm - Products',
-              'both': 'Hourly + All Comm'
+              'commission_services': 'Services',
+              'commission_sales': 'Sales',
+              'hourly_services': 'Hourly + Serv',
+              'hourly_sales': 'Hourly + Sales',
+              'hourly_all': 'Hourly + All'
             };
             const payTypeLabel = payTypeLabels[emp.pay_type] || 'Hourly';
 
@@ -1042,11 +1110,36 @@
       }
     }
 
+    function getPayTypeFromCheckboxes(prefix) {
+      const hourly = document.getElementById(`${prefix}-hourly-check`).checked;
+      const services = document.getElementById(`${prefix}-services-check`).checked;
+      const sales = document.getElementById(`${prefix}-sales-check`).checked;
+
+      if (hourly && services && sales) return 'hourly_all';
+      if (hourly && services) return 'hourly_services';
+      if (hourly && sales) return 'hourly_sales';
+      if (hourly) return 'hourly';
+      if (services && sales) return 'commission_all';
+      if (services) return 'commission_services';
+      if (sales) return 'commission_sales';
+      return 'hourly'; // default
+    }
+
+    function setCheckboxesFromPayType(prefix, payType) {
+      const hourlyCheck = document.getElementById(`${prefix}-hourly-check`);
+      const servicesCheck = document.getElementById(`${prefix}-services-check`);
+      const salesCheck = document.getElementById(`${prefix}-sales-check`);
+
+      hourlyCheck.checked = ['hourly', 'hourly_services', 'hourly_sales', 'hourly_all'].includes(payType);
+      servicesCheck.checked = ['commission_services', 'hourly_services', 'hourly_all', 'commission_all'].includes(payType);
+      salesCheck.checked = ['commission_sales', 'hourly_sales', 'hourly_all', 'commission_all'].includes(payType);
+    }
+
     async function addEmployee() {
       const name = document.getElementById('new-emp-name').value.trim();
       const pin = document.getElementById('new-emp-pin').value.trim();
       const email = document.getElementById('new-emp-email').value.trim();
-      const payType = document.getElementById('new-emp-pay-type').value;
+      const payType = getPayTypeFromCheckboxes('new-emp');
       const hourlyWage = parseFloat(document.getElementById('new-emp-hourly').value) || 0;
       const errorEl = document.getElementById('emp-error');
 
@@ -1077,7 +1170,9 @@
           document.getElementById('new-emp-name').value = '';
           document.getElementById('new-emp-pin').value = '';
           document.getElementById('new-emp-email').value = '';
-          document.getElementById('new-emp-pay-type').value = 'hourly';
+          document.getElementById('new-emp-hourly-check').checked = true;
+          document.getElementById('new-emp-services-check').checked = false;
+          document.getElementById('new-emp-sales-check').checked = false;
           document.getElementById('new-emp-hourly').value = '';
           loadEmployees();
         } else {
@@ -1095,7 +1190,7 @@
       document.getElementById('edit-emp-name').value = name;
       document.getElementById('edit-emp-pin').value = pin;
       document.getElementById('edit-emp-email').value = email || '';
-      document.getElementById('edit-emp-pay-type').value = payType || 'hourly';
+      setCheckboxesFromPayType('edit-emp', payType || 'hourly');
       document.getElementById('edit-emp-hourly').value = hourlyWage || '';
       document.getElementById('edit-error').classList.remove('show');
       document.getElementById('edit-modal').classList.add('show');
@@ -1106,7 +1201,7 @@
       const name = document.getElementById('edit-emp-name').value.trim();
       const pin = document.getElementById('edit-emp-pin').value.trim();
       const email = document.getElementById('edit-emp-email').value.trim();
-      const payType = document.getElementById('edit-emp-pay-type').value;
+      const payType = getPayTypeFromCheckboxes('edit-emp');
       const hourlyWage = parseFloat(document.getElementById('edit-emp-hourly').value) || 0;
       const errorEl = document.getElementById('edit-error');
 
@@ -1208,6 +1303,7 @@
         let totalHours = 0;
         let totalHourlyPay = 0;
         let totalServices = 0;
+        let totalSales = 0;
         let totalTips = 0;
         let totalTipsOwed = 0;
 
@@ -1221,6 +1317,7 @@
               hours: 0,
               hourlyPay: 0,
               services: 0,
+              sales: 0,
               tips: 0,
               tipsOwed: 0,
               hourlyWage: e.hourly_wage || 0
@@ -1245,9 +1342,16 @@
               }
             });
           }
+
+          if (e.productSales) {
+            e.productSales.forEach(p => {
+              byEmployee[empName].sales += p.commission_amount || 0;
+              totalSales += p.commission_amount || 0;
+            });
+          }
         });
 
-        const grandTotal = totalHourlyPay + totalServices + totalTips;
+        const grandTotal = totalHourlyPay + totalServices + totalSales + totalTips;
 
         // Render stats
         document.getElementById('report-stats').innerHTML = `
@@ -1262,6 +1366,10 @@
           <div class="stat-card">
             <div class="label">Services</div>
             <div class="value">$${totalServices.toFixed(0)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Sales</div>
+            <div class="value">$${totalSales.toFixed(0)}</div>
           </div>
           <div class="stat-card">
             <div class="label">Tips</div>
@@ -1280,20 +1388,21 @@
         // Render table
         const tbody = document.getElementById('report-table');
         const employeeList = Object.entries(byEmployee).sort((a, b) =>
-          (b[1].hourlyPay + b[1].services + b[1].tips) - (a[1].hourlyPay + a[1].services + a[1].tips)
+          (b[1].hourlyPay + b[1].services + b[1].sales + b[1].tips) - (a[1].hourlyPay + a[1].services + a[1].sales + a[1].tips)
         );
 
         if (employeeList.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No data for this period</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No data for this period</td></tr>';
         } else {
           tbody.innerHTML = employeeList.map(([name, data]) => {
-            const total = data.hourlyPay + data.services + data.tips;
+            const total = data.hourlyPay + data.services + data.sales + data.tips;
             return `
               <tr>
                 <td><strong>${escapeHtml(name)}</strong></td>
                 <td>${data.hours.toFixed(1)}h</td>
                 <td>$${data.hourlyPay.toFixed(2)}</td>
                 <td>$${data.services.toFixed(2)}</td>
+                <td>$${data.sales.toFixed(2)}</td>
                 <td>$${data.tips.toFixed(2)}</td>
                 <td style="color: ${data.tipsOwed > 0 ? '#ff6b6b' : '#666'};">$${data.tipsOwed.toFixed(2)}</td>
                 <td><span class="earnings-total">$${total.toFixed(2)}</span></td>

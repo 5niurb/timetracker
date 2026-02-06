@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <title>LeMed Spa - Time Tracker</title>
+  <title>LM PayTrack</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon.svg">
@@ -291,7 +291,7 @@
 
     .date-scroll-btn {
       background: #222;
-      border: 1px solid #444;
+      border: 1px solid #ffffff;
       color: #fff;
       width: 44px;
       height: 44px;
@@ -405,35 +405,35 @@
       color: #fff;
     }
 
-    /* Patient entries */
-    .patient-entries {
+    /* Service entries */
+    .service-entries {
       margin-top: 24px;
       border-top: 1px solid #333;
       padding-top: 24px;
     }
 
-    .patient-entry {
+    .service-entry {
       background: #0a0a0a;
       border: 1px solid #333;
       padding: 16px;
       margin-bottom: 12px;
     }
 
-    .patient-entry-header {
+    .service-entry-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 12px;
     }
 
-    .patient-entry-title {
+    .service-entry-title {
       font-size: 12px;
       color: #888;
       letter-spacing: 0.1em;
       text-transform: uppercase;
     }
 
-    .remove-patient {
+    .remove-entry {
       background: none;
       border: none;
       color: #666;
@@ -442,15 +442,15 @@
       font-size: 18px;
     }
 
-    .remove-patient:hover {
+    .remove-entry:hover {
       color: #ff6b6b;
     }
 
-    .patient-entry .form-group {
+    .service-entry .form-group {
       margin-bottom: 12px;
     }
 
-    .patient-entry .form-group:last-child {
+    .service-entry .form-group:last-child {
       margin-bottom: 0;
     }
 
@@ -475,18 +475,76 @@
       color: #888;
     }
 
-    /* Product sales section */
-    .product-sales {
+    /* Sales entries */
+    .sales-entries {
       margin-top: 24px;
       border-top: 1px solid #333;
       padding-top: 24px;
     }
 
-    .product-entry {
+    .sales-entry {
       background: #0a0a0a;
       border: 1px solid #333;
       padding: 16px;
       margin-bottom: 12px;
+    }
+
+    /* Commission type toggle */
+    .commission-type-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: 12px;
+    }
+
+    .commission-type-btn {
+      flex: 1;
+      padding: 10px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #666;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .commission-type-btn:first-child {
+      border-right: none;
+    }
+
+    .commission-type-btn.active {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+
+    .commission-calc-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .calculated-commission {
+      background: #1a2a1a;
+      border: 1px solid #2a4a2a;
+      padding: 10px;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .calculated-commission .label {
+      font-size: 9px;
+      color: #6bff6b;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .calculated-commission .value {
+      font-size: 18px;
+      color: #6bff6b;
+      font-weight: 600;
     }
 
     /* Pay Period Summary */
@@ -729,26 +787,6 @@
       color: #6bff6b;
     }
 
-    /* Footer */
-    .admin-link {
-      text-align: center;
-      margin-top: 32px;
-      padding-top: 20px;
-      border-top: 1px solid #222;
-    }
-
-    .admin-link a {
-      color: #555;
-      text-decoration: none;
-      font-size: 11px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    .admin-link a:hover {
-      color: #888;
-    }
-
     /* Responsive */
     @media (max-width: 480px) {
       .container {
@@ -782,16 +820,13 @@
   <div id="login-screen" class="screen active">
     <div class="login-box">
       <h2>LeMed Spa</h2>
-      <p class="login-subtitle">Time Tracker</p>
+      <p class="login-subtitle">PayTrack</p>
       <div class="alert error" id="login-error">Invalid PIN</div>
       <div class="form-group">
         <label for="pin-input">Enter Your PIN</label>
         <input type="password" id="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="4-digit PIN">
       </div>
-      <button class="btn-primary" onclick="login()">Clock In</button>
-      <div class="admin-link">
-        <a href="/admin">Admin Access</a>
-      </div>
+      <button class="btn-primary" onclick="login()">Submit</button>
     </div>
   </div>
 
@@ -887,28 +922,33 @@
           <div class="value" id="calculated-hours">0.00</div>
         </div>
 
-        <!-- Patient Entries (for commission workers) -->
-        <div class="patient-entries" id="patient-section" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">Patients</h3>
-            <button class="btn-secondary btn-small" onclick="addPatientEntry()">+ Add Patient</button>
-          </div>
-          <div id="patient-entries-container"></div>
-        </div>
-
-        <!-- Product Sales (for product commission workers) -->
-        <div class="product-sales" id="product-section" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">Product Sales</h3>
-            <button class="btn-secondary btn-small" onclick="addProductEntry()">+ Add Sale</button>
-          </div>
-          <div id="product-entries-container"></div>
-        </div>
-
         <div class="alert error" id="entry-error"></div>
         <div class="alert success" id="entry-success"></div>
 
         <button class="btn-primary" onclick="submitEntry()" id="submit-entry-btn">Save Entry</button>
+      </div>
+
+      <!-- Log Commissions & Tips Card (separate panel) -->
+      <div class="card" id="commissions-card" style="display: none;">
+        <h3>Log Commissions & Tips</h3>
+
+        <!-- Service Entries (for service commission workers) -->
+        <div class="service-entries" id="service-section" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 14px;">Services & Tips</h3>
+            <button class="btn-secondary btn-small" onclick="addServiceEntry()">+ Add Service</button>
+          </div>
+          <div id="service-entries-container"></div>
+        </div>
+
+        <!-- Sales Entries (for sales commission workers) -->
+        <div class="sales-entries" id="sales-section" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 14px;">Sales</h3>
+            <button class="btn-secondary btn-small" onclick="addSalesEntry()">+ Add Sale</button>
+          </div>
+          <div id="sales-entries-container"></div>
+        </div>
       </div>
 
       <!-- Recent Entries -->
@@ -982,8 +1022,8 @@
     let currentPayPeriod = null;
     let conflictEntryId = null;
     let pendingEntry = null;
-    let patientCount = 0;
-    let productCount = 0;
+    let serviceCount = 0;
+    let salesCount = 0;
 
     // Initialize
     document.getElementById('pin-input').addEventListener('keypress', e => {
@@ -1047,11 +1087,15 @@
 
       // Show/hide sections based on pay type
       const payType = currentEmployee.pay_type;
-      const showPatients = payType === 'commission' || payType === 'both';
-      const showProducts = payType === 'commission_products' || payType === 'both';
 
-      document.getElementById('patient-section').style.display = showPatients ? 'block' : 'none';
-      document.getElementById('product-section').style.display = showProducts ? 'block' : 'none';
+      // Determine what to show
+      const showServices = ['commission_services', 'hourly_services', 'hourly_all'].includes(payType);
+      const showSales = ['commission_sales', 'hourly_sales', 'hourly_all'].includes(payType);
+      const showCommissionsCard = showServices || showSales;
+
+      document.getElementById('commissions-card').style.display = showCommissionsCard ? 'block' : 'none';
+      document.getElementById('service-section').style.display = showServices ? 'block' : 'none';
+      document.getElementById('sales-section').style.display = showSales ? 'block' : 'none';
 
       initializeDatePicker();
       loadPayPeriod();
@@ -1193,40 +1237,40 @@
       return 0;
     }
 
-    // Patient Entries
-    function addPatientEntry() {
-      patientCount++;
-      const container = document.getElementById('patient-entries-container');
+    // Service Entries (renamed from Patient)
+    function addServiceEntry() {
+      serviceCount++;
+      const container = document.getElementById('service-entries-container');
 
       const entry = document.createElement('div');
-      entry.className = 'patient-entry';
-      entry.id = `patient-${patientCount}`;
+      entry.className = 'service-entry';
+      entry.id = `service-${serviceCount}`;
       entry.innerHTML = `
-        <div class="patient-entry-header">
-          <span class="patient-entry-title">Patient #${patientCount}</span>
-          <button class="remove-patient" onclick="removePatientEntry(${patientCount})">&times;</button>
+        <div class="service-entry-header">
+          <span class="service-entry-title">Service #${serviceCount}</span>
+          <button class="remove-entry" onclick="removeServiceEntry(${serviceCount})">&times;</button>
         </div>
         <div class="form-group">
-          <label>Patient Name</label>
-          <input type="text" class="patient-name" placeholder="Enter patient name">
+          <label>Client Name</label>
+          <input type="text" class="service-client" placeholder="Enter client name">
         </div>
         <div class="form-group">
-          <label>Services</label>
-          <input type="text" class="patient-services" placeholder="Services performed">
+          <label>Service Performed</label>
+          <input type="text" class="service-name" placeholder="Service performed">
         </div>
         <div class="time-row">
           <div class="form-group">
             <label>Earnings ($)</label>
-            <input type="number" class="patient-earnings" step="0.01" min="0" placeholder="0.00">
+            <input type="number" class="service-earnings" step="0.01" min="0" placeholder="0.00">
           </div>
           <div class="form-group">
             <label>Tip ($)</label>
-            <input type="number" class="patient-tip" step="0.01" min="0" placeholder="0.00">
+            <input type="number" class="service-tip" step="0.01" min="0" placeholder="0.00">
           </div>
         </div>
         <div class="form-group">
           <label>Notes</label>
-          <input type="text" class="patient-notes" placeholder="Optional notes">
+          <input type="text" class="service-notes" placeholder="Optional notes">
         </div>
         <label class="checkbox-group">
           <input type="checkbox" class="tip-cash">
@@ -1237,39 +1281,52 @@
       container.appendChild(entry);
     }
 
-    function removePatientEntry(id) {
-      const entry = document.getElementById(`patient-${id}`);
+    function removeServiceEntry(id) {
+      const entry = document.getElementById(`service-${id}`);
       if (entry) entry.remove();
     }
 
-    // Product Sales
-    function addProductEntry() {
-      productCount++;
-      const container = document.getElementById('product-entries-container');
+    // Sales Entries with commission type toggle
+    function addSalesEntry() {
+      salesCount++;
+      const container = document.getElementById('sales-entries-container');
 
       const entry = document.createElement('div');
-      entry.className = 'product-entry';
-      entry.id = `product-${productCount}`;
+      entry.className = 'sales-entry';
+      entry.id = `sales-${salesCount}`;
       entry.innerHTML = `
-        <div class="patient-entry-header">
-          <span class="patient-entry-title">Sale #${productCount}</span>
-          <button class="remove-patient" onclick="removeProductEntry(${productCount})">&times;</button>
+        <div class="service-entry-header">
+          <span class="service-entry-title">Sale #${salesCount}</span>
+          <button class="remove-entry" onclick="removeSalesEntry(${salesCount})">&times;</button>
         </div>
         <div class="form-group">
           <label>Product Name</label>
           <input type="text" class="product-name" placeholder="Product sold">
         </div>
-        <div class="time-row">
-          <div class="form-group">
-            <label>Sale Amount ($)</label>
-            <input type="number" class="product-amount" step="0.01" min="0" placeholder="0.00">
-          </div>
-          <div class="form-group">
-            <label>Commission ($)</label>
-            <input type="number" class="product-commission" step="0.01" min="0" placeholder="0.00">
-          </div>
+        <div class="form-group">
+          <label>Sale Amount ($)</label>
+          <input type="number" class="product-amount" step="0.01" min="0" placeholder="0.00" oninput="calculateSalesCommission(${salesCount})">
         </div>
         <div class="form-group">
+          <label>Commission Type</label>
+          <div class="commission-type-toggle">
+            <button type="button" class="commission-type-btn active" data-type="percent" onclick="setCommissionType(${salesCount}, 'percent')">% Percentage</button>
+            <button type="button" class="commission-type-btn" data-type="flat" onclick="setCommissionType(${salesCount}, 'flat')">$ Flat Amount</button>
+          </div>
+        </div>
+        <div class="commission-calc-row">
+          <div class="form-group" id="commission-input-${salesCount}">
+            <label>Commission Rate (%)</label>
+            <input type="number" class="commission-rate" step="0.1" min="0" placeholder="10" oninput="calculateSalesCommission(${salesCount})">
+          </div>
+        </div>
+        <div class="calculated-commission" id="calc-commission-${salesCount}">
+          <div class="label">Commission Earned</div>
+          <div class="value">$0.00</div>
+        </div>
+        <input type="hidden" class="commission-type" value="percent">
+        <input type="hidden" class="product-commission" value="0">
+        <div class="form-group" style="margin-top: 12px;">
           <label>Notes</label>
           <input type="text" class="product-notes" placeholder="Optional notes">
         </div>
@@ -1278,9 +1335,61 @@
       container.appendChild(entry);
     }
 
-    function removeProductEntry(id) {
-      const entry = document.getElementById(`product-${id}`);
+    function removeSalesEntry(id) {
+      const entry = document.getElementById(`sales-${id}`);
       if (entry) entry.remove();
+    }
+
+    function setCommissionType(id, type) {
+      const entry = document.getElementById(`sales-${id}`);
+      if (!entry) return;
+
+      // Update buttons
+      entry.querySelectorAll('.commission-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+      });
+
+      // Update hidden input
+      entry.querySelector('.commission-type').value = type;
+
+      // Update label
+      const inputGroup = document.getElementById(`commission-input-${id}`);
+      const label = inputGroup.querySelector('label');
+      const input = inputGroup.querySelector('input');
+
+      if (type === 'percent') {
+        label.textContent = 'Commission Rate (%)';
+        input.placeholder = '10';
+      } else {
+        label.textContent = 'Flat Commission ($)';
+        input.placeholder = '0.00';
+      }
+
+      calculateSalesCommission(id);
+    }
+
+    function calculateSalesCommission(id) {
+      const entry = document.getElementById(`sales-${id}`);
+      if (!entry) return;
+
+      const saleAmount = parseFloat(entry.querySelector('.product-amount').value) || 0;
+      const commissionType = entry.querySelector('.commission-type').value;
+      const rateInput = entry.querySelector('.commission-rate').value;
+      const rate = parseFloat(rateInput) || 0;
+
+      let commission = 0;
+      if (commissionType === 'percent') {
+        commission = saleAmount * (rate / 100);
+      } else {
+        commission = rate;
+      }
+
+      // Update display
+      const calcDisplay = document.getElementById(`calc-commission-${id}`);
+      calcDisplay.querySelector('.value').textContent = `$${commission.toFixed(2)}`;
+
+      // Store value
+      entry.querySelector('.product-commission').value = commission.toFixed(2);
     }
 
     // Check for conflicts
@@ -1341,22 +1450,22 @@
 
     function gatherEntryData(hours) {
       const clients = [];
-      document.querySelectorAll('.patient-entry').forEach(entry => {
-        const name = entry.querySelector('.patient-name').value.trim();
+      document.querySelectorAll('.service-entry').forEach(entry => {
+        const name = entry.querySelector('.service-client').value.trim();
         if (name) {
           clients.push({
             clientName: name,
-            procedure: entry.querySelector('.patient-services').value.trim(),
-            notes: entry.querySelector('.patient-notes').value.trim(),
-            amountEarned: parseFloat(entry.querySelector('.patient-earnings').value) || 0,
-            tipAmount: parseFloat(entry.querySelector('.patient-tip').value) || 0,
+            procedure: entry.querySelector('.service-name').value.trim(),
+            notes: entry.querySelector('.service-notes').value.trim(),
+            amountEarned: parseFloat(entry.querySelector('.service-earnings').value) || 0,
+            tipAmount: parseFloat(entry.querySelector('.service-tip').value) || 0,
             tipReceivedCash: entry.querySelector('.tip-cash').checked
           });
         }
       });
 
       const productSales = [];
-      document.querySelectorAll('.product-entry').forEach(entry => {
+      document.querySelectorAll('.sales-entry').forEach(entry => {
         const name = entry.querySelector('.product-name').value.trim();
         if (name) {
           productSales.push({
@@ -1433,10 +1542,10 @@
       document.getElementById('end-time').value = '';
       document.getElementById('break-minutes').value = '0';
       document.getElementById('calculated-hours').textContent = '0.00';
-      document.getElementById('patient-entries-container').innerHTML = '';
-      document.getElementById('product-entries-container').innerHTML = '';
-      patientCount = 0;
-      productCount = 0;
+      document.getElementById('service-entries-container').innerHTML = '';
+      document.getElementById('sales-entries-container').innerHTML = '';
+      serviceCount = 0;
+      salesCount = 0;
     }
 
     // Pay Period
@@ -1524,7 +1633,7 @@
               <td style="text-align: right;">$${currentPayPeriod.totalCommissions.toFixed(2)}</td>
             </tr>
             <tr>
-              <td>Product Commissions</td>
+              <td>Sales Commissions</td>
               <td style="text-align: right;">$${currentPayPeriod.totalProductCommissions.toFixed(2)}</td>
             </tr>
             <tr>

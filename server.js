@@ -12,10 +12,33 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database file path
-const DB_PATH = path.join(__dirname, 'timetracker.db');
+// Database file path - use /tmp for Render compatibility but also try local
+const DB_PATH = process.env.NODE_ENV === 'production'
+  ? '/tmp/timetracker.db'
+  : path.join(__dirname, 'timetracker.db');
 
 let db;
+
+// Keep-alive ping to prevent Render spin down
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+function setupKeepAlive() {
+  if (process.env.NODE_ENV === 'production') {
+    setInterval(async () => {
+      try {
+        const response = await fetch(`${SELF_URL}/api/health`);
+        console.log(`[Keep-alive] Ping at ${new Date().toISOString()}: ${response.ok ? 'OK' : 'Failed'}`);
+      } catch (err) {
+        console.log(`[Keep-alive] Ping failed: ${err.message}`);
+      }
+    }, 14 * 60 * 1000); // Every 14 minutes
+    console.log('[Keep-alive] Scheduled ping every 14 minutes');
+  }
+}
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Initialize database
 async function initDatabase() {
@@ -23,9 +46,14 @@ async function initDatabase() {
 
   // Load existing database or create new one
   if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(fileBuffer);
-    console.log('Loaded existing database');
+    try {
+      const fileBuffer = fs.readFileSync(DB_PATH);
+      db = new SQL.Database(fileBuffer);
+      console.log('Loaded existing database from', DB_PATH);
+    } catch (err) {
+      console.log('Could not load database, creating new one:', err.message);
+      db = new SQL.Database();
+    }
   } else {
     db = new SQL.Database();
     console.log('Created new database');
@@ -146,9 +174,13 @@ async function initDatabase() {
 
 // Save database to file
 function saveDatabase() {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(DB_PATH, buffer);
+  try {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(DB_PATH, buffer);
+  } catch (err) {
+    console.error('Error saving database:', err.message);
+  }
 }
 
 // Helper to run queries
@@ -234,6 +266,89 @@ function getPayPeriodByOffset(offset = 0) {
   }
 
   return getPayPeriod(targetDate);
+}
+
+// Simple email sending function (using fetch to external email API)
+async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
+  // Check if Resend API key is configured
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+  if (!RESEND_API_KEY) {
+    console.log('[Email] No RESEND_API_KEY configured - email not sent');
+    return { sent: false, reason: 'No API key configured' };
+  }
+
+  const emailBody = `
+    <h2>LeMed Spa - Pay Period Invoice</h2>
+    <p><strong>Employee:</strong> ${employee.name}</p>
+    <p><strong>Pay Period:</strong> ${periodStart} to ${periodEnd}</p>
+
+    <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+      <tr style="background: #f5f5f5;">
+        <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Description</th>
+        <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Amount</th>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 10px;">Hours Worked (${summary.totalHours.toFixed(2)} hrs @ $${employee.hourlyWage}/hr)</td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalWages.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 10px;">Service Commissions</td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalCommissions.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 10px;">Sales Commissions</td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalProductCommissions.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 10px;">Tips</td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalTips.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 10px; color: #cc0000;">Less: Cash Tips Already Received</td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #cc0000;">-$${summary.totalCashTips.toFixed(2)}</td>
+      </tr>
+      <tr style="background: #e8f5e9;">
+        <td style="border: 1px solid #ddd; padding: 10px;"><strong>TOTAL PAYABLE</strong></td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;"><strong>$${summary.totalPayable.toFixed(2)}</strong></td>
+      </tr>
+    </table>
+
+    <p style="color: #666; font-size: 12px;">Submitted via LM PayTrack</p>
+  `;
+
+  const recipients = ['lea@lemedspa.com', 'ops@lemedspa.com'];
+  const cc = employee.email ? [employee.email] : [];
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'LM PayTrack <paytrack@lemedspa.com>',
+        to: recipients,
+        cc: cc,
+        subject: `Pay Period Invoice - ${employee.name} - ${periodStart} to ${periodEnd}`,
+        html: emailBody,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      console.log('[Email] Invoice sent successfully:', result.id);
+      return { sent: true, id: result.id };
+    } else {
+      console.error('[Email] Failed to send:', result);
+      return { sent: false, reason: result.message || 'API error' };
+    }
+  } catch (error) {
+    console.error('[Email] Error sending invoice:', error.message);
+    return { sent: false, reason: error.message };
+  }
 }
 
 // ============ API ROUTES ============
@@ -455,7 +570,7 @@ app.get('/api/pay-period/:employeeId', (req, res) => {
 });
 
 // Submit invoice
-app.post('/api/submit-invoice', (req, res) => {
+app.post('/api/submit-invoice', async (req, res) => {
   const { employeeId, periodStart, periodEnd, totalHours, totalWages, totalCommissions, totalTips, totalCashTips, totalProductCommissions, totalPayable } = req.body;
 
   // Check if already submitted
@@ -469,7 +584,7 @@ app.post('/api/submit-invoice', (req, res) => {
   }
 
   // Get employee details
-  const employee = getOne('SELECT name, email FROM employees WHERE id = ?', [employeeId]);
+  const employee = getOne('SELECT name, email, hourly_wage FROM employees WHERE id = ?', [employeeId]);
 
   // Create invoice record
   const result = runQuery(
@@ -479,8 +594,15 @@ app.post('/api/submit-invoice', (req, res) => {
   );
 
   if (result.success) {
-    // In production, this would send an actual email
-    // For now, we'll just log it and mark as sent
+    // Try to send email
+    const emailResult = await sendInvoiceEmail(
+      { name: employee?.name, email: employee?.email, hourlyWage: employee?.hourly_wage || 0 },
+      periodStart,
+      periodEnd,
+      { totalHours, totalWages, totalCommissions, totalProductCommissions, totalTips, totalCashTips, totalPayable }
+    );
+
+    // Log invoice details
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                    INVOICE SUBMITTED                       ║
@@ -497,20 +619,20 @@ app.post('/api/submit-invoice', (req, res) => {
 ║
 ║  TOTAL PAYABLE: $${totalPayable.toFixed(2)}
 ║
-║  Email would be sent to:
-║    - lea@lemedspa.com
-║    - ops@lemedspa.com
-║    ${employee?.email ? `- ${employee.email} (CC)` : ''}
+║  Email: ${emailResult.sent ? 'SENT' : 'NOT SENT - ' + emailResult.reason}
 ╚════════════════════════════════════════════════════════════╝
     `);
 
-    // Mark email as sent (in production, only after actual email success)
-    runQuery('UPDATE invoices SET email_sent = 1 WHERE id = ?', [result.lastId]);
+    // Mark email as sent if successful
+    if (emailResult.sent) {
+      runQuery('UPDATE invoices SET email_sent = 1 WHERE id = ?', [result.lastId]);
+    }
 
     res.json({
       success: true,
-      message: 'Invoice submitted successfully',
-      invoiceId: result.lastId
+      message: emailResult.sent ? 'Invoice submitted and email sent!' : 'Invoice submitted (email not configured)',
+      invoiceId: result.lastId,
+      emailSent: emailResult.sent
     });
   } else {
     res.json({ success: false, message: 'Failed to create invoice' });
@@ -616,13 +738,14 @@ app.get('/api/invoice-preview/:employeeId', (req, res) => {
 
 // ============ ADMIN ROUTES ============
 
-// Admin PIN (change this in production!)
-const ADMIN_PIN = '0000';
+// Admin password - set via environment variable or use default
+// Generate a strong password from 1Password or similar vault for production
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LM$PayTrack#Admin2026!';
 
-// Verify admin PIN
+// Verify admin password
 app.post('/api/admin/verify', (req, res) => {
-  const { pin } = req.body;
-  res.json({ success: pin === ADMIN_PIN });
+  const { password } = req.body;
+  res.json({ success: password === ADMIN_PASSWORD });
 });
 
 // Get all employees
@@ -771,20 +894,20 @@ app.get('/admin', (req, res) => {
 // Start server
 async function start() {
   await initDatabase();
+  setupKeepAlive();
 
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
-║                 LEMED SPA TIME TRACKER                     ║
+║                    LM PAYTRACK                             ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Server running at: http://localhost:${PORT}                  ║
 ║                                                            ║
 ║  Employee App:  http://localhost:${PORT}                      ║
 ║  Admin Panel:   http://localhost:${PORT}/admin                ║
 ║                                                            ║
-║  Default PINs:                                             ║
-║    Employee: 1234                                          ║
-║    Admin:    0000                                          ║
+║  Default Employee PIN: 1234                                ║
+║  Admin Password: Set via ADMIN_PASSWORD env var            ║
 ╚════════════════════════════════════════════════════════════╝
     `);
   });
