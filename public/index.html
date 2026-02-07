@@ -970,8 +970,8 @@
 
   <!-- Invoice Preview Modal -->
   <div id="invoice-modal" class="modal">
-    <div class="modal-content" style="max-width: 500px;">
-      <h3 style="color: #fff;">Submit Invoice</h3>
+    <div class="modal-content" style="max-width: 800px;">
+      <h3 style="color: #fff;">Invoice Review</h3>
       <div class="invoice-preview" id="invoice-preview"></div>
       <p style="font-size: 12px; color: #888; margin: 16px 0;">This will send an invoice to lea@lemedspa.com and ops@lemedspa.com</p>
       <div class="modal-actions">
@@ -1614,49 +1614,89 @@
       if (!currentPayPeriod || currentPayPeriod.invoiceSubmitted) return;
 
       const preview = document.getElementById('invoice-preview');
-      preview.innerHTML = `
-        <table class="invoice-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th style="text-align: right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Hours Worked (${currentPayPeriod.totalHours.toFixed(2)} hrs @ $${currentPayPeriod.hourlyWage}/hr)</td>
-              <td style="text-align: right;">$${currentPayPeriod.totalWages.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Service Commissions</td>
-              <td style="text-align: right;">$${currentPayPeriod.totalCommissions.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Sales Commissions</td>
-              <td style="text-align: right;">$${currentPayPeriod.totalProductCommissions.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td>Tips</td>
-              <td style="text-align: right;">$${currentPayPeriod.totalTips.toFixed(2)}</td>
-            </tr>
-            <tr>
-              <td style="color: #ff6b6b;">Less: Cash Tips Already Received</td>
-              <td style="text-align: right; color: #ff6b6b;">-$${currentPayPeriod.totalCashTips.toFixed(2)}</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td><strong>TOTAL PAYABLE</strong></td>
-              <td style="text-align: right; color: #6bff6b;"><strong>$${currentPayPeriod.totalPayable.toFixed(2)}</strong></td>
-            </tr>
-          </tfoot>
-        </table>
-        <p style="font-size: 11px; color: #666; margin-top: 12px;">
-          Pay Period: ${currentPayPeriod.periodStart} to ${currentPayPeriod.periodEnd}
-        </p>
-      `;
-
+      preview.innerHTML = '<p style="text-align: center; padding: 20px;">Loading...</p>';
       document.getElementById('invoice-modal').classList.add('show');
+
+      try {
+        // Fetch detailed invoice data
+        const response = await fetch(`/api/invoice-preview/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`);
+        const data = await response.json();
+
+        if (!data.entries || data.entries.length === 0) {
+          preview.innerHTML = '<p style="text-align: center; padding: 20px; color: #888;">No entries for this pay period</p>';
+          return;
+        }
+
+        // Format date for display
+        const formatDateShort = (dateStr) => {
+          const d = new Date(dateStr + 'T00:00:00');
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          return `${days[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
+        };
+
+        // Build daily rows
+        let dailyRows = '';
+        data.entries.forEach(entry => {
+          const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips;
+          dailyRows += `
+            <tr>
+              <td>${formatDateShort(entry.date)}</td>
+              <td style="text-align: right;">${entry.hours.toFixed(2)}</td>
+              <td style="text-align: right;">$${entry.wages.toFixed(2)}</td>
+              <td style="text-align: right;">$${entry.commissions.toFixed(2)}</td>
+              <td style="text-align: right;">$${entry.productCommissions.toFixed(2)}</td>
+              <td style="text-align: right;">$${entry.tips.toFixed(2)}</td>
+              <td style="text-align: right; color: #ff6b6b;">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
+              <td style="text-align: right; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+
+        const summary = data.summary;
+
+        preview.innerHTML = `
+          <p style="font-size: 11px; color: #888; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.1em;">
+            Pay Period: ${currentPayPeriod.periodStart} to ${currentPayPeriod.periodEnd}
+          </p>
+          <p style="font-size: 12px; color: #aaa; margin-bottom: 16px;">
+            Hourly Rate: $${data.employee.hourlyWage}/hr
+          </p>
+          <div style="overflow-x: auto;">
+            <table class="invoice-table" style="min-width: 600px;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th style="text-align: right;">Hours</th>
+                  <th style="text-align: right;">Wages</th>
+                  <th style="text-align: right;">Service Comm</th>
+                  <th style="text-align: right;">Sales Comm</th>
+                  <th style="text-align: right;">Tips</th>
+                  <th style="text-align: right;">Cash Tips</th>
+                  <th style="text-align: right;">Day Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${dailyRows}
+              </tbody>
+              <tfoot>
+                <tr style="background: #1a1a1a;">
+                  <td><strong>TOTALS</strong></td>
+                  <td style="text-align: right;"><strong>${summary.totalHours.toFixed(2)}</strong></td>
+                  <td style="text-align: right;"><strong>$${summary.totalWages.toFixed(2)}</strong></td>
+                  <td style="text-align: right;"><strong>$${summary.totalCommissions.toFixed(2)}</strong></td>
+                  <td style="text-align: right;"><strong>$${summary.totalProductCommissions.toFixed(2)}</strong></td>
+                  <td style="text-align: right;"><strong>$${summary.totalTips.toFixed(2)}</strong></td>
+                  <td style="text-align: right; color: #ff6b6b;"><strong>-$${summary.totalCashTips.toFixed(2)}</strong></td>
+                  <td style="text-align: right; color: #6bff6b; font-size: 14px;"><strong>$${summary.totalPayable.toFixed(2)}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading invoice preview:', error);
+        preview.innerHTML = '<p style="text-align: center; padding: 20px; color: #ff6b6b;">Error loading invoice details</p>';
+      }
     }
 
     function closeInvoiceModal() {
