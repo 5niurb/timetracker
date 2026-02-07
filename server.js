@@ -189,7 +189,7 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'LM PayTrack <paytrack@lemedspa.com>',
+        from: 'LM PayTrack <paytrack@updates.lemedspa.com>',
         to: recipients,
         cc: cc,
         subject: `Pay Period Invoice - ${employee.name} - ${periodStart} to ${periodEnd}`,
