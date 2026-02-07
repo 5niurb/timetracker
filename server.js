@@ -1,8 +1,7 @@
 const express = require('express');
-const initSqlJs = require('sql.js');
+const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,12 +11,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database file path - use /tmp for Render compatibility but also try local
-const DB_PATH = process.env.NODE_ENV === 'production'
-  ? '/tmp/timetracker.db'
-  : path.join(__dirname, 'timetracker.db');
+// Supabase configuration
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-let db;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('ERROR: SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required');
+  console.error('Please set these in your Render environment variables');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Keep-alive ping to prevent Render spin down
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
@@ -40,183 +44,40 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Initialize database
+// Initialize database tables
 async function initDatabase() {
-  const SQL = await initSqlJs();
+  console.log('Initializing Supabase database...');
 
-  // Load existing database or create new one
-  if (fs.existsSync(DB_PATH)) {
-    try {
-      const fileBuffer = fs.readFileSync(DB_PATH);
-      db = new SQL.Database(fileBuffer);
-      console.log('Loaded existing database from', DB_PATH);
-    } catch (err) {
-      console.log('Could not load database, creating new one:', err.message);
-      db = new SQL.Database();
-    }
-  } else {
-    db = new SQL.Database();
-    console.log('Created new database');
+  // Create employees table
+  const { error: empError } = await supabase.rpc('create_employees_table_if_not_exists');
+  if (empError && !empError.message.includes('already exists')) {
+    // Table might already exist, that's fine
+    console.log('Employees table check:', empError?.message || 'OK');
   }
 
-  // Create tables
-  db.run(`
-    CREATE TABLE IF NOT EXISTS employees (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      pin TEXT NOT NULL UNIQUE,
-      email TEXT,
-      hourly_wage REAL DEFAULT 0,
-      commission_rate REAL DEFAULT 0,
-      pay_type TEXT DEFAULT 'hourly',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  // Check if we have any employees
+  const { data: employees, error: countError } = await supabase
+    .from('employees')
+    .select('id')
+    .limit(1);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS time_entries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      employee_id INTEGER NOT NULL,
-      date TEXT NOT NULL,
-      start_time TEXT,
-      end_time TEXT,
-      break_minutes INTEGER DEFAULT 0,
-      hours REAL NOT NULL,
-      description TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (employee_id) REFERENCES employees(id)
-    )
-  `);
+  if (!countError && (!employees || employees.length === 0)) {
+    // Insert sample employee
+    const { error: insertError } = await supabase
+      .from('employees')
+      .insert({
+        name: 'Sample Employee',
+        pin: '1234',
+        hourly_wage: 15.00,
+        pay_type: 'hourly'
+      });
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS client_entries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      time_entry_id INTEGER NOT NULL,
-      client_name TEXT NOT NULL,
-      procedure_name TEXT,
-      notes TEXT,
-      amount_earned REAL DEFAULT 0,
-      tip_amount REAL DEFAULT 0,
-      tip_received_cash INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (time_entry_id) REFERENCES time_entries(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS product_sales (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      time_entry_id INTEGER NOT NULL,
-      product_name TEXT NOT NULL,
-      sale_amount REAL DEFAULT 0,
-      commission_amount REAL DEFAULT 0,
-      notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (time_entry_id) REFERENCES time_entries(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS invoices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      employee_id INTEGER NOT NULL,
-      pay_period_start TEXT NOT NULL,
-      pay_period_end TEXT NOT NULL,
-      total_hours REAL DEFAULT 0,
-      total_wages REAL DEFAULT 0,
-      total_commissions REAL DEFAULT 0,
-      total_tips REAL DEFAULT 0,
-      total_product_commissions REAL DEFAULT 0,
-      cash_tips_received REAL DEFAULT 0,
-      total_payable REAL DEFAULT 0,
-      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      email_sent INTEGER DEFAULT 0,
-      FOREIGN KEY (employee_id) REFERENCES employees(id)
-    )
-  `);
-
-  // Migration: Add new columns if they don't exist
-  const migrations = [
-    { table: 'employees', column: 'hourly_wage', def: 'REAL DEFAULT 0' },
-    { table: 'employees', column: 'commission_rate', def: 'REAL DEFAULT 0' },
-    { table: 'employees', column: 'pay_type', def: 'TEXT DEFAULT "hourly"' },
-    { table: 'employees', column: 'email', def: 'TEXT' },
-    { table: 'time_entries', column: 'start_time', def: 'TEXT' },
-    { table: 'time_entries', column: 'end_time', def: 'TEXT' },
-    { table: 'time_entries', column: 'break_minutes', def: 'INTEGER DEFAULT 0' },
-    { table: 'client_entries', column: 'notes', def: 'TEXT' },
-  ];
-
-  for (const m of migrations) {
-    try {
-      db.exec(`SELECT ${m.column} FROM ${m.table} LIMIT 1`);
-    } catch (e) {
-      try {
-        db.run(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${m.def}`);
-        console.log(`Added column ${m.column} to ${m.table}`);
-      } catch (e2) {}
+    if (!insertError) {
+      console.log('Created sample employee with PIN: 1234');
     }
   }
 
-  saveDatabase();
-
-  // Insert sample employee if none exist
-  const result = db.exec('SELECT COUNT(*) as count FROM employees');
-  const count = result[0]?.values[0][0] || 0;
-
-  if (count === 0) {
-    db.run('INSERT INTO employees (name, pin, hourly_wage, pay_type) VALUES (?, ?, ?, ?)',
-      ['Sample Employee', '1234', 15.00, 'hourly']);
-    console.log('Created sample employee with PIN: 1234');
-    saveDatabase();
-  }
-}
-
-// Save database to file
-function saveDatabase() {
-  try {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
-  } catch (err) {
-    console.error('Error saving database:', err.message);
-  }
-}
-
-// Helper to run queries
-function runQuery(sql, params = []) {
-  try {
-    db.run(sql, params);
-    saveDatabase();
-    return { success: true, lastId: db.exec('SELECT last_insert_rowid()')[0]?.values[0][0] };
-  } catch (error) {
-    console.error('Query error:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Helper to get results
-function getAll(sql, params = []) {
-  try {
-    const stmt = db.prepare(sql);
-    if (params.length > 0) stmt.bind(params);
-
-    const results = [];
-    while (stmt.step()) {
-      const row = stmt.getAsObject();
-      results.push(row);
-    }
-    stmt.free();
-    return results;
-  } catch (error) {
-    console.error('Query error:', error);
-    return [];
-  }
-}
-
-function getOne(sql, params = []) {
-  const results = getAll(sql, params);
-  return results[0] || null;
+  console.log('Database initialization complete');
 }
 
 // Pay period helper functions
@@ -354,52 +215,72 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
 // ============ API ROUTES ============
 
 // Verify employee PIN
-app.post('/api/verify-pin', (req, res) => {
+app.post('/api/verify-pin', async (req, res) => {
   const { pin } = req.body;
-  const employee = getOne(
-    'SELECT id, name, email, hourly_wage, commission_rate, pay_type FROM employees WHERE pin = ?',
-    [pin]
-  );
 
-  if (employee) {
-    res.json({ success: true, employee });
-  } else {
+  const { data: employee, error } = await supabase
+    .from('employees')
+    .select('id, name, email, hourly_wage, commission_rate, pay_type')
+    .eq('pin', pin)
+    .single();
+
+  if (error || !employee) {
     res.json({ success: false, message: 'Invalid PIN' });
+  } else {
+    res.json({ success: true, employee });
   }
 });
 
 // Change PIN
-app.post('/api/change-pin', (req, res) => {
+app.post('/api/change-pin', async (req, res) => {
   const { employeeId, currentPin, newPin } = req.body;
 
   // Verify current PIN
-  const employee = getOne('SELECT id FROM employees WHERE id = ? AND pin = ?', [employeeId, currentPin]);
-  if (!employee) {
+  const { data: employee, error: verifyError } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('id', employeeId)
+    .eq('pin', currentPin)
+    .single();
+
+  if (verifyError || !employee) {
     return res.json({ success: false, message: 'Current PIN is incorrect' });
   }
 
   // Check if new PIN is already used
-  const existing = getOne('SELECT id FROM employees WHERE pin = ? AND id != ?', [newPin, employeeId]);
+  const { data: existing } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('pin', newPin)
+    .neq('id', employeeId)
+    .single();
+
   if (existing) {
     return res.json({ success: false, message: 'PIN already in use by another employee' });
   }
 
-  const result = runQuery('UPDATE employees SET pin = ? WHERE id = ?', [newPin, employeeId]);
-  if (result.success) {
-    res.json({ success: true, message: 'PIN changed successfully' });
-  } else {
+  const { error: updateError } = await supabase
+    .from('employees')
+    .update({ pin: newPin })
+    .eq('id', employeeId);
+
+  if (updateError) {
     res.json({ success: false, message: 'Failed to change PIN' });
+  } else {
+    res.json({ success: true, message: 'PIN changed successfully' });
   }
 });
 
 // Check for conflicting entries
-app.post('/api/check-conflict', (req, res) => {
+app.post('/api/check-conflict', async (req, res) => {
   const { employeeId, date } = req.body;
 
-  const existing = getOne(
-    'SELECT id, start_time, end_time, hours FROM time_entries WHERE employee_id = ? AND date = ?',
-    [employeeId, date]
-  );
+  const { data: existing } = await supabase
+    .from('time_entries')
+    .select('id, start_time, end_time, hours')
+    .eq('employee_id', employeeId)
+    .eq('date', date)
+    .single();
 
   if (existing) {
     res.json({
@@ -412,86 +293,121 @@ app.post('/api/check-conflict', (req, res) => {
 });
 
 // Delete a specific time entry (for override)
-app.delete('/api/time-entry/:id', (req, res) => {
+app.delete('/api/time-entry/:id', async (req, res) => {
   const { id } = req.params;
   const { employeeId } = req.body;
 
   // Verify ownership
-  const entry = getOne('SELECT id FROM time_entries WHERE id = ? AND employee_id = ?', [parseInt(id), employeeId]);
+  const { data: entry } = await supabase
+    .from('time_entries')
+    .select('id')
+    .eq('id', parseInt(id))
+    .eq('employee_id', employeeId)
+    .single();
+
   if (!entry) {
     return res.status(403).json({ success: false, message: 'Not authorized' });
   }
 
-  runQuery('DELETE FROM product_sales WHERE time_entry_id = ?', [parseInt(id)]);
-  runQuery('DELETE FROM client_entries WHERE time_entry_id = ?', [parseInt(id)]);
-  runQuery('DELETE FROM time_entries WHERE id = ?', [parseInt(id)]);
+  // Delete related records
+  await supabase.from('product_sales').delete().eq('time_entry_id', parseInt(id));
+  await supabase.from('client_entries').delete().eq('time_entry_id', parseInt(id));
+  await supabase.from('time_entries').delete().eq('id', parseInt(id));
 
   res.json({ success: true });
 });
 
 // Submit time entry with client entries and product sales
-app.post('/api/time-entry', (req, res) => {
+app.post('/api/time-entry', async (req, res) => {
   const { employeeId, date, startTime, endTime, breakMinutes, hours, description, clients, productSales } = req.body;
 
-  const result = runQuery(
-    'INSERT INTO time_entries (employee_id, date, start_time, end_time, break_minutes, hours, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [employeeId, date, startTime || null, endTime || null, breakMinutes || 0, hours, description || '']
-  );
+  const { data: timeEntry, error } = await supabase
+    .from('time_entries')
+    .insert({
+      employee_id: employeeId,
+      date: date,
+      start_time: startTime || null,
+      end_time: endTime || null,
+      break_minutes: breakMinutes || 0,
+      hours: hours,
+      description: description || ''
+    })
+    .select()
+    .single();
 
-  if (result.success) {
-    const timeEntryId = result.lastId;
-
-    // Insert client entries if provided
-    if (clients && clients.length > 0) {
-      for (const client of clients) {
-        runQuery(
-          'INSERT INTO client_entries (time_entry_id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [timeEntryId, client.clientName, client.procedure || '', client.notes || '', client.amountEarned || 0, client.tipAmount || 0, client.tipReceivedCash ? 1 : 0]
-        );
-      }
-    }
-
-    // Insert product sales if provided
-    if (productSales && productSales.length > 0) {
-      for (const sale of productSales) {
-        runQuery(
-          'INSERT INTO product_sales (time_entry_id, product_name, sale_amount, commission_amount, notes) VALUES (?, ?, ?, ?, ?)',
-          [timeEntryId, sale.productName, sale.saleAmount || 0, sale.commissionAmount || 0, sale.notes || '']
-        );
-      }
-    }
-
-    res.json({ success: true, id: timeEntryId });
-  } else {
-    res.status(400).json({ success: false, message: result.error });
+  if (error) {
+    return res.status(400).json({ success: false, message: error.message });
   }
+
+  const timeEntryId = timeEntry.id;
+
+  // Insert client entries if provided
+  if (clients && clients.length > 0) {
+    const clientData = clients.map(client => ({
+      time_entry_id: timeEntryId,
+      client_name: client.clientName,
+      procedure_name: client.procedure || '',
+      notes: client.notes || '',
+      amount_earned: client.amountEarned || 0,
+      tip_amount: client.tipAmount || 0,
+      tip_received_cash: client.tipReceivedCash ? true : false
+    }));
+
+    await supabase.from('client_entries').insert(clientData);
+  }
+
+  // Insert product sales if provided
+  if (productSales && productSales.length > 0) {
+    const salesData = productSales.map(sale => ({
+      time_entry_id: timeEntryId,
+      product_name: sale.productName,
+      sale_amount: sale.saleAmount || 0,
+      commission_amount: sale.commissionAmount || 0,
+      notes: sale.notes || ''
+    }));
+
+    await supabase.from('product_sales').insert(salesData);
+  }
+
+  res.json({ success: true, id: timeEntryId });
 });
 
 // Get time entries for an employee with client entries
-app.get('/api/time-entries/:employeeId', (req, res) => {
+app.get('/api/time-entries/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
-  const entries = getAll(
-    'SELECT id, date, start_time, end_time, break_minutes, hours, description, created_at FROM time_entries WHERE employee_id = ? ORDER BY date DESC, created_at DESC',
-    [parseInt(employeeId)]
-  );
+
+  const { data: entries, error } = await supabase
+    .from('time_entries')
+    .select('id, date, start_time, end_time, break_minutes, hours, description, created_at')
+    .eq('employee_id', parseInt(employeeId))
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.json([]);
+  }
 
   // Get client entries and product sales for each time entry
   for (const entry of entries) {
-    entry.clients = getAll(
-      'SELECT id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash FROM client_entries WHERE time_entry_id = ?',
-      [entry.id]
-    );
-    entry.productSales = getAll(
-      'SELECT id, product_name, sale_amount, commission_amount, notes FROM product_sales WHERE time_entry_id = ?',
-      [entry.id]
-    );
+    const { data: clients } = await supabase
+      .from('client_entries')
+      .select('id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash')
+      .eq('time_entry_id', entry.id);
+
+    const { data: productSales } = await supabase
+      .from('product_sales')
+      .select('id, product_name, sale_amount, commission_amount, notes')
+      .eq('time_entry_id', entry.id);
+
+    entry.clients = clients || [];
+    entry.productSales = productSales || [];
   }
 
   res.json(entries);
 });
 
 // Get pay period summary
-app.get('/api/pay-period/:employeeId', (req, res) => {
+app.get('/api/pay-period/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
   const { offset } = req.query;
 
@@ -502,13 +418,20 @@ app.get('/api/pay-period/:employeeId', (req, res) => {
   const endDate = formatDateForDB(period.end);
 
   // Get employee info
-  const employee = getOne('SELECT hourly_wage, pay_type FROM employees WHERE id = ?', [parseInt(employeeId)]);
+  const { data: employee } = await supabase
+    .from('employees')
+    .select('hourly_wage, pay_type')
+    .eq('id', parseInt(employeeId))
+    .single();
 
   // Get time entries for this period
-  const entries = getAll(
-    'SELECT id, date, hours FROM time_entries WHERE employee_id = ? AND date BETWEEN ? AND ? ORDER BY date ASC',
-    [parseInt(employeeId), startDate, endDate]
-  );
+  const { data: entries } = await supabase
+    .from('time_entries')
+    .select('id, date, hours')
+    .eq('employee_id', parseInt(employeeId))
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: true });
 
   let totalHours = 0;
   let totalCommissions = 0;
@@ -516,15 +439,16 @@ app.get('/api/pay-period/:employeeId', (req, res) => {
   let totalCashTips = 0;
   let totalProductCommissions = 0;
 
-  for (const entry of entries) {
+  for (const entry of (entries || [])) {
     totalHours += entry.hours;
 
     // Get client entries
-    const clients = getAll(
-      'SELECT amount_earned, tip_amount, tip_received_cash FROM client_entries WHERE time_entry_id = ?',
-      [entry.id]
-    );
-    for (const c of clients) {
+    const { data: clients } = await supabase
+      .from('client_entries')
+      .select('amount_earned, tip_amount, tip_received_cash')
+      .eq('time_entry_id', entry.id);
+
+    for (const c of (clients || [])) {
       totalCommissions += c.amount_earned || 0;
       totalTips += c.tip_amount || 0;
       if (c.tip_received_cash) {
@@ -533,11 +457,12 @@ app.get('/api/pay-period/:employeeId', (req, res) => {
     }
 
     // Get product sales
-    const sales = getAll(
-      'SELECT commission_amount FROM product_sales WHERE time_entry_id = ?',
-      [entry.id]
-    );
-    for (const s of sales) {
+    const { data: sales } = await supabase
+      .from('product_sales')
+      .select('commission_amount')
+      .eq('time_entry_id', entry.id);
+
+    for (const s of (sales || [])) {
       totalProductCommissions += s.commission_amount || 0;
     }
   }
@@ -546,10 +471,13 @@ app.get('/api/pay-period/:employeeId', (req, res) => {
   const totalWages = totalHours * hourlyWage;
 
   // Check if invoice already submitted for this period
-  const existingInvoice = getOne(
-    'SELECT id, submitted_at FROM invoices WHERE employee_id = ? AND pay_period_start = ? AND pay_period_end = ?',
-    [parseInt(employeeId), startDate, endDate]
-  );
+  const { data: existingInvoice } = await supabase
+    .from('invoices')
+    .select('id, submitted_at')
+    .eq('employee_id', parseInt(employeeId))
+    .eq('pay_period_start', startDate)
+    .eq('pay_period_end', endDate)
+    .single();
 
   res.json({
     periodStart: startDate,
@@ -563,7 +491,7 @@ app.get('/api/pay-period/:employeeId', (req, res) => {
     totalProductCommissions,
     totalPayable: totalWages + totalCommissions + totalTips + totalProductCommissions - totalCashTips,
     hourlyWage,
-    entries,
+    entries: entries || [],
     invoiceSubmitted: !!existingInvoice,
     invoiceDate: existingInvoice?.submitted_at
   });
@@ -574,36 +502,58 @@ app.post('/api/submit-invoice', async (req, res) => {
   const { employeeId, periodStart, periodEnd, totalHours, totalWages, totalCommissions, totalTips, totalCashTips, totalProductCommissions, totalPayable } = req.body;
 
   // Check if already submitted
-  const existing = getOne(
-    'SELECT id FROM invoices WHERE employee_id = ? AND pay_period_start = ? AND pay_period_end = ?',
-    [employeeId, periodStart, periodEnd]
-  );
+  const { data: existing } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('employee_id', employeeId)
+    .eq('pay_period_start', periodStart)
+    .eq('pay_period_end', periodEnd)
+    .single();
 
   if (existing) {
     return res.json({ success: false, message: 'Invoice already submitted for this pay period' });
   }
 
   // Get employee details
-  const employee = getOne('SELECT name, email, hourly_wage FROM employees WHERE id = ?', [employeeId]);
+  const { data: employee } = await supabase
+    .from('employees')
+    .select('name, email, hourly_wage')
+    .eq('id', employeeId)
+    .single();
 
   // Create invoice record
-  const result = runQuery(
-    `INSERT INTO invoices (employee_id, pay_period_start, pay_period_end, total_hours, total_wages, total_commissions, total_tips, total_product_commissions, cash_tips_received, total_payable, email_sent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-    [employeeId, periodStart, periodEnd, totalHours, totalWages, totalCommissions, totalTips, totalProductCommissions, totalCashTips, totalPayable]
+  const { data: invoice, error } = await supabase
+    .from('invoices')
+    .insert({
+      employee_id: employeeId,
+      pay_period_start: periodStart,
+      pay_period_end: periodEnd,
+      total_hours: totalHours,
+      total_wages: totalWages,
+      total_commissions: totalCommissions,
+      total_tips: totalTips,
+      total_product_commissions: totalProductCommissions,
+      cash_tips_received: totalCashTips,
+      total_payable: totalPayable,
+      email_sent: false
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return res.json({ success: false, message: 'Failed to create invoice' });
+  }
+
+  // Try to send email
+  const emailResult = await sendInvoiceEmail(
+    { name: employee?.name, email: employee?.email, hourlyWage: employee?.hourly_wage || 0 },
+    periodStart,
+    periodEnd,
+    { totalHours, totalWages, totalCommissions, totalProductCommissions, totalTips, totalCashTips, totalPayable }
   );
 
-  if (result.success) {
-    // Try to send email
-    const emailResult = await sendInvoiceEmail(
-      { name: employee?.name, email: employee?.email, hourlyWage: employee?.hourly_wage || 0 },
-      periodStart,
-      periodEnd,
-      { totalHours, totalWages, totalCommissions, totalProductCommissions, totalTips, totalCashTips, totalPayable }
-    );
-
-    // Log invoice details
-    console.log(`
+  // Log invoice details
+  console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                    INVOICE SUBMITTED                       ║
 ╠════════════════════════════════════════════════════════════╣
@@ -621,43 +571,47 @@ app.post('/api/submit-invoice', async (req, res) => {
 ║
 ║  Email: ${emailResult.sent ? 'SENT' : 'NOT SENT - ' + emailResult.reason}
 ╚════════════════════════════════════════════════════════════╝
-    `);
+  `);
 
-    // Mark email as sent if successful
-    if (emailResult.sent) {
-      runQuery('UPDATE invoices SET email_sent = 1 WHERE id = ?', [result.lastId]);
-    }
-
-    res.json({
-      success: true,
-      message: emailResult.sent ? 'Invoice submitted and email sent!' : 'Invoice submitted (email not configured)',
-      invoiceId: result.lastId,
-      emailSent: emailResult.sent
-    });
-  } else {
-    res.json({ success: false, message: 'Failed to create invoice' });
+  // Mark email as sent if successful
+  if (emailResult.sent) {
+    await supabase
+      .from('invoices')
+      .update({ email_sent: true })
+      .eq('id', invoice.id);
   }
+
+  res.json({
+    success: true,
+    message: emailResult.sent ? 'Invoice submitted and email sent!' : 'Invoice submitted (email not configured)',
+    invoiceId: invoice.id,
+    emailSent: emailResult.sent
+  });
 });
 
 // Get invoice details for email preview
-app.get('/api/invoice-preview/:employeeId', (req, res) => {
+app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
   const { periodStart, periodEnd } = req.query;
 
-  const employee = getOne('SELECT id, name, email, hourly_wage, pay_type FROM employees WHERE id = ?', [parseInt(employeeId)]);
+  const { data: employee, error: empError } = await supabase
+    .from('employees')
+    .select('id, name, email, hourly_wage, pay_type')
+    .eq('id', parseInt(employeeId))
+    .single();
 
-  if (!employee) {
+  if (empError || !employee) {
     return res.status(404).json({ success: false, message: 'Employee not found' });
   }
 
   // Get all entries for the period with details
-  const entries = getAll(
-    `SELECT te.id, te.date, te.start_time, te.end_time, te.hours
-     FROM time_entries te
-     WHERE te.employee_id = ? AND te.date BETWEEN ? AND ?
-     ORDER BY te.date ASC`,
-    [parseInt(employeeId), periodStart, periodEnd]
-  );
+  const { data: entries } = await supabase
+    .from('time_entries')
+    .select('id, date, start_time, end_time, hours')
+    .eq('employee_id', parseInt(employeeId))
+    .gte('date', periodStart)
+    .lte('date', periodEnd)
+    .order('date', { ascending: true });
 
   const detailedEntries = [];
   let totalHours = 0;
@@ -666,29 +620,29 @@ app.get('/api/invoice-preview/:employeeId', (req, res) => {
   let totalCashTips = 0;
   let totalProductCommissions = 0;
 
-  for (const entry of entries) {
-    const clients = getAll(
-      'SELECT client_name, procedure_name, amount_earned, tip_amount, tip_received_cash FROM client_entries WHERE time_entry_id = ?',
-      [entry.id]
-    );
+  for (const entry of (entries || [])) {
+    const { data: clients } = await supabase
+      .from('client_entries')
+      .select('client_name, procedure_name, amount_earned, tip_amount, tip_received_cash')
+      .eq('time_entry_id', entry.id);
 
-    const products = getAll(
-      'SELECT product_name, sale_amount, commission_amount FROM product_sales WHERE time_entry_id = ?',
-      [entry.id]
-    );
+    const { data: products } = await supabase
+      .from('product_sales')
+      .select('product_name, sale_amount, commission_amount')
+      .eq('time_entry_id', entry.id);
 
     let dayCommissions = 0;
     let dayTips = 0;
     let dayCashTips = 0;
     let dayProductCommissions = 0;
 
-    for (const c of clients) {
+    for (const c of (clients || [])) {
       dayCommissions += c.amount_earned || 0;
       dayTips += c.tip_amount || 0;
       if (c.tip_received_cash) dayCashTips += c.tip_amount || 0;
     }
 
-    for (const p of products) {
+    for (const p of (products || [])) {
       dayProductCommissions += p.commission_amount || 0;
     }
 
@@ -708,8 +662,8 @@ app.get('/api/invoice-preview/:employeeId', (req, res) => {
       productCommissions: dayProductCommissions,
       tips: dayTips,
       cashTips: dayCashTips,
-      clients,
-      products
+      clients: clients || [],
+      products: products || []
     });
   }
 
@@ -749,141 +703,209 @@ app.post('/api/admin/verify', (req, res) => {
 });
 
 // Get all employees
-app.get('/api/admin/employees', (req, res) => {
-  const employees = getAll('SELECT id, name, pin, email, hourly_wage, commission_rate, pay_type, created_at FROM employees');
-  res.json(employees);
+app.get('/api/admin/employees', async (req, res) => {
+  const { data: employees, error } = await supabase
+    .from('employees')
+    .select('id, name, pin, email, hourly_wage, commission_rate, pay_type, created_at');
+
+  res.json(employees || []);
 });
 
 // Add new employee
-app.post('/api/admin/employees', (req, res) => {
+app.post('/api/admin/employees', async (req, res) => {
   const { name, pin, email, hourlyWage, commissionRate, payType } = req.body;
 
   // Check if PIN already exists
-  const existing = getOne('SELECT id FROM employees WHERE pin = ?', [pin]);
+  const { data: existing } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('pin', pin)
+    .single();
+
   if (existing) {
     return res.status(400).json({ success: false, message: 'PIN already exists' });
   }
 
-  const result = runQuery(
-    'INSERT INTO employees (name, pin, email, hourly_wage, commission_rate, pay_type) VALUES (?, ?, ?, ?, ?, ?)',
-    [name, pin, email || null, hourlyWage || 0, commissionRate || 0, payType || 'hourly']
-  );
+  const { data: employee, error } = await supabase
+    .from('employees')
+    .insert({
+      name: name,
+      pin: pin,
+      email: email || null,
+      hourly_wage: hourlyWage || 0,
+      commission_rate: commissionRate || 0,
+      pay_type: payType || 'hourly'
+    })
+    .select()
+    .single();
 
-  if (result.success) {
-    res.json({ success: true, id: result.lastId });
+  if (error) {
+    res.status(400).json({ success: false, message: error.message });
   } else {
-    res.status(400).json({ success: false, message: result.error });
+    res.json({ success: true, id: employee.id });
   }
 });
 
 // Update employee
-app.put('/api/admin/employees/:id', (req, res) => {
+app.put('/api/admin/employees/:id', async (req, res) => {
   const { id } = req.params;
   const { name, pin, email, hourlyWage, commissionRate, payType } = req.body;
 
   // Check if PIN already exists for another employee
-  const existing = getOne('SELECT id FROM employees WHERE pin = ? AND id != ?', [pin, parseInt(id)]);
+  const { data: existing } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('pin', pin)
+    .neq('id', parseInt(id))
+    .single();
+
   if (existing) {
     return res.status(400).json({ success: false, message: 'PIN already exists' });
   }
 
-  const result = runQuery(
-    'UPDATE employees SET name = ?, pin = ?, email = ?, hourly_wage = ?, commission_rate = ?, pay_type = ? WHERE id = ?',
-    [name, pin, email || null, hourlyWage || 0, commissionRate || 0, payType || 'hourly', parseInt(id)]
-  );
+  const { error } = await supabase
+    .from('employees')
+    .update({
+      name: name,
+      pin: pin,
+      email: email || null,
+      hourly_wage: hourlyWage || 0,
+      commission_rate: commissionRate || 0,
+      pay_type: payType || 'hourly'
+    })
+    .eq('id', parseInt(id));
 
-  if (result.success) {
-    res.json({ success: true });
+  if (error) {
+    res.status(400).json({ success: false, message: error.message });
   } else {
-    res.status(400).json({ success: false, message: result.error });
+    res.json({ success: true });
   }
 });
 
 // Delete employee
-app.delete('/api/admin/employees/:id', (req, res) => {
+app.delete('/api/admin/employees/:id', async (req, res) => {
   const { id } = req.params;
 
+  // Get time entries for this employee
+  const { data: timeEntries } = await supabase
+    .from('time_entries')
+    .select('id')
+    .eq('employee_id', parseInt(id));
+
   // Delete related records
-  const timeEntries = getAll('SELECT id FROM time_entries WHERE employee_id = ?', [parseInt(id)]);
-  for (const entry of timeEntries) {
-    runQuery('DELETE FROM product_sales WHERE time_entry_id = ?', [entry.id]);
-    runQuery('DELETE FROM client_entries WHERE time_entry_id = ?', [entry.id]);
+  for (const entry of (timeEntries || [])) {
+    await supabase.from('product_sales').delete().eq('time_entry_id', entry.id);
+    await supabase.from('client_entries').delete().eq('time_entry_id', entry.id);
   }
 
-  runQuery('DELETE FROM invoices WHERE employee_id = ?', [parseInt(id)]);
-  runQuery('DELETE FROM time_entries WHERE employee_id = ?', [parseInt(id)]);
-  runQuery('DELETE FROM employees WHERE id = ?', [parseInt(id)]);
+  await supabase.from('invoices').delete().eq('employee_id', parseInt(id));
+  await supabase.from('time_entries').delete().eq('employee_id', parseInt(id));
+  await supabase.from('employees').delete().eq('id', parseInt(id));
 
   res.json({ success: true });
 });
 
 // Get all time entries (admin view)
-app.get('/api/admin/time-entries', (req, res) => {
+app.get('/api/admin/time-entries', async (req, res) => {
   const { startDate, endDate } = req.query;
 
-  let sql = `
-    SELECT
-      te.id,
-      te.date,
-      te.start_time,
-      te.end_time,
-      te.break_minutes,
-      te.hours,
-      te.description,
-      te.created_at,
-      e.name as employee_name,
-      e.id as employee_id,
-      e.hourly_wage,
-      e.commission_rate,
-      e.pay_type
-    FROM time_entries te
-    JOIN employees e ON te.employee_id = e.id
-  `;
-
-  const params = [];
+  let query = supabase
+    .from('time_entries')
+    .select(`
+      id,
+      date,
+      start_time,
+      end_time,
+      break_minutes,
+      hours,
+      description,
+      created_at,
+      employee_id,
+      employees (
+        id,
+        name,
+        hourly_wage,
+        commission_rate,
+        pay_type
+      )
+    `)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
 
   if (startDate && endDate) {
-    sql += ' WHERE te.date BETWEEN ? AND ?';
-    params.push(startDate, endDate);
+    query = query.gte('date', startDate).lte('date', endDate);
   }
 
-  sql += ' ORDER BY te.date DESC, te.created_at DESC';
+  const { data: entries, error } = await query;
 
-  const entries = getAll(sql, params);
-
-  // Get client entries and product sales for each time entry
-  for (const entry of entries) {
-    entry.clients = getAll(
-      'SELECT id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash FROM client_entries WHERE time_entry_id = ?',
-      [entry.id]
-    );
-    entry.productSales = getAll(
-      'SELECT id, product_name, sale_amount, commission_amount, notes FROM product_sales WHERE time_entry_id = ?',
-      [entry.id]
-    );
+  if (error) {
+    return res.json([]);
   }
 
-  res.json(entries);
+  // Transform and get client entries and product sales for each time entry
+  const transformedEntries = [];
+  for (const entry of (entries || [])) {
+    const { data: clients } = await supabase
+      .from('client_entries')
+      .select('id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash')
+      .eq('time_entry_id', entry.id);
+
+    const { data: productSales } = await supabase
+      .from('product_sales')
+      .select('id, product_name, sale_amount, commission_amount, notes')
+      .eq('time_entry_id', entry.id);
+
+    transformedEntries.push({
+      id: entry.id,
+      date: entry.date,
+      start_time: entry.start_time,
+      end_time: entry.end_time,
+      break_minutes: entry.break_minutes,
+      hours: entry.hours,
+      description: entry.description,
+      created_at: entry.created_at,
+      employee_id: entry.employee_id,
+      employee_name: entry.employees?.name,
+      hourly_wage: entry.employees?.hourly_wage,
+      commission_rate: entry.employees?.commission_rate,
+      pay_type: entry.employees?.pay_type,
+      clients: clients || [],
+      productSales: productSales || []
+    });
+  }
+
+  res.json(transformedEntries);
 });
 
 // Delete time entry (admin)
-app.delete('/api/admin/time-entries/:id', (req, res) => {
+app.delete('/api/admin/time-entries/:id', async (req, res) => {
   const { id } = req.params;
-  runQuery('DELETE FROM product_sales WHERE time_entry_id = ?', [parseInt(id)]);
-  runQuery('DELETE FROM client_entries WHERE time_entry_id = ?', [parseInt(id)]);
-  runQuery('DELETE FROM time_entries WHERE id = ?', [parseInt(id)]);
+
+  await supabase.from('product_sales').delete().eq('time_entry_id', parseInt(id));
+  await supabase.from('client_entries').delete().eq('time_entry_id', parseInt(id));
+  await supabase.from('time_entries').delete().eq('id', parseInt(id));
+
   res.json({ success: true });
 });
 
 // Get all invoices (admin)
-app.get('/api/admin/invoices', (req, res) => {
-  const invoices = getAll(`
-    SELECT i.*, e.name as employee_name
-    FROM invoices i
-    JOIN employees e ON i.employee_id = e.id
-    ORDER BY i.submitted_at DESC
-  `);
-  res.json(invoices);
+app.get('/api/admin/invoices', async (req, res) => {
+  const { data: invoices, error } = await supabase
+    .from('invoices')
+    .select(`
+      *,
+      employees (
+        name
+      )
+    `)
+    .order('submitted_at', { ascending: false });
+
+  const transformedInvoices = (invoices || []).map(inv => ({
+    ...inv,
+    employee_name: inv.employees?.name
+  }));
+
+  res.json(transformedInvoices);
 });
 
 // Serve admin page
@@ -906,7 +928,7 @@ async function start() {
 ║  Employee App:  http://localhost:${PORT}                      ║
 ║  Admin Panel:   http://localhost:${PORT}/admin                ║
 ║                                                            ║
-║  Default Employee PIN: 1234                                ║
+║  Using Supabase PostgreSQL for data persistence            ║
 ║  Admin Password: Set via ADMIN_PASSWORD env var            ║
 ╚════════════════════════════════════════════════════════════╝
     `);

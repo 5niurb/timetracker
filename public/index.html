@@ -877,7 +877,7 @@
             </div>
           </div>
           <div id="invoice-status"></div>
-          <button class="btn-primary" id="submit-invoice-btn" onclick="showInvoicePreview()" style="margin-top: 12px;">Submit for Payment</button>
+          <button class="btn-primary" id="submit-invoice-btn" onclick="showInvoicePreview()" style="margin-top: 12px;">Generate Invoice for Review</button>
         </div>
       </div>
 
@@ -922,16 +922,6 @@
           <div class="value" id="calculated-hours">0.00</div>
         </div>
 
-        <div class="alert error" id="entry-error"></div>
-        <div class="alert success" id="entry-success"></div>
-
-        <button class="btn-primary" onclick="submitEntry()" id="submit-entry-btn">Save Entry</button>
-      </div>
-
-      <!-- Log Commissions & Tips Card (separate panel) -->
-      <div class="card" id="commissions-card" style="display: none;">
-        <h3>Log Commissions & Tips</h3>
-
         <!-- Service Entries (for service commission workers) -->
         <div class="service-entries" id="service-section" style="display: none;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -949,6 +939,11 @@
           </div>
           <div id="sales-entries-container"></div>
         </div>
+
+        <div class="alert error" id="entry-error"></div>
+        <div class="alert success" id="entry-success"></div>
+
+        <button class="btn-primary" onclick="submitEntry()" id="submit-entry-btn">Save Entry</button>
       </div>
 
       <!-- Recent Entries -->
@@ -1091,9 +1086,7 @@
       // Determine what to show
       const showServices = ['commission_services', 'hourly_services', 'hourly_all'].includes(payType);
       const showSales = ['commission_sales', 'hourly_sales', 'hourly_all'].includes(payType);
-      const showCommissionsCard = showServices || showSales;
 
-      document.getElementById('commissions-card').style.display = showCommissionsCard ? 'block' : 'none';
       document.getElementById('service-section').style.display = showServices ? 'block' : 'none';
       document.getElementById('sales-section').style.display = showSales ? 'block' : 'none';
 
@@ -1251,12 +1244,12 @@
           <button class="remove-entry" onclick="removeServiceEntry(${serviceCount})">&times;</button>
         </div>
         <div class="form-group">
-          <label>Client Name</label>
-          <input type="text" class="service-client" placeholder="Enter client name">
+          <label>Service Description</label>
+          <input type="text" class="service-client" placeholder="Service / client details">
         </div>
         <div class="form-group">
-          <label>Service Performed</label>
-          <input type="text" class="service-name" placeholder="Service performed">
+          <label>Procedure</label>
+          <input type="text" class="service-name" placeholder="Procedure performed">
         </div>
         <div class="time-row">
           <div class="form-group">
@@ -1452,13 +1445,16 @@
       const clients = [];
       document.querySelectorAll('.service-entry').forEach(entry => {
         const name = entry.querySelector('.service-client').value.trim();
-        if (name) {
+        const earnings = parseFloat(entry.querySelector('.service-earnings').value) || 0;
+        const tip = parseFloat(entry.querySelector('.service-tip').value) || 0;
+        // Include if there's a name OR any earnings/tips
+        if (name || earnings > 0 || tip > 0) {
           clients.push({
-            clientName: name,
+            clientName: name || 'Service',
             procedure: entry.querySelector('.service-name').value.trim(),
             notes: entry.querySelector('.service-notes').value.trim(),
-            amountEarned: parseFloat(entry.querySelector('.service-earnings').value) || 0,
-            tipAmount: parseFloat(entry.querySelector('.service-tip').value) || 0,
+            amountEarned: earnings,
+            tipAmount: tip,
             tipReceivedCash: entry.querySelector('.tip-cash').checked
           });
         }
@@ -1467,11 +1463,14 @@
       const productSales = [];
       document.querySelectorAll('.sales-entry').forEach(entry => {
         const name = entry.querySelector('.product-name').value.trim();
-        if (name) {
+        const amount = parseFloat(entry.querySelector('.product-amount').value) || 0;
+        const commission = parseFloat(entry.querySelector('.product-commission').value) || 0;
+        // Include if there's a name OR any sale amount/commission
+        if (name || amount > 0 || commission > 0) {
           productSales.push({
-            productName: name,
-            saleAmount: parseFloat(entry.querySelector('.product-amount').value) || 0,
-            commissionAmount: parseFloat(entry.querySelector('.product-commission').value) || 0,
+            productName: name || 'Sale',
+            saleAmount: amount,
+            commissionAmount: commission,
             notes: entry.querySelector('.product-notes').value.trim()
           });
         }
