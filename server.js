@@ -589,6 +589,13 @@ app.post('/api/submit-invoice', async (req, res) => {
   });
 });
 
+// Helper to get today's date in LA timezone
+function getLATodayString() {
+  const now = new Date();
+  const laDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  return `${laDate.getFullYear()}-${String(laDate.getMonth() + 1).padStart(2, '0')}-${String(laDate.getDate()).padStart(2, '0')}`;
+}
+
 // Get invoice details for email preview
 app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
@@ -604,14 +611,20 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
     return res.status(404).json({ success: false, message: 'Employee not found' });
   }
 
-  // Get all entries for the period with details
+  // Get today's date in LA timezone to filter out future entries
+  const todayLA = getLATodayString();
+
+  // Use the earlier of periodEnd or today (to exclude future dates)
+  const effectiveEndDate = periodEnd <= todayLA ? periodEnd : todayLA;
+
+  // Get all entries for the period with details (only up to today in LA time)
   const { data: entries } = await supabase
     .from('time_entries')
     .select('id, date, start_time, end_time, hours')
     .eq('employee_id', parseInt(employeeId))
     .gte('date', periodStart)
-    .lte('date', periodEnd)
-    .order('date', { ascending: true });
+    .lte('date', effectiveEndDate)
+    .order('date', { ascending: false }); // Descending order (most recent first)
 
   const detailedEntries = [];
   let totalHours = 0;
@@ -653,6 +666,7 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
     totalProductCommissions += dayProductCommissions;
 
     detailedEntries.push({
+      id: entry.id, // Include entry ID for delete functionality
       date: entry.date,
       startTime: entry.start_time,
       endTime: entry.end_time,

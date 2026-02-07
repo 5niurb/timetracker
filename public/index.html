@@ -199,6 +199,24 @@
       color: #666;
     }
 
+    .btn-delete-small {
+      background: #8b0000;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: 'Montserrat', sans-serif;
+      transition: background 0.2s;
+    }
+
+    .btn-delete-small:hover {
+      background: #a00000;
+    }
+
     .login-box {
       max-width: 380px;
       margin: 60px auto;
@@ -957,7 +975,7 @@
       <div class="container">
         <!-- Time Entry Form -->
         <div class="card" id="time-entry-card">
-          <h3>Log Time</h3>
+          <h3>Daily Entry</h3>
 
           <!-- Date Picker -->
           <div class="date-picker-container">
@@ -1080,10 +1098,11 @@
                   <th class="right">Tips</th>
                   <th class="right">Cash Tips</th>
                   <th class="right">Day Total</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="review-entries-body">
-                <tr><td colspan="8" class="no-entries">Loading...</td></tr>
+                <tr><td colspan="9" class="no-entries">Loading...</td></tr>
               </tbody>
               <tfoot id="review-entries-footer" style="display: none;">
                 <tr>
@@ -1095,6 +1114,7 @@
                   <td class="right" id="review-total-tips">$0.00</td>
                   <td class="right cash-tips" id="review-total-cash">-$0.00</td>
                   <td class="right total-value" id="review-total-payable">$0.00</td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -1168,6 +1188,19 @@
     let serviceCount = 0;
     let salesCount = 0;
     let currentTab = 'entry';
+
+    // Get current date/time in Los Angeles timezone
+    function getLADate() {
+      const now = new Date();
+      const laTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      return laTime;
+    }
+
+    // Get today's date string in LA timezone (YYYY-MM-DD)
+    function getLAToday() {
+      const la = getLADate();
+      return `${la.getFullYear()}-${String(la.getMonth() + 1).padStart(2, '0')}-${String(la.getDate()).padStart(2, '0')}`;
+    }
 
     // Initialize
     document.getElementById('pin-input').addEventListener('keypress', e => {
@@ -1271,7 +1304,7 @@
 
       const tbody = document.getElementById('review-entries-body');
       const tfoot = document.getElementById('review-entries-footer');
-      tbody.innerHTML = '<tr><td colspan="8" class="no-entries">Loading...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-entries">Loading...</td></tr>';
       tfoot.style.display = 'none';
 
       try {
@@ -1279,7 +1312,7 @@
         const data = await response.json();
 
         if (!data.entries || data.entries.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="no-entries">No entries for this pay period</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="no-entries">No entries for this pay period</td></tr>';
           return;
         }
 
@@ -1290,9 +1323,14 @@
           return `${days[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
         };
 
+        // Sort entries by date descending (most recent first)
+        const sortedEntries = [...data.entries].sort((a, b) => {
+          return new Date(b.date) - new Date(a.date);
+        });
+
         // Build rows
         let rows = '';
-        data.entries.forEach(entry => {
+        sortedEntries.forEach(entry => {
           const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips;
           rows += `
             <tr>
@@ -1304,6 +1342,7 @@
               <td class="right">$${entry.tips.toFixed(2)}</td>
               <td class="right cash-tips">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
               <td class="right" style="font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+              <td class="right"><button class="btn-delete-small" onclick="deleteReviewEntry(${entry.id}, '${entry.date}')">Delete</button></td>
             </tr>
           `;
         });
@@ -1328,7 +1367,8 @@
 
     // Date Picker
     function initializeDatePicker() {
-      selectedDate = new Date();
+      selectedDate = getLADate();
+      selectedDate.setHours(0, 0, 0, 0);
       updateDateDisplay();
       buildDateWheel();
     }
@@ -1358,7 +1398,8 @@
       const container = document.getElementById('date-wheel-inner');
       container.innerHTML = '';
 
-      const today = new Date();
+      // Use LA timezone for "today"
+      const today = getLADate();
       today.setHours(0, 0, 0, 0);
 
       // Show 30 days back and forward
@@ -1397,7 +1438,8 @@
     }
 
     function scrollDate(direction) {
-      const today = new Date();
+      // Use LA timezone for "today"
+      const today = getLADate();
       today.setHours(0, 0, 0, 0);
 
       const newDate = new Date(selectedDate);
@@ -1411,7 +1453,8 @@
     }
 
     function selectDateByOffset(offset) {
-      const today = new Date();
+      // Use LA timezone for "today"
+      const today = getLADate();
       today.setHours(0, 0, 0, 0);
 
       const newDate = new Date(selectedDate);
@@ -1425,7 +1468,8 @@
     }
 
     function updateScrollButtons() {
-      const today = new Date();
+      // Use LA timezone for "today"
+      const today = getLADate();
       today.setHours(0, 0, 0, 0);
 
       const downBtn = document.getElementById('date-scroll-down');
@@ -1562,6 +1606,34 @@
     function removeSalesEntry(id) {
       const entry = document.getElementById(`sales-${id}`);
       if (entry) entry.remove();
+    }
+
+    // Delete entry from Pay Review
+    async function deleteReviewEntry(entryId, dateStr) {
+      if (!confirm(`Are you sure you want to delete the entry for ${dateStr}?`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/time-entry/${entryId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employeeId: currentEmployee.id })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Reload the review data
+          loadPayPeriod();
+          loadReviewEntries();
+        } else {
+          alert('Failed to delete entry: ' + (data.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+        alert('Connection error while deleting entry');
+      }
     }
 
     function setCommissionType(id, type) {
