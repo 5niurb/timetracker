@@ -85,12 +85,118 @@
       padding: 20px;
     }
 
+    .container.wide {
+      max-width: 900px;
+    }
+
     .screen {
       display: none;
     }
 
     .screen.active {
       display: block;
+    }
+
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      background: #0a0a0a;
+      border-bottom: 1px solid #333;
+      position: sticky;
+      top: 57px;
+      z-index: 99;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 14px 20px;
+      background: transparent;
+      border: none;
+      color: #666;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.3s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab-btn:hover {
+      color: #aaa;
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      border-bottom-color: #fff;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Review Table Styles */
+    .review-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .review-table th {
+      background: #1a1a1a;
+      color: #888;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 12px 8px;
+      text-align: left;
+      border-bottom: 1px solid #333;
+    }
+
+    .review-table th.right {
+      text-align: right;
+    }
+
+    .review-table td {
+      padding: 14px 8px;
+      border-bottom: 1px solid #222;
+      color: #ccc;
+    }
+
+    .review-table td.right {
+      text-align: right;
+    }
+
+    .review-table tr:hover {
+      background: #151515;
+    }
+
+    .review-table tfoot td {
+      background: #1a2a1a;
+      border-top: 2px solid #2a4a2a;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .review-table tfoot td.total-value {
+      color: #6bff6b;
+      font-size: 14px;
+    }
+
+    .review-table .cash-tips {
+      color: #ff6b6b;
+    }
+
+    .no-entries {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
     }
 
     .login-box {
@@ -840,117 +946,159 @@
       </div>
     </div>
 
-    <div class="container">
-      <!-- Pay Period Summary -->
-      <div class="pay-period-card" id="pay-period-card">
-        <div class="pay-period-header">
-          <div class="pay-period-nav">
-            <button onclick="changePeriod(-1)" id="prev-period-btn">&larr;</button>
-            <div>
-              <div class="pay-period-label">Pay Period</div>
-              <div class="pay-period-dates" id="period-dates">Loading...</div>
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('entry')" id="tab-entry-btn">Pay Entry</button>
+      <button class="tab-btn" onclick="switchTab('review')" id="tab-review-btn">Pay Review</button>
+    </div>
+
+    <!-- PAY ENTRY TAB -->
+    <div class="tab-content active" id="tab-entry">
+      <div class="container">
+        <!-- Time Entry Form -->
+        <div class="card" id="time-entry-card">
+          <h3>Log Time</h3>
+
+          <!-- Date Picker -->
+          <div class="date-picker-container">
+            <div class="date-display">
+              <div class="day-name" id="selected-day-name">Friday</div>
+              <div class="full-date" id="selected-full-date">February 6th, 2026</div>
             </div>
-            <button onclick="changePeriod(1)" id="next-period-btn">&rarr;</button>
-          </div>
-        </div>
-        <div class="pay-period-body">
-          <div class="pay-period-stats">
-            <div class="pay-stat">
-              <div class="label">Hours Worked</div>
-              <div class="value" id="period-hours">0.0</div>
-            </div>
-            <div class="pay-stat">
-              <div class="label">Wages</div>
-              <div class="value" id="period-wages">$0</div>
-            </div>
-            <div class="pay-stat">
-              <div class="label">Commissions</div>
-              <div class="value" id="period-commissions">$0</div>
-            </div>
-            <div class="pay-stat">
-              <div class="label">Tips</div>
-              <div class="value" id="period-tips">$0</div>
-            </div>
-            <div class="pay-stat total">
-              <div class="label">Total Payable</div>
-              <div class="value" id="period-total">$0</div>
+            <div class="date-scroll-container">
+              <button class="date-scroll-btn" onclick="scrollDate(-1)">&uarr;</button>
+              <div class="date-wheel" id="date-wheel">
+                <div class="date-wheel-inner" id="date-wheel-inner"></div>
+              </div>
+              <button class="date-scroll-btn" onclick="scrollDate(1)" id="date-scroll-down">&darr;</button>
             </div>
           </div>
-          <div id="invoice-status"></div>
-          <button class="btn-primary" id="submit-invoice-btn" onclick="showInvoicePreview()" style="margin-top: 12px;">Generate Invoice for Review</button>
+
+          <!-- Time Inputs -->
+          <div class="time-row">
+            <div class="form-group">
+              <label>Start Time</label>
+              <input type="time" id="start-time" onchange="calculateHours()">
+            </div>
+            <div class="form-group">
+              <label>End Time</label>
+              <input type="time" id="end-time" onchange="calculateHours()">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Break Time (minutes)</label>
+            <input type="number" id="break-minutes" value="0" min="0" step="5" onchange="calculateHours()">
+          </div>
+
+          <div class="calculated-hours">
+            <div class="label">Hours Worked</div>
+            <div class="value" id="calculated-hours">0.00</div>
+          </div>
+
+          <!-- Service Entries (for service commission workers) -->
+          <div class="service-entries" id="service-section" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0; font-size: 14px;">Services & Tips</h3>
+              <button class="btn-secondary btn-small" onclick="addServiceEntry()">+ Add Service</button>
+            </div>
+            <div id="service-entries-container"></div>
+          </div>
+
+          <!-- Sales Entries (for sales commission workers) -->
+          <div class="sales-entries" id="sales-section" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0; font-size: 14px;">Sales</h3>
+              <button class="btn-secondary btn-small" onclick="addSalesEntry()">+ Add Sale</button>
+            </div>
+            <div id="sales-entries-container"></div>
+          </div>
+
+          <div class="alert error" id="entry-error"></div>
+          <div class="alert success" id="entry-success"></div>
+
+          <button class="btn-primary" onclick="submitEntry()" id="submit-entry-btn">Save Entry</button>
         </div>
       </div>
+    </div>
 
-      <!-- Time Entry Form -->
-      <div class="card" id="time-entry-card">
-        <h3>Log Time</h3>
-
-        <!-- Date Picker -->
-        <div class="date-picker-container">
-          <div class="date-display">
-            <div class="day-name" id="selected-day-name">Friday</div>
-            <div class="full-date" id="selected-full-date">February 6th, 2026</div>
-          </div>
-          <div class="date-scroll-container">
-            <button class="date-scroll-btn" onclick="scrollDate(-1)">&uarr;</button>
-            <div class="date-wheel" id="date-wheel">
-              <div class="date-wheel-inner" id="date-wheel-inner"></div>
+    <!-- PAY REVIEW TAB -->
+    <div class="tab-content" id="tab-review">
+      <div class="container wide">
+        <!-- Pay Period Summary -->
+        <div class="pay-period-card" id="pay-period-card">
+          <div class="pay-period-header">
+            <div class="pay-period-nav">
+              <button onclick="changePeriod(-1)" id="prev-period-btn">&larr;</button>
+              <div>
+                <div class="pay-period-label">Pay Period</div>
+                <div class="pay-period-dates" id="period-dates">Loading...</div>
+              </div>
+              <button onclick="changePeriod(1)" id="next-period-btn">&rarr;</button>
             </div>
-            <button class="date-scroll-btn" onclick="scrollDate(1)" id="date-scroll-down">&darr;</button>
+          </div>
+          <div class="pay-period-body">
+            <div class="pay-period-stats">
+              <div class="pay-stat">
+                <div class="label">Hours Worked</div>
+                <div class="value" id="period-hours">0.0</div>
+              </div>
+              <div class="pay-stat">
+                <div class="label">Wages</div>
+                <div class="value" id="period-wages">$0</div>
+              </div>
+              <div class="pay-stat">
+                <div class="label">Commissions</div>
+                <div class="value" id="period-commissions">$0</div>
+              </div>
+              <div class="pay-stat">
+                <div class="label">Tips</div>
+                <div class="value" id="period-tips">$0</div>
+              </div>
+              <div class="pay-stat total">
+                <div class="label">Total Payable</div>
+                <div class="value" id="period-total">$0</div>
+              </div>
+            </div>
+            <div id="invoice-status"></div>
+            <button class="btn-primary" id="submit-invoice-btn" onclick="showInvoicePreview()" style="margin-top: 12px;">Generate Invoice for Review</button>
           </div>
         </div>
 
-        <!-- Time Inputs -->
-        <div class="time-row">
-          <div class="form-group">
-            <label>Start Time</label>
-            <input type="time" id="start-time" onchange="calculateHours()">
+        <!-- Daily Entries Breakdown -->
+        <div class="card">
+          <h3>Entries This Period</h3>
+          <div style="overflow-x: auto; margin-top: 16px;">
+            <table class="review-table" id="review-entries-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th class="right">Hours</th>
+                  <th class="right">Wages</th>
+                  <th class="right">Service Comm</th>
+                  <th class="right">Sales Comm</th>
+                  <th class="right">Tips</th>
+                  <th class="right">Cash Tips</th>
+                  <th class="right">Day Total</th>
+                </tr>
+              </thead>
+              <tbody id="review-entries-body">
+                <tr><td colspan="8" class="no-entries">Loading...</td></tr>
+              </tbody>
+              <tfoot id="review-entries-footer" style="display: none;">
+                <tr>
+                  <td><strong>TOTALS</strong></td>
+                  <td class="right" id="review-total-hours">0.00</td>
+                  <td class="right" id="review-total-wages">$0.00</td>
+                  <td class="right" id="review-total-service">$0.00</td>
+                  <td class="right" id="review-total-sales">$0.00</td>
+                  <td class="right" id="review-total-tips">$0.00</td>
+                  <td class="right cash-tips" id="review-total-cash">-$0.00</td>
+                  <td class="right total-value" id="review-total-payable">$0.00</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
-          <div class="form-group">
-            <label>End Time</label>
-            <input type="time" id="end-time" onchange="calculateHours()">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Break Time (minutes)</label>
-          <input type="number" id="break-minutes" value="0" min="0" step="5" onchange="calculateHours()">
-        </div>
-
-        <div class="calculated-hours">
-          <div class="label">Hours Worked</div>
-          <div class="value" id="calculated-hours">0.00</div>
-        </div>
-
-        <!-- Service Entries (for service commission workers) -->
-        <div class="service-entries" id="service-section" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0; font-size: 14px;">Services & Tips</h3>
-            <button class="btn-secondary btn-small" onclick="addServiceEntry()">+ Add Service</button>
-          </div>
-          <div id="service-entries-container"></div>
-        </div>
-
-        <!-- Sales Entries (for sales commission workers) -->
-        <div class="sales-entries" id="sales-section" style="display: none;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0; font-size: 14px;">Sales</h3>
-            <button class="btn-secondary btn-small" onclick="addSalesEntry()">+ Add Sale</button>
-          </div>
-          <div id="sales-entries-container"></div>
-        </div>
-
-        <div class="alert error" id="entry-error"></div>
-        <div class="alert success" id="entry-success"></div>
-
-        <button class="btn-primary" onclick="submitEntry()" id="submit-entry-btn">Save Entry</button>
-      </div>
-
-      <!-- Recent Entries -->
-      <div class="card">
-        <h3>Recent Entries</h3>
-        <div class="entries-list" id="entries-list">
-          <p style="color: #666; text-align: center; padding: 20px;">No entries yet</p>
         </div>
       </div>
     </div>
@@ -1019,11 +1167,31 @@
     let pendingEntry = null;
     let serviceCount = 0;
     let salesCount = 0;
+    let currentTab = 'entry';
 
     // Initialize
     document.getElementById('pin-input').addEventListener('keypress', e => {
       if (e.key === 'Enter') login();
     });
+
+    // Tab Switching
+    function switchTab(tab) {
+      currentTab = tab;
+
+      // Update tab buttons
+      document.getElementById('tab-entry-btn').classList.toggle('active', tab === 'entry');
+      document.getElementById('tab-review-btn').classList.toggle('active', tab === 'review');
+
+      // Update tab content
+      document.getElementById('tab-entry').classList.toggle('active', tab === 'entry');
+      document.getElementById('tab-review').classList.toggle('active', tab === 'review');
+
+      // Load review data when switching to review tab
+      if (tab === 'review') {
+        loadPayPeriod();
+        loadReviewEntries();
+      }
+    }
 
     // Check for saved session
     const savedEmployee = sessionStorage.getItem('employee');
@@ -1090,9 +1258,72 @@
       document.getElementById('service-section').style.display = showServices ? 'block' : 'none';
       document.getElementById('sales-section').style.display = showSales ? 'block' : 'none';
 
+      // Reset to entry tab
+      switchTab('entry');
+
       initializeDatePicker();
       loadPayPeriod();
-      loadEntries();
+    }
+
+    // Load Review Entries for Pay Review Tab
+    async function loadReviewEntries() {
+      if (!currentPayPeriod) return;
+
+      const tbody = document.getElementById('review-entries-body');
+      const tfoot = document.getElementById('review-entries-footer');
+      tbody.innerHTML = '<tr><td colspan="8" class="no-entries">Loading...</td></tr>';
+      tfoot.style.display = 'none';
+
+      try {
+        const response = await fetch(`/api/invoice-preview/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`);
+        const data = await response.json();
+
+        if (!data.entries || data.entries.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="no-entries">No entries for this pay period</td></tr>';
+          return;
+        }
+
+        // Format date for display
+        const formatDateShort = (dateStr) => {
+          const d = new Date(dateStr + 'T00:00:00');
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          return `${days[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
+        };
+
+        // Build rows
+        let rows = '';
+        data.entries.forEach(entry => {
+          const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips;
+          rows += `
+            <tr>
+              <td>${formatDateShort(entry.date)}</td>
+              <td class="right">${entry.hours.toFixed(2)}</td>
+              <td class="right">$${entry.wages.toFixed(2)}</td>
+              <td class="right">$${entry.commissions.toFixed(2)}</td>
+              <td class="right">$${entry.productCommissions.toFixed(2)}</td>
+              <td class="right">$${entry.tips.toFixed(2)}</td>
+              <td class="right cash-tips">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
+              <td class="right" style="font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+        tbody.innerHTML = rows;
+
+        // Update footer totals
+        const s = data.summary;
+        document.getElementById('review-total-hours').textContent = s.totalHours.toFixed(2);
+        document.getElementById('review-total-wages').textContent = '$' + s.totalWages.toFixed(2);
+        document.getElementById('review-total-service').textContent = '$' + s.totalCommissions.toFixed(2);
+        document.getElementById('review-total-sales').textContent = '$' + s.totalProductCommissions.toFixed(2);
+        document.getElementById('review-total-tips').textContent = '$' + s.totalTips.toFixed(2);
+        document.getElementById('review-total-cash').textContent = '-$' + s.totalCashTips.toFixed(2);
+        document.getElementById('review-total-payable').textContent = '$' + s.totalPayable.toFixed(2);
+        tfoot.style.display = 'table-footer-group';
+
+      } catch (error) {
+        console.error('Error loading review entries:', error);
+        tbody.innerHTML = '<tr><td colspan="8" class="no-entries" style="color: #ff6b6b;">Error loading entries</td></tr>';
+      }
     }
 
     // Date Picker
@@ -1523,7 +1754,10 @@
           showSuccess('entry-success', 'Entry saved successfully!');
           clearForm();
           loadPayPeriod();
-          loadEntries();
+          // Also update review tab data if it's been loaded
+          if (currentTab === 'review') {
+            loadReviewEntries();
+          }
         } else {
           showError('entry-error', data.message || 'Failed to save entry');
         }
@@ -1554,6 +1788,11 @@
         currentPayPeriod = await response.json();
 
         updatePayPeriodDisplay();
+
+        // If on review tab, also load review entries
+        if (currentTab === 'review') {
+          loadReviewEntries();
+        }
       } catch (error) {
         console.error('Error loading pay period:', error);
       }
