@@ -821,7 +821,7 @@ app.delete('/api/admin/employees/:id', async (req, res) => {
 
 // Get all time entries (admin view)
 app.get('/api/admin/time-entries', async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, employeeId } = req.query;
 
   let query = supabase
     .from('time_entries')
@@ -848,6 +848,10 @@ app.get('/api/admin/time-entries', async (req, res) => {
 
   if (startDate && endDate) {
     query = query.gte('date', startDate).lte('date', endDate);
+  }
+
+  if (employeeId) {
+    query = query.eq('employee_id', parseInt(employeeId));
   }
 
   const { data: entries, error } = await query;

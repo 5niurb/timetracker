@@ -625,16 +625,22 @@
 
     <div class="container">
       <div class="tabs">
-        <button class="tab active" onclick="showTab('time-entries')">Time Entries</button>
+        <button class="tab active" onclick="showTab('review-entries')">Review Entries</button>
         <button class="tab" onclick="showTab('employees')">Employees</button>
         <button class="tab" onclick="showTab('reports')">Reports</button>
       </div>
 
-      <!-- Time Entries Tab -->
-      <div id="tab-time-entries" class="tab-content">
+      <!-- Review Entries Tab -->
+      <div id="tab-review-entries" class="tab-content">
         <div class="card">
           <h3>Filter Entries</h3>
           <div class="filter-bar">
+            <div class="form-group">
+              <label>Employee</label>
+              <select id="filter-employee">
+                <option value="">All Employees</option>
+              </select>
+            </div>
             <div class="form-group">
               <label>Start Date</label>
               <input type="date" id="filter-start">
@@ -643,26 +649,43 @@
               <label>End Date</label>
               <input type="date" id="filter-end">
             </div>
-            <button class="btn-primary" onclick="loadTimeEntries()">Filter</button>
+            <button class="btn-primary" onclick="loadReviewEntries()">Filter</button>
             <button class="btn-secondary" onclick="clearFilters()">Clear</button>
           </div>
         </div>
 
         <div class="card">
-          <h3>All Time Entries</h3>
+          <h3>Daily Entries</h3>
           <div style="overflow-x: auto;">
             <table>
               <thead>
                 <tr>
                   <th>Date</th>
                   <th>Employee</th>
-                  <th>Time</th>
-                  <th>Hours</th>
-                  <th>Earnings</th>
+                  <th style="text-align: right;">Hours</th>
+                  <th style="text-align: right;">Wages</th>
+                  <th style="text-align: right;">Service Comm</th>
+                  <th style="text-align: right;">Sales Comm</th>
+                  <th style="text-align: right;">Tips</th>
+                  <th style="text-align: right;">Cash Tips</th>
+                  <th style="text-align: right;">Day Total</th>
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody id="entries-table"></tbody>
+              <tbody id="review-entries-table"></tbody>
+              <tfoot id="review-entries-footer" style="display: none;">
+                <tr style="background: #1a2a1a;">
+                  <td colspan="2"><strong>TOTALS</strong></td>
+                  <td style="text-align: right;" id="review-total-hours"><strong>0.00</strong></td>
+                  <td style="text-align: right;" id="review-total-wages"><strong>$0.00</strong></td>
+                  <td style="text-align: right;" id="review-total-service"><strong>$0.00</strong></td>
+                  <td style="text-align: right;" id="review-total-sales"><strong>$0.00</strong></td>
+                  <td style="text-align: right;" id="review-total-tips"><strong>$0.00</strong></td>
+                  <td style="text-align: right; color: #ff6b6b;" id="review-total-cash"><strong>-$0.00</strong></td>
+                  <td style="text-align: right; color: #6bff6b; font-size: 14px;" id="review-total-payable"><strong>$0.00</strong></td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -846,10 +869,16 @@
   <script>
     let deleteCallback = null;
     let allEntries = [];
+    let allEmployees = [];
 
-    // Set default dates
-    const today = new Date();
-    const thirtyDaysAgo = new Date();
+    // Set default dates (LA timezone aware)
+    function getLADate() {
+      const now = new Date();
+      return new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    }
+
+    const today = getLADate();
+    const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
 
     document.getElementById('filter-start').valueAsDate = thirtyDaysAgo;
@@ -877,7 +906,8 @@
         if (data.success) {
           sessionStorage.setItem('adminAuth', 'true');
           showScreen('admin-screen');
-          loadTimeEntries();
+          loadEmployeesForFilter();
+          loadReviewEntries();
           loadEmployees();
         } else {
           errorEl.classList.add('show');
@@ -907,65 +937,105 @@
       event.target.classList.add('active');
       document.getElementById('tab-' + tabId).style.display = 'block';
 
+      if (tabId === 'review-entries') loadReviewEntries();
       if (tabId === 'employees') loadEmployees();
       if (tabId === 'reports') loadReport();
     }
 
-    async function loadTimeEntries() {
+    async function loadEmployeesForFilter() {
+      try {
+        const response = await fetch('/api/admin/employees');
+        allEmployees = await response.json();
+
+        const select = document.getElementById('filter-employee');
+        select.innerHTML = '<option value="">All Employees</option>' +
+          allEmployees.map(emp => `<option value="${emp.id}">${escapeHtml(emp.name)}</option>`).join('');
+      } catch (error) {
+        console.error('Error loading employees for filter:', error);
+      }
+    }
+
+    async function loadReviewEntries() {
       const startDate = document.getElementById('filter-start').value;
       const endDate = document.getElementById('filter-end').value;
+      const employeeId = document.getElementById('filter-employee').value;
 
       let url = '/api/admin/time-entries';
-      if (startDate && endDate) {
-        url += `?startDate=${startDate}&endDate=${endDate}`;
-      }
+      const params = [];
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      if (employeeId) params.push(`employeeId=${employeeId}`);
+      if (params.length > 0) url += '?' + params.join('&');
 
       try {
         const response = await fetch(url);
         allEntries = await response.json();
 
-        const tbody = document.getElementById('entries-table');
+        // Sort entries by date descending (most recent first)
+        allEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const tbody = document.getElementById('review-entries-table');
+        const footer = document.getElementById('review-entries-footer');
 
         if (allEntries.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No entries found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No entries found</td></tr>';
+          footer.style.display = 'none';
         } else {
+          let totalHours = 0;
+          let totalWages = 0;
+          let totalServiceComm = 0;
+          let totalSalesComm = 0;
+          let totalTips = 0;
+          let totalCashTips = 0;
+          let totalPayable = 0;
+
           tbody.innerHTML = allEntries.map(entry => {
-            const hourlyEarnings = entry.hours * (entry.hourly_wage || 0);
-            let serviceEarnings = 0;
+            const hours = parseFloat(entry.hours) || 0;
+            const wages = hours * (parseFloat(entry.hourly_wage) || 0);
+            let serviceComm = 0;
             let tips = 0;
-            let salesCommissions = 0;
+            let cashTips = 0;
+            let salesComm = 0;
 
             if (entry.clients && entry.clients.length > 0) {
               entry.clients.forEach(c => {
-                serviceEarnings += c.amount_earned || 0;
-                tips += c.tip_amount || 0;
+                serviceComm += parseFloat(c.amount_earned) || 0;
+                tips += parseFloat(c.tip_amount) || 0;
+                if (c.tip_received_cash) {
+                  cashTips += parseFloat(c.tip_amount) || 0;
+                }
               });
             }
 
             if (entry.productSales && entry.productSales.length > 0) {
               entry.productSales.forEach(p => {
-                salesCommissions += p.commission_amount || 0;
+                salesComm += parseFloat(p.commission_amount) || 0;
               });
             }
 
-            const totalEarnings = hourlyEarnings + serviceEarnings + tips + salesCommissions;
-            const hasDetails = (entry.clients && entry.clients.length > 0) || (entry.productSales && entry.productSales.length > 0);
+            const dayTotal = wages + serviceComm + salesComm + tips - cashTips;
 
-            const timeRange = entry.start_time && entry.end_time
-              ? `${formatTime(entry.start_time)} - ${formatTime(entry.end_time)}`
-              : '-';
+            totalHours += hours;
+            totalWages += wages;
+            totalServiceComm += serviceComm;
+            totalSalesComm += salesComm;
+            totalTips += tips;
+            totalCashTips += cashTips;
+            totalPayable += dayTotal;
+
+            const hasDetails = (entry.clients && entry.clients.length > 0) || (entry.productSales && entry.productSales.length > 0);
 
             return `
               <tr>
                 <td><strong>${formatDate(entry.date)}</strong></td>
                 <td>${escapeHtml(entry.employee_name)}</td>
-                <td style="font-size: 12px;">${timeRange}${entry.break_minutes > 0 ? `<br><span style="color: #666;">(${entry.break_minutes}min break)</span>` : ''}</td>
-                <td><span class="badge badge-blue">${entry.hours.toFixed(1)}h</span></td>
-                <td>
-                  ${totalEarnings > 0 ? `<span class="earnings-total">$${totalEarnings.toFixed(2)}</span>` : '-'}
-                  ${entry.clients && entry.clients.length > 0 ? `<br><span style="font-size: 10px; color: #666;">${entry.clients.length} service(s)</span>` : ''}
-                  ${entry.productSales && entry.productSales.length > 0 ? `<br><span style="font-size: 10px; color: #666;">${entry.productSales.length} sale(s)</span>` : ''}
-                </td>
+                <td style="text-align: right;">${hours.toFixed(2)}</td>
+                <td style="text-align: right;">$${wages.toFixed(2)}</td>
+                <td style="text-align: right;">$${serviceComm.toFixed(2)}</td>
+                <td style="text-align: right;">$${salesComm.toFixed(2)}</td>
+                <td style="text-align: right;">$${tips.toFixed(2)}</td>
+                <td style="text-align: right; color: #ff6b6b;">${cashTips > 0 ? '-$' + cashTips.toFixed(2) : '$0.00'}</td>
+                <td style="text-align: right; color: #6bff6b; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
                 <td class="actions">
                   ${hasDetails ? `<button class="btn-secondary" onclick="showEntryDetails(${entry.id})">Details</button>` : ''}
                   <button class="btn-danger" onclick="confirmDeleteEntry(${entry.id})">Delete</button>
@@ -973,9 +1043,19 @@
               </tr>
             `;
           }).join('');
+
+          // Update footer totals
+          document.getElementById('review-total-hours').innerHTML = `<strong>${totalHours.toFixed(2)}</strong>`;
+          document.getElementById('review-total-wages').innerHTML = `<strong>$${totalWages.toFixed(2)}</strong>`;
+          document.getElementById('review-total-service').innerHTML = `<strong>$${totalServiceComm.toFixed(2)}</strong>`;
+          document.getElementById('review-total-sales').innerHTML = `<strong>$${totalSalesComm.toFixed(2)}</strong>`;
+          document.getElementById('review-total-tips').innerHTML = `<strong>$${totalTips.toFixed(2)}</strong>`;
+          document.getElementById('review-total-cash').innerHTML = `<strong>-$${totalCashTips.toFixed(2)}</strong>`;
+          document.getElementById('review-total-payable').innerHTML = `<strong>$${totalPayable.toFixed(2)}</strong>`;
+          footer.style.display = '';
         }
       } catch (error) {
-        console.error('Error loading entries:', error);
+        console.error('Error loading review entries:', error);
       }
     }
 
@@ -1418,7 +1498,8 @@
     function clearFilters() {
       document.getElementById('filter-start').valueAsDate = thirtyDaysAgo;
       document.getElementById('filter-end').valueAsDate = today;
-      loadTimeEntries();
+      document.getElementById('filter-employee').value = '';
+      loadReviewEntries();
     }
 
     function formatDate(dateStr) {
@@ -1445,7 +1526,8 @@
     // Check if already logged in
     if (sessionStorage.getItem('adminAuth')) {
       showScreen('admin-screen');
-      loadTimeEntries();
+      loadEmployeesForFilter();
+      loadReviewEntries();
       loadEmployees();
     }
   </script>
