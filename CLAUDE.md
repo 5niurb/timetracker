@@ -96,6 +96,16 @@ Invoice emails sent via Resend:
 - **To:** `lea@lemedspa.com`, `ops@lemedspa.com`
 - **CC:** Employee email (if set)
 
+## Claude Code Automations
+
+### Skills (`.claude/skills/`)
+- **`/commit`** — Stage, commit, push with formatted message
+- **`/deploy`** — Push to main and verify Render deployment
+
+### Inherited from Workspace
+- **Prettier auto-format** hook — Formats JS/HTML/CSS on every edit
+- **`.env` blocker** hook — Prevents accidental edits to sensitive files
+
 ## Recent Changes
 
 - Migrated from SQLite to Supabase PostgreSQL
