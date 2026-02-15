@@ -1,5 +1,27 @@
 # CLAUDE.md — timetracker (LM PayTrack)
 
+## Session Management
+
+### Starting a Session
+- Read `SESSION_NOTES.md` first to restore context from previous sessions.
+- Briefly confirm what you understand the current state to be before diving in.
+
+### During a Session
+- After completing each major task or milestone, append an update to `SESSION_NOTES.md`.
+- Every ~15 minutes of active work, checkpoint progress to `SESSION_NOTES.md`.
+- After implementing any new feature, design change, or component, update `SPECS.md` with the requirement, acceptance criteria, and any design decisions made. (Use `/capture-specs` to batch-update at session end if preferred.)
+- If the conversation is getting long (50+ exchanges), proactively write a summary and suggest starting a fresh session.
+
+### Ending a Session
+- Always write a final summary to `SESSION_NOTES.md` before the session ends, including:
+  - What was accomplished
+  - Current state and what's working
+  - Known issues or bugs
+  - Recommended next steps
+  - Dev server port and access URLs if running
+
+---
+
 ## What This Is
 
 Employee time & payroll tracking PWA for Le Med Spa staff.
