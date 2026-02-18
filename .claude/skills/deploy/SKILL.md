@@ -32,13 +32,13 @@ Timetracker auto-deploys when you push to `main`. This skill:
 4. **Verify deployment**
    ```bash
    # Wait a moment, then check health
-   curl -s https://lm-paytrack.onrender.com/api/health
+   curl -s https://paytrack.lemedspa.app/api/health
    ```
    Should return `{"status":"ok","timestamp":"..."}`
 
 5. **Report results**
-   - Production URL: https://lm-paytrack.onrender.com
-   - Admin panel: https://lm-paytrack.onrender.com/admin
+   - Production URL: https://paytrack.lemedspa.app
+   - Admin panel: https://paytrack.lemedspa.app/admin
 
 ## Notes
 - Render free tier spins down after 15 min inactivity

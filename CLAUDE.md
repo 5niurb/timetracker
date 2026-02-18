@@ -29,7 +29,7 @@ Employee time & payroll tracking PWA for Le Med Spa staff.
 - **Repo:** github.com/5niurb/timetracker
 - **Tech:** Node.js, Express, Supabase (PostgreSQL), vanilla JS frontend
 - **Deployment:** Render.com (auto-deploys on push to main)
-- **Production URL:** https://lm-paytrack.onrender.com
+- **Production URL:** https://paytrack.lemedspa.app
 
 ## Running Locally
 
