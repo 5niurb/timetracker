@@ -3,6 +3,8 @@ const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const path = require('path');
 
+const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -80,54 +82,7 @@ async function initDatabase() {
   console.log('Database initialization complete');
 }
 
-// Pay period helper functions
-function getPayPeriod(date) {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = d.getMonth();
-  const day = d.getDate();
-
-  if (day <= 15) {
-    // First half: 1st to 15th
-    return {
-      start: new Date(year, month, 1),
-      end: new Date(year, month, 15)
-    };
-  } else {
-    // Second half: 16th to end of month
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    return {
-      start: new Date(year, month, 16),
-      end: new Date(year, month, lastDay)
-    };
-  }
-}
-
-function formatDateForDB(date) {
-  return date.toISOString().split('T')[0];
-}
-
-function getPayPeriodByOffset(offset = 0) {
-  const today = new Date();
-  let targetDate = new Date(today);
-
-  // Move by pay periods
-  for (let i = 0; i < Math.abs(offset); i++) {
-    if (offset < 0) {
-      // Go back
-      const currentPeriod = getPayPeriod(targetDate);
-      targetDate = new Date(currentPeriod.start);
-      targetDate.setDate(targetDate.getDate() - 1);
-    } else {
-      // Go forward
-      const currentPeriod = getPayPeriod(targetDate);
-      targetDate = new Date(currentPeriod.end);
-      targetDate.setDate(targetDate.getDate() + 1);
-    }
-  }
-
-  return getPayPeriod(targetDate);
-}
+// Pay period helpers imported from ./lib/pay-periods.js
 
 // Simple email sending function (using fetch to external email API)
 async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
