@@ -1,14 +1,88 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(npm run dev:*)",
-      "Bash(npm start:*)"
-    ]
-  }
+	"permissions": {
+		"allow": [
+			"Bash(git add:*)",
+			"Bash(git commit:*)",
+			"Bash(git push:*)",
+			"Bash(git status:*)",
+			"Bash(git diff:*)",
+			"Bash(git log:*)",
+			"Bash(npm run dev:*)",
+			"Bash(npm start:*)"
+		]
+	},
+	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "startup",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/session-memory.mjs\" --load",
+						"timeout": 10
+					}
+				]
+			},
+			{
+				"matcher": "startup",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/cloud-setup.sh\"",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node -e \"const f=process.env.TOOL_INPUT_file_path||process.env.TOOL_INPUT_FILE_PATH||''; const blocked=['.env','.env.local','.env.production','credentials.json','secrets.yaml','secrets.json']; const base=f.replace(/\\\\\\\\/g,'/').split('/').pop()||''; if(blocked.includes(base)||f.includes('.env')){console.error('BLOCKED: Cannot edit sensitive file: '+f);process.exit(2);}\"",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node -e \"const f=process.env.TOOL_INPUT_file_path||process.env.TOOL_INPUT_FILE_PATH||''; if(f && /\\\\.(html|css|js|json|md|svelte)$/.test(f) && !f.includes('node_modules') && !f.includes('.min.')) { const {execSync}=require('child_process'); try { execSync('prettier --write \\\"'+f.replace(/\\\\/g,'/')+'\\\"', {stdio:'pipe'}); console.log('Formatted: '+f); } catch(e) { /* prettier not found or parse error - skip silently */ } }\"",
+						"timeout": 10
+					}
+				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/post-push-ci-check.mjs\"",
+						"timeout": 200
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/console-log-check.mjs\"",
+						"timeout": 10
+					},
+					{
+						"type": "command",
+						"command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/session-memory.mjs\" --save",
+						"timeout": 10
+					}
+				]
+			}
+		]
+	}
 }
