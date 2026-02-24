@@ -2104,57 +2104,9 @@
       }
     }
 
-    // Load Entries
-    async function loadEntries() {
-      try {
-        const response = await fetch(`/api/time-entries/${currentEmployee.id}`);
-        const entries = await response.json();
-
-        const container = document.getElementById('entries-list');
-
-        if (entries.length === 0) {
-          container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No entries yet</p>';
-          return;
-        }
-
-        container.innerHTML = entries.slice(0, 10).map(entry => {
-          const date = new Date(entry.date + 'T00:00:00');
-          const dateStr = formatDateDisplay(date);
-
-          const timeStr = entry.start_time && entry.end_time
-            ? `${formatTime12(entry.start_time)} - ${formatTime12(entry.end_time)}`
-            : `${entry.hours.toFixed(1)} hours`;
-
-          let totalEarnings = entry.hours * (currentEmployee.hourly_wage || 0);
-
-          if (entry.clients) {
-            entry.clients.forEach(c => {
-              totalEarnings += (c.amount_earned || 0) + (c.tip_amount || 0);
-            });
-          }
-
-          if (entry.productSales) {
-            entry.productSales.forEach(p => {
-              totalEarnings += p.commission_amount || 0;
-            });
-          }
-
-          return `
-            <div class="entry-item">
-              <div class="entry-date">${dateStr}</div>
-              <div class="entry-details">${timeStr} (${entry.hours.toFixed(2)} hours)</div>
-              ${totalEarnings > 0 ? `<div class="entry-earnings">$${totalEarnings.toFixed(2)}</div>` : ''}
-            </div>
-          `;
-        }).join('');
-      } catch (error) {
-        console.error('Error loading entries:', error);
-      }
-    }
-
     // Utility Functions
     function formatDate(date) {
-      return date.toISOString().split('T')[0];
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 
     function formatDateDisplay(date) {
