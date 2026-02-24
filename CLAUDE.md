@@ -123,10 +123,34 @@ Invoice emails sent via Resend:
 ### Skills (`.claude/skills/`)
 - **`/commit`** — Stage, commit, push with formatted message
 - **`/deploy`** — Push to main and verify Render deployment
+- **`/capture-specs`** — Reviews current session and batch-updates SPECS.md with new requirements, acceptance criteria, and design decisions
+- **`/checkpoint`** — Git-backed save points. Supports `create`, `list`, `restore <sha>`. Auto-checkpoints before restore
+- **`/orchestrate`** — Chains agents through dev pipeline: plan → implement → review → qa → verify. Supports `feature`, `bugfix`, `refactor` modes. Final verdict: SHIP/NEEDS WORK/BLOCKED
+- **`/api-design`** — Interactive API specification and endpoint planning with request/response examples
+- **`/postgres-patterns`** — Analyzes and documents PostgreSQL query patterns, indexes, and optimization opportunities
+- **`/database-migrations`** — Generates and verifies schema migrations with rollback safety checks
+- **`/security-review`** — Scans for OWASP Top 10 vulnerabilities, secret leakage, and auth bypass risks
+- **`/strategic-compact`** — Evaluates when to compact context, creates recovery snapshots, and restores session state
+- **`/continuous-learning-v2`** — Extracts production errors and API quirks from logs, updates SKILL.md Learnings sections to prevent recurrence
+
+### Agents (inherited from workspace — `.claude/agents/`)
+- **`code-reviewer`** — Zero-context code review with severity tiers (Info/Warning/Error) and PASS/FAIL verdict. Model: Sonnet
+- **`qa`** — Generates tests, executes them across multiple languages (Python/JS/Bash), reports pass/fail. Model: Sonnet
+- **`research`** — Deep investigation via web search and codebase exploration. Returns concise sourced findings. Model: Sonnet
+- **`architect`** — Read-only system design analysis. Evaluates scalability, trade-offs, and integration impact. Model: Opus
+- **`build-error-resolver`** — Minimal-diff build fixes. No refactoring — just fixes compilation errors. Model: Sonnet
+- **`database-reviewer`** — PostgreSQL/Supabase specialist. Flags SELECT *, unindexed FKs, missing RLS, OFFSET pagination, N+1 queries. Model: Sonnet
+- **`deploy-verifier`** — Post-deploy health checks: site loads, CORS headers, no localhost in bundles, API health endpoints. Model: Sonnet
+- **`email-classifier`** — Classifies emails into Action Required / Waiting On / Reference. Adapted for M365/Outlook. Model: Sonnet
+- **`planner`** — Breaks down features into milestones and implementation steps with effort estimates. Model: Sonnet
+- **`security-reviewer`** — OWASP Top 10 analysis, secret detection, XSS/SQL injection/auth bypass checks. Auto-triggers on auth/payment/PII code. Model: Opus
 
 ### Inherited from Workspace
 - **Prettier auto-format** hook — Formats JS/HTML/CSS on every edit
 - **`.env` blocker** hook — Prevents accidental edits to sensitive files
+- **CI & Deploy Check** hook — After `git push`: polls GitHub Actions (up to 3min), reports pass/fail with failure logs so Claude can fix immediately. Non-blocking. Script: `.claude/scripts/post-push-ci-check.mjs`
+- **Observe** hooks — SessionStart hook loads previous session state from memory; Stop hook persists context before exit
+- **Strategic Compact** hook — Evaluates context saturation, creates recovery snapshots before compaction, auto-restores branch/session state on reentry
 
 ## Recent Changes
 
