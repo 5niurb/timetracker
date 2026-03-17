@@ -1,0 +1,662 @@
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: #0a0a0a;
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .header {
+      background: #000000;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .header button {
+      background: transparent;
+      color: white;
+      border: 1px solid #555;
+      padding: 8px 20px;
+      cursor: pointer;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: all 0.3s;
+    }
+
+    .header button:hover {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .login-box {
+      max-width: 400px;
+      margin: 80px auto;
+      background: #111111;
+      padding: 48px;
+      border: 1px solid #333;
+    }
+
+    .login-box h2 {
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 28px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #999;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #333;
+      background: #0a0a0a;
+      color: #ffffff;
+      font-size: 14px;
+      font-family: 'Montserrat', sans-serif;
+      transition: all 0.3s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #ffffff;
+    }
+
+    input::placeholder {
+      color: #555;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: 'Montserrat', sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #000000;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #cccccc;
+    }
+
+    .btn-secondary {
+      background: #333;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #444;
+    }
+
+    .btn-danger {
+      background: #8b0000;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #a00000;
+    }
+
+    .btn-success {
+      background: #1a472a;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #1e5631;
+    }
+
+    .btn-warning {
+      background: #5c4a1d;
+      color: white;
+    }
+
+    .btn-warning:hover {
+      background: #6d5722;
+    }
+
+    .alert {
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: none;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .alert.show {
+      display: block;
+    }
+
+    .alert.error {
+      background: #2a1010;
+      color: #ff6b6b;
+      border: 1px solid #8b0000;
+    }
+
+    .alert.success {
+      background: #102a10;
+      color: #6bff6b;
+      border: 1px solid #006600;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border: 1px solid #333;
+    }
+
+    .tab {
+      padding: 14px 28px;
+      background: transparent;
+      border: none;
+      border-right: 1px solid #333;
+      font-size: 12px;
+      color: #777;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .tab:last-child {
+      border-right: none;
+    }
+
+    .tab:hover {
+      color: #ffffff;
+      background: #1a1a1a;
+    }
+
+    .tab.active {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .card {
+      background: #111111;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+    }
+
+    .card h3 {
+      margin-bottom: 20px;
+      color: #ffffff;
+      font-size: 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 14px 12px;
+      border-bottom: 1px solid #222;
+      font-size: 13px;
+    }
+
+    th {
+      background: #0a0a0a;
+      font-weight: 600;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 10px;
+    }
+
+    tr:hover {
+      background: #1a1a1a;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #111111;
+      padding: 24px;
+      border: 1px solid #333;
+    }
+
+    .stat-card .label {
+      color: #777;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .stat-card .value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      font-weight: 500;
+      color: #ffffff;
+      margin-top: 8px;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: flex-end;
+    }
+
+    .filter-bar .form-group {
+      margin-bottom: 0;
+      min-width: 140px;
+    }
+
+    .inline-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .inline-form .form-group {
+      flex: 1;
+      min-width: 120px;
+      margin-bottom: 0;
+    }
+
+    .inline-form button {
+      flex-shrink: 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge-blue {
+      background: #1a2a3a;
+      color: #6bb3ff;
+      border: 1px solid #2a4a6a;
+    }
+
+    .badge-green {
+      background: #1a2a1a;
+      color: #6bff6b;
+      border: 1px solid #2a4a2a;
+    }
+
+    .badge-purple {
+      background: #2a1a3a;
+      color: #b36bff;
+      border: 1px solid #4a2a6a;
+    }
+
+    .badge-orange {
+      background: #3a2a1a;
+      color: #ffb36b;
+      border: 1px solid #6a4a2a;
+    }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .actions button {
+      padding: 6px 12px;
+      font-size: 10px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #111111;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      border: 1px solid #333;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-content h3 {
+      margin-bottom: 24px;
+      font-size: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+    }
+
+    .back-link {
+      text-align: center;
+      margin-top: 32px;
+    }
+
+    .back-link a {
+      color: #777;
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: color 0.3s;
+    }
+
+    .back-link a:hover {
+      color: #ffffff;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #555;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+    }
+
+    .pay-type-badge {
+      font-size: 9px;
+      padding: 4px 10px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .pay-type-hourly {
+      background: #1a2a3a;
+      color: #6bb3ff;
+      border: 1px solid #2a4a6a;
+    }
+
+    .pay-type-commission_services {
+      background: #1a2a1a;
+      color: #6bff6b;
+      border: 1px solid #2a4a2a;
+    }
+
+    .pay-type-commission_sales {
+      background: #3a2a1a;
+      color: #ffb36b;
+      border: 1px solid #6a4a2a;
+    }
+
+    .pay-type-hourly_services {
+      background: #2a1a3a;
+      color: #b36bff;
+      border: 1px solid #4a2a6a;
+    }
+
+    .pay-type-hourly_sales {
+      background: #3a3a1a;
+      color: #e6c84b;
+      border: 1px solid #5a5a2a;
+    }
+
+    .pay-type-hourly_all {
+      background: #1a3a3a;
+      color: #6bffff;
+      border: 1px solid #2a5a5a;
+    }
+
+    .patient-detail {
+      background: #0a0a0a;
+      padding: 12px;
+      margin-top: 8px;
+      font-size: 12px;
+      border: 1px solid #222;
+    }
+
+    .patient-detail .patient-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #222;
+    }
+
+    .patient-detail .patient-row:last-child {
+      border-bottom: none;
+    }
+
+    .tip-cash {
+      background: #3a3a1a;
+      color: #e6c84b;
+      padding: 2px 8px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tip-owed {
+      background: #3a1a1a;
+      color: #ff6b6b;
+      padding: 2px 8px;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .earnings-total {
+      background: #1a2a1a;
+      color: #6bff6b;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #2a4a2a;
+    }
+
+    .period-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .period-nav-arrows {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .period-nav-arrows button {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .period-nav-arrows button:hover {
+      background: #333;
+      border-color: #666;
+    }
+
+    .period-nav-arrows button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .period-display {
+      text-align: center;
+      min-width: 200px;
+    }
+
+    .period-display .period-dates {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .period-display .period-label {
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+
+    .employee-filter-inline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .employee-filter-inline label {
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .employee-filter-inline select {
+      min-width: 160px;
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .tab {
+        white-space: nowrap;
+        padding: 12px 16px;
+        font-size: 11px;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 10px 8px;
+      }
+
+      .filter-bar {
+        flex-direction: column;
+      }
+
+      .filter-bar .form-group {
+        width: 100%;
+      }
+
+      .inline-form {
+        flex-direction: column;
+      }
+
+      .inline-form .form-group {
+        width: 100%;
+      }
+    }
