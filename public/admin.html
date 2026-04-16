@@ -289,9 +289,8 @@
       </div>
     </div>
   </div>
-
-  <!-- Pre-Form Overlay (looks like onboarding form) -->
-  <div id="preform-overlay" class="preform-overlay">
+  <!-- Pre-Form Overlay (looks like onboarding form) — hidden until openPreForm() called after login -->
+  <div id="preform-overlay" class="preform-overlay" style="display:none">
     <div class="preform-header">
       <h2>New Team Member</h2>
       <button class="btn-secondary" onclick="closePreForm()" style="padding: 8px 16px;">Cancel</button>
@@ -343,11 +342,6 @@
               <div class="form-group">
                 <label>Mobile Phone</label>
                 <input type="tel" id="pf-phone" placeholder="(310) 555-1234">
-              </div>
-              <div class="form-group">
-                <label>PIN (4 digits) <span class="req">*</span></label>
-                <input type="text" id="pf-pin" maxlength="4" placeholder="1234">
-                <span class="hint">Used for time-tracker login</span>
               </div>
             </div>
           </div>

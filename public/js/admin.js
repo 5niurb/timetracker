@@ -456,7 +456,7 @@
       document.getElementById('preform-success').style.display = 'none';
       document.getElementById('preform-error').classList.remove('show');
       // Reset fields
-      ['pf-first-name','pf-last-name','pf-email','pf-phone','pf-pin','pf-hourly',
+      ['pf-first-name','pf-last-name','pf-email','pf-phone','pf-hourly',
        'pf-additional-pay-rate','pf-rate-notes','pf-start-date'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -487,7 +487,8 @@
       const firstName = document.getElementById('pf-first-name').value.trim();
       const lastName = document.getElementById('pf-last-name').value.trim();
       const name = [firstName, lastName].filter(Boolean).join(' ');
-      const pin = document.getElementById('pf-pin').value.trim();
+      // Auto-generate a random 4-digit PIN (can be changed later via Edit)
+      const pin = String(Math.floor(1000 + Math.random() * 9000));
       const email = document.getElementById('pf-email').value.trim();
       const phone = document.getElementById('pf-phone').value.trim();
       const designation = document.getElementById('pf-designation').value;
@@ -503,11 +504,6 @@
 
       if (!firstName || !lastName) {
         errorEl.textContent = 'First name and last name are required';
-        errorEl.classList.add('show');
-        return;
-      }
-      if (!pin || !/^\d{4}$/.test(pin)) {
-        errorEl.textContent = 'PIN must be exactly 4 digits';
         errorEl.classList.add('show');
         return;
       }
