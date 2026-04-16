@@ -445,7 +445,7 @@
     .subsection-label:first-child { margin-top: 0; }
 
     /* Digit boxes (TIN + phone) */
-    .tin-digit, .phone-digit {
+    .tin-digit {
       width: 32px;
       height: 36px;
       text-align: center;
@@ -458,7 +458,7 @@
       padding: 0;
       border-radius: 2px;
     }
-    .tin-digit:focus, .phone-digit:focus {
+    .tin-digit:focus {
       border-color: var(--gold);
       outline: none;
       background: #1a1a1a;
@@ -537,22 +537,8 @@
         </div>
         <div class="form-group">
           <label>Mobile Phone <span class="req">*</span></label>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
-            <span style="color:var(--text-dim);font-size:14px;padding-right:2px;">(</span>
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="0" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="1" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="2" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:14px;padding:0 2px;">)</span>
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="3" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="4" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="5" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:18px;padding:0 2px;">–</span>
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="6" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="7" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="8" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="phone-digit" data-ph-idx="9" inputmode="numeric" autocomplete="off">
-          </div>
-          <input type="hidden" id="mobile_phone">
+          <input type="tel" id="mobile_phone" autocomplete="tel" placeholder="(310) 555-1234"
+            maxlength="14" oninput="formatPhoneInput(this)" onblur="validatePhoneField()">
           <span class="field-error" id="err-mobile_phone"></span>
         </div>
         <div class="form-group">
@@ -1043,11 +1029,10 @@
   }
 
   function validatePhoneField() {
-    assemblePhone();
     const val = document.getElementById('mobile_phone').value.trim();
     if (!val) { setError('mobile_phone', 'Mobile phone is required'); return false; }
     const digits = val.replace(/\D/g, '');
-    if (digits.length < 10) { setError('mobile_phone', 'Complete all 10 digits'); return false; }
+    if (digits.length < 10) { setError('mobile_phone', 'Must be 10 digits'); return false; }
     clearError('mobile_phone'); return true;
   }
 
@@ -1130,59 +1115,19 @@
   initDigitBoxes('tin-ein-wrap');
 
   // ============================================================
-  // Phone digit-box logic: (###) ###-####
+  // Phone auto-format: (###) ###-####
   // ============================================================
 
-  function assemblePhone() {
-    const boxes = document.querySelectorAll('.phone-digit');
-    const digits = Array.from(boxes).map(d => d.value).join('');
-    document.getElementById('mobile_phone').value = digits.length === 10 ? digits : digits;
+  function formatPhoneInput(el) {
+    const digits = el.value.replace(/\D/g, '').slice(0, 10);
+    let formatted = '';
+    if (digits.length > 0) formatted = '(' + digits.slice(0, 3);
+    if (digits.length >= 3) formatted += ') ';
+    if (digits.length > 3) formatted += digits.slice(3, 6);
+    if (digits.length >= 6) formatted += '-';
+    if (digits.length > 6) formatted += digits.slice(6, 10);
+    el.value = formatted;
   }
-
-  function prefillPhoneBoxes(phone) {
-    if (!phone) return;
-    const digits = phone.replace(/\D/g, '');
-    // If 11 digits starting with 1, strip country code
-    const d = digits.length === 11 && digits[0] === '1' ? digits.slice(1) : digits;
-    const boxes = document.querySelectorAll('.phone-digit');
-    for (let i = 0; i < Math.min(d.length, boxes.length); i++) {
-      boxes[i].value = d[i];
-    }
-    assemblePhone();
-  }
-
-  (function initPhoneBoxes() {
-    const boxes = document.querySelectorAll('.phone-digit');
-    boxes.forEach((box, i) => {
-      box.addEventListener('input', () => {
-        box.value = box.value.replace(/\D/g, '').slice(0, 1);
-        if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
-        assemblePhone();
-      });
-      box.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !box.value && i > 0) {
-          boxes[i - 1].focus();
-          boxes[i - 1].value = '';
-          assemblePhone();
-        }
-      });
-      box.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pasted = (e.clipboardData.getData('text') || '').replace(/\D/g, '');
-        // Strip leading 1 for 11-digit paste
-        const d = pasted.length === 11 && pasted[0] === '1' ? pasted.slice(1) : pasted;
-        for (let j = 0; j < Math.min(d.length, boxes.length - i); j++) {
-          boxes[i + j].value = d[j];
-        }
-        const nextIdx = Math.min(i + d.length, boxes.length - 1);
-        boxes[nextIdx].focus();
-        assemblePhone();
-      });
-      if (i === boxes.length - 1) {
-        box.addEventListener('blur', () => validatePhoneField());
-      }
-    });
-  })();
 
   // Set today's date on attestation
   const todayISO = new Date().toISOString().split('T')[0];
@@ -1210,7 +1155,10 @@
       if (p.first_name) document.getElementById('first_name').value = p.first_name;
       if (p.last_name) document.getElementById('last_name').value = p.last_name;
       if (p.email) document.getElementById('email').value = p.email;
-      if (p.phone) prefillPhoneBoxes(p.phone);
+      if (p.phone) {
+        document.getElementById('mobile_phone').value = p.phone;
+        formatPhoneInput(document.getElementById('mobile_phone'));
+      }
 
       // Determine if clinical title — show/hide license + insurance sections
       isClinical = CLINICAL_TITLES.has(p.designation);
