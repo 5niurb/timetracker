@@ -4,6 +4,8 @@ const cors = require('cors');
 const path = require('path');
 
 const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
+const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account } = require('./lib/onboarding-validation');
+const { randomUUID } = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -671,29 +673,29 @@ app.post('/api/admin/verify', (req, res) => {
   res.json({ success: password === ADMIN_PASSWORD });
 });
 
-// Get all employees
+// Get all employees (includes onboarding status)
 app.get('/api/admin/employees', async (req, res) => {
   const { data: employees, error } = await supabase
     .from('employees')
-    .select('id, name, pin, email, hourly_wage, commission_rate, pay_type, created_at');
+    .select(
+      'id, name, pin, email, hourly_wage, commission_rate, pay_type, created_at, onboarding_token, onboarding_completed_at',
+    );
 
   res.json(employees || []);
 });
 
-// Add new employee
+// Add new employee — auto-generates onboarding_token
 app.post('/api/admin/employees', async (req, res) => {
   const { name, pin, email, hourlyWage, commissionRate, payType } = req.body;
 
   // Check if PIN already exists
-  const { data: existing } = await supabase
-    .from('employees')
-    .select('id')
-    .eq('pin', pin)
-    .single();
+  const { data: existing } = await supabase.from('employees').select('id').eq('pin', pin).single();
 
   if (existing) {
     return res.status(400).json({ success: false, message: 'PIN already exists' });
   }
+
+  const onboardingToken = randomUUID();
 
   const { data: employee, error } = await supabase
     .from('employees')
@@ -703,7 +705,8 @@ app.post('/api/admin/employees', async (req, res) => {
       email: email || null,
       hourly_wage: hourlyWage || 0,
       commission_rate: commissionRate || 0,
-      pay_type: payType || 'hourly'
+      pay_type: payType || 'hourly',
+      onboarding_token: onboardingToken,
     })
     .select()
     .single();
@@ -711,7 +714,7 @@ app.post('/api/admin/employees', async (req, res) => {
   if (error) {
     res.status(400).json({ success: false, message: error.message });
   } else {
-    res.json({ success: true, id: employee.id });
+    res.json({ success: true, id: employee.id, onboardingToken });
   }
 });
 
@@ -884,6 +887,225 @@ app.get('/api/admin/invoices', async (req, res) => {
 // Serve admin page
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// ============ ONBOARDING ROUTES ============
+
+// Admin: get onboarding details for an employee (masked — no *_encrypted columns)
+app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+
+  const { data: record, error } = await supabase
+    .from('employee_onboarding')
+    .select(
+      `id, employee_id, first_name, last_name, middle_name, preferred_name,
+       other_email, home_phone, work_phone, date_of_birth,
+       address_street, address_city, address_state, address_zip,
+       tin_last4, tin_type, w9_entity_name, w9_tax_classification,
+       w9_exempt_payee_code, w9_signed_at, w9_collected_at,
+       license_number, license_expiration, certifications,
+       driver_license_no, driver_license_expiry,
+       insurer_name, insurance_expiration,
+       prof_liability_per_occurrence, prof_liability_aggregate,
+       bank_name, bank_account_owner_name, bank_account_type,
+       bank_routing_last4, bank_account_last4,
+       payment_method, zelle_contact,
+       time_commitment_hours_per_week, services_offered,
+       other_commitments, exhibit_a_rate, exhibit_a_rate_notes,
+       attestation_checked, attestation_signature, attestation_date,
+       submitted_at`,
+    )
+    .eq('employee_id', parseInt(id))
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    return res.status(404).json({ success: false, message: 'No onboarding data found' });
+  }
+
+  res.json({ success: true, data: record });
+});
+
+// Admin: generate a new onboarding token for an existing employee
+app.post('/api/admin/employees/:id/onboarding-token', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const newToken = randomUUID();
+
+  const { error } = await supabase
+    .from('employees')
+    .update({ onboarding_token: newToken, onboarding_completed_at: null })
+    .eq('id', parseInt(id));
+
+  if (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+
+  res.json({ success: true, onboardingToken: newToken });
+});
+
+// Public: serve onboarding page (validates token)
+app.get('/onboarding/:token', async (req, res) => {
+  const { token } = req.params;
+
+  const { data: employee, error } = await supabase
+    .from('employees')
+    .select('id, name, onboarding_completed_at')
+    .eq('onboarding_token', token)
+    .single();
+
+  if (error || !employee) {
+    return res.status(404).send(`
+      <!DOCTYPE html><html><head><title>Invalid Link</title>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body{font-family:sans-serif;text-align:center;padding:60px 20px;background:#0a0a0a;color:#ccc;}
+      h2{color:#c9a84c;}</style></head>
+      <body><h2>Invalid Onboarding Link</h2>
+      <p>This link is invalid or has expired. Please contact your administrator.</p></body></html>
+    `);
+  }
+
+  if (employee.onboarding_completed_at) {
+    return res.status(200).send(`
+      <!DOCTYPE html><html><head><title>Already Complete</title>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>body{font-family:sans-serif;text-align:center;padding:60px 20px;background:#0a0a0a;color:#ccc;}
+      h2{color:#6bff6b;}</style></head>
+      <body><h2>Onboarding Complete</h2>
+      <p>Your onboarding was already submitted. Thank you!</p></body></html>
+    `);
+  }
+
+  // Serve the onboarding HTML page
+  res.sendFile(path.join(__dirname, 'public', 'onboarding.html'));
+});
+
+// Public: submit onboarding form
+app.post('/api/onboarding/:token', async (req, res) => {
+  const { token } = req.params;
+
+  // Verify token
+  const { data: employee, error: empError } = await supabase
+    .from('employees')
+    .select('id, name, onboarding_completed_at')
+    .eq('onboarding_token', token)
+    .single();
+
+  if (empError || !employee) {
+    return res.status(404).json({ success: false, message: 'Invalid or expired onboarding link' });
+  }
+
+  if (employee.onboarding_completed_at) {
+    return res.status(409).json({ success: false, message: 'Onboarding already completed' });
+  }
+
+  // Validate all fields
+  const form = req.body;
+  const errors = validateOnboarding(form);
+
+  if (Object.keys(errors).length > 0) {
+    return res.status(400).json({ success: false, errors });
+  }
+
+  // Extract masked values
+  const tin_last4 = form.tin_raw ? extractLast4SSN(form.tin_raw) : null;
+  const bank_routing_last4 = form.bank_routing_raw
+    ? extractLast4Routing(form.bank_routing_raw)
+    : null;
+  const bank_account_last4 = form.bank_account_raw
+    ? extractLast4Account(form.bank_account_raw)
+    : null;
+
+  // TODO(security): encrypt tin_encrypted, bank_routing_encrypted, bank_account_encrypted
+  //   via pgsodium.crypto_aead_det_encrypt() with a tenant-level key before storing.
+  //   For now storing plaintext — encrypt tomorrow.
+  const onboardingRecord = {
+    employee_id: employee.id,
+    first_name: form.first_name.trim(),
+    last_name: form.last_name.trim(),
+    middle_name: form.middle_name?.trim() || null,
+    preferred_name: form.preferred_name?.trim() || null,
+    other_email: form.other_email?.trim() || null,
+    home_phone: form.home_phone?.trim() || null,
+    work_phone: form.work_phone?.trim() || null,
+    date_of_birth: form.date_of_birth || null,
+    address_street: form.address_street?.trim() || null,
+    address_city: form.address_city?.trim() || null,
+    address_state: form.address_state || null,
+    address_zip: form.address_zip?.trim() || null,
+    tin_last4,
+    tin_type: form.tin_type || null,
+    tin_encrypted: form.tin_raw || null, // TODO(security): encrypt with pgsodium
+    w9_entity_name: form.w9_entity_name?.trim() || null,
+    w9_tax_classification: form.w9_tax_classification || null,
+    w9_exempt_payee_code: form.w9_exempt_payee_code?.trim() || null,
+    w9_signed_at: form.w9_signed_at || null,
+    license_number: form.license_number?.trim() || null,
+    license_expiration: form.license_expiration || null,
+    certifications: form.certifications?.trim() || null,
+    driver_license_no: form.driver_license_no?.trim() || null,
+    driver_license_expiry: form.driver_license_expiry || null,
+    insurer_name: form.insurer_name?.trim() || null,
+    insurance_expiration: form.insurance_expiration || null,
+    prof_liability_per_occurrence: form.prof_liability_per_occurrence
+      ? parseFloat(form.prof_liability_per_occurrence)
+      : null,
+    prof_liability_aggregate: form.prof_liability_aggregate
+      ? parseFloat(form.prof_liability_aggregate)
+      : null,
+    bank_name: form.bank_name?.trim() || null,
+    bank_account_owner_name: form.bank_account_owner_name?.trim() || null,
+    bank_account_type: form.bank_account_type || null,
+    bank_routing_last4,
+    bank_account_last4,
+    bank_routing_encrypted: form.bank_routing_raw || null, // TODO(security): encrypt with pgsodium
+    bank_account_encrypted: form.bank_account_raw || null, // TODO(security): encrypt with pgsodium
+    payment_method: form.payment_method || null,
+    zelle_contact: form.zelle_contact?.trim() || null,
+    time_commitment_hours_per_week: form.time_commitment_hours_per_week
+      ? parseInt(form.time_commitment_hours_per_week)
+      : null,
+    services_offered: Array.isArray(form.services_offered) ? form.services_offered : [],
+    other_commitments: form.other_commitments?.trim() || null,
+    exhibit_a_rate: form.exhibit_a_rate ? parseFloat(form.exhibit_a_rate) : null,
+    exhibit_a_rate_notes: form.exhibit_a_rate_notes?.trim() || null,
+    attestation_checked: true,
+    attestation_signature: form.attestation_signature.trim(),
+    attestation_date: form.attestation_date,
+  };
+
+  // Insert onboarding record
+  const { error: insertError } = await supabase.from('employee_onboarding').insert(onboardingRecord);
+
+  if (insertError) {
+    console.error('[Onboarding] Insert error:', insertError);
+    return res.status(500).json({ success: false, message: 'Failed to save onboarding data. Please try again.' });
+  }
+
+  // Mark employee as onboarded
+  const now = new Date().toISOString();
+  await supabase
+    .from('employees')
+    .update({
+      ic_agreement_signed: true,
+      ic_agreement_signed_at: now,
+      onboarding_completed_at: now,
+    })
+    .eq('id', employee.id);
+
+  console.log(`[Onboarding] Completed for employee ${employee.id} (${employee.name})`);
+
+  res.json({ success: true, message: 'Onboarding submitted successfully' });
 });
 
 // Start server
