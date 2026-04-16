@@ -94,21 +94,21 @@ async function initDatabase() {
   console.log('Initializing Supabase database...');
 
   // Create employees table
-  const { error: empError } = await supabase.rpc('create_employees_table_if_not_exists');
+  const { error: empError } = await supabaseAdmin.rpc('create_employees_table_if_not_exists');
   if (empError && !empError.message.includes('already exists')) {
     // Table might already exist, that's fine
     console.log('Employees table check:', empError?.message || 'OK');
   }
 
   // Check if we have any employees
-  const { data: employees, error: countError } = await supabase
+  const { data: employees, error: countError } = await supabaseAdmin
     .from('employees')
     .select('id')
     .limit(1);
 
   if (!countError && (!employees || employees.length === 0)) {
     // Insert sample employee
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('employees')
       .insert({
         name: 'Sample Employee',
@@ -216,7 +216,7 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
 app.post('/api/verify-pin', async (req, res) => {
   const { pin } = req.body;
 
-  const { data: employee, error } = await supabase
+  const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .select('id, name, email, hourly_wage, commission_rate, pay_type')
     .eq('pin', pin)
@@ -234,7 +234,7 @@ app.post('/api/change-pin', async (req, res) => {
   const { employeeId, currentPin, newPin } = req.body;
 
   // Verify current PIN
-  const { data: employee, error: verifyError } = await supabase
+  const { data: employee, error: verifyError } = await supabaseAdmin
     .from('employees')
     .select('id')
     .eq('id', employeeId)
@@ -246,7 +246,7 @@ app.post('/api/change-pin', async (req, res) => {
   }
 
   // Check if new PIN is already used
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from('employees')
     .select('id')
     .eq('pin', newPin)
@@ -257,7 +257,7 @@ app.post('/api/change-pin', async (req, res) => {
     return res.json({ success: false, message: 'PIN already in use by another employee' });
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from('employees')
     .update({ pin: newPin })
     .eq('id', employeeId);
@@ -273,7 +273,7 @@ app.post('/api/change-pin', async (req, res) => {
 app.post('/api/check-conflict', async (req, res) => {
   const { employeeId, date } = req.body;
 
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from('time_entries')
     .select('id, start_time, end_time, hours')
     .eq('employee_id', employeeId)
@@ -296,7 +296,7 @@ app.delete('/api/time-entry/:id', async (req, res) => {
   const { employeeId } = req.body;
 
   // Verify ownership
-  const { data: entry } = await supabase
+  const { data: entry } = await supabaseAdmin
     .from('time_entries')
     .select('id')
     .eq('id', parseInt(id))
@@ -308,9 +308,9 @@ app.delete('/api/time-entry/:id', async (req, res) => {
   }
 
   // Delete related records
-  await supabase.from('product_sales').delete().eq('time_entry_id', parseInt(id));
-  await supabase.from('client_entries').delete().eq('time_entry_id', parseInt(id));
-  await supabase.from('time_entries').delete().eq('id', parseInt(id));
+  await supabaseAdmin.from('product_sales').delete().eq('time_entry_id', parseInt(id));
+  await supabaseAdmin.from('client_entries').delete().eq('time_entry_id', parseInt(id));
+  await supabaseAdmin.from('time_entries').delete().eq('id', parseInt(id));
 
   res.json({ success: true });
 });
@@ -319,7 +319,7 @@ app.delete('/api/time-entry/:id', async (req, res) => {
 app.post('/api/time-entry', async (req, res) => {
   const { employeeId, date, startTime, endTime, breakMinutes, hours, description, clients, productSales } = req.body;
 
-  const { data: timeEntry, error } = await supabase
+  const { data: timeEntry, error } = await supabaseAdmin
     .from('time_entries')
     .insert({
       employee_id: employeeId,
@@ -351,7 +351,7 @@ app.post('/api/time-entry', async (req, res) => {
       tip_received_cash: client.tipReceivedCash ? true : false
     }));
 
-    await supabase.from('client_entries').insert(clientData);
+    await supabaseAdmin.from('client_entries').insert(clientData);
   }
 
   // Insert product sales if provided
@@ -364,7 +364,7 @@ app.post('/api/time-entry', async (req, res) => {
       notes: sale.notes || ''
     }));
 
-    await supabase.from('product_sales').insert(salesData);
+    await supabaseAdmin.from('product_sales').insert(salesData);
   }
 
   res.json({ success: true, id: timeEntryId });
@@ -374,7 +374,7 @@ app.post('/api/time-entry', async (req, res) => {
 app.get('/api/time-entries/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
 
-  const { data: entries, error } = await supabase
+  const { data: entries, error } = await supabaseAdmin
     .from('time_entries')
     .select('id, date, start_time, end_time, break_minutes, hours, description, created_at')
     .eq('employee_id', parseInt(employeeId))
@@ -387,12 +387,12 @@ app.get('/api/time-entries/:employeeId', async (req, res) => {
 
   // Get client entries and product sales for each time entry
   for (const entry of entries) {
-    const { data: clients } = await supabase
+    const { data: clients } = await supabaseAdmin
       .from('client_entries')
       .select('id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash')
       .eq('time_entry_id', entry.id);
 
-    const { data: productSales } = await supabase
+    const { data: productSales } = await supabaseAdmin
       .from('product_sales')
       .select('id, product_name, sale_amount, commission_amount, notes')
       .eq('time_entry_id', entry.id);
@@ -416,14 +416,14 @@ app.get('/api/pay-period/:employeeId', async (req, res) => {
   const endDate = formatDateForDB(period.end);
 
   // Get employee info
-  const { data: employee } = await supabase
+  const { data: employee } = await supabaseAdmin
     .from('employees')
     .select('hourly_wage, pay_type')
     .eq('id', parseInt(employeeId))
     .single();
 
   // Get time entries for this period
-  const { data: entries } = await supabase
+  const { data: entries } = await supabaseAdmin
     .from('time_entries')
     .select('id, date, hours')
     .eq('employee_id', parseInt(employeeId))
@@ -441,7 +441,7 @@ app.get('/api/pay-period/:employeeId', async (req, res) => {
     totalHours += entry.hours;
 
     // Get client entries
-    const { data: clients } = await supabase
+    const { data: clients } = await supabaseAdmin
       .from('client_entries')
       .select('amount_earned, tip_amount, tip_received_cash')
       .eq('time_entry_id', entry.id);
@@ -455,7 +455,7 @@ app.get('/api/pay-period/:employeeId', async (req, res) => {
     }
 
     // Get product sales
-    const { data: sales } = await supabase
+    const { data: sales } = await supabaseAdmin
       .from('product_sales')
       .select('commission_amount')
       .eq('time_entry_id', entry.id);
@@ -469,7 +469,7 @@ app.get('/api/pay-period/:employeeId', async (req, res) => {
   const totalWages = totalHours * hourlyWage;
 
   // Check if invoice already submitted for this period
-  const { data: existingInvoice } = await supabase
+  const { data: existingInvoice } = await supabaseAdmin
     .from('invoices')
     .select('id, submitted_at')
     .eq('employee_id', parseInt(employeeId))
@@ -500,7 +500,7 @@ app.post('/api/submit-invoice', async (req, res) => {
   const { employeeId, periodStart, periodEnd, totalHours, totalWages, totalCommissions, totalTips, totalCashTips, totalProductCommissions, totalPayable } = req.body;
 
   // Check if already submitted
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from('invoices')
     .select('id')
     .eq('employee_id', employeeId)
@@ -513,14 +513,14 @@ app.post('/api/submit-invoice', async (req, res) => {
   }
 
   // Get employee details
-  const { data: employee } = await supabase
+  const { data: employee } = await supabaseAdmin
     .from('employees')
     .select('name, email, hourly_wage')
     .eq('id', employeeId)
     .single();
 
   // Create invoice record
-  const { data: invoice, error } = await supabase
+  const { data: invoice, error } = await supabaseAdmin
     .from('invoices')
     .insert({
       employee_id: employeeId,
@@ -573,7 +573,7 @@ app.post('/api/submit-invoice', async (req, res) => {
 
   // Mark email as sent if successful
   if (emailResult.sent) {
-    await supabase
+    await supabaseAdmin
       .from('invoices')
       .update({ email_sent: true })
       .eq('id', invoice.id);
@@ -599,7 +599,7 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
   const { periodStart, periodEnd } = req.query;
 
-  const { data: employee, error: empError } = await supabase
+  const { data: employee, error: empError } = await supabaseAdmin
     .from('employees')
     .select('id, name, email, hourly_wage, pay_type')
     .eq('id', parseInt(employeeId))
@@ -616,7 +616,7 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   const effectiveEndDate = periodEnd <= todayLA ? periodEnd : todayLA;
 
   // Get all entries for the period with details (only up to today in LA time)
-  const { data: entries } = await supabase
+  const { data: entries } = await supabaseAdmin
     .from('time_entries')
     .select('id, date, start_time, end_time, hours')
     .eq('employee_id', parseInt(employeeId))
@@ -632,12 +632,12 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   let totalProductCommissions = 0;
 
   for (const entry of (entries || [])) {
-    const { data: clients } = await supabase
+    const { data: clients } = await supabaseAdmin
       .from('client_entries')
       .select('client_name, procedure_name, amount_earned, tip_amount, tip_received_cash')
       .eq('time_entry_id', entry.id);
 
-    const { data: products } = await supabase
+    const { data: products } = await supabaseAdmin
       .from('product_sales')
       .select('product_name, sale_amount, commission_amount')
       .eq('time_entry_id', entry.id);
@@ -716,7 +716,7 @@ app.post('/api/admin/verify', (req, res) => {
 
 // Get all employees (includes onboarding status)
 app.get('/api/admin/employees', async (req, res) => {
-  const { data: employees, error } = await supabase
+  const { data: employees, error } = await supabaseAdmin
     .from('employees')
     .select(
       'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, created_at, onboarding_token, onboarding_completed_at',
@@ -743,7 +743,7 @@ app.post('/api/admin/employees', async (req, res) => {
   } = req.body;
 
   // Check if PIN already exists
-  const { data: existing } = await supabase.from('employees').select('id').eq('pin', pin).single();
+  const { data: existing } = await supabaseAdmin.from('employees').select('id').eq('pin', pin).single();
 
   if (existing) {
     return res.status(400).json({ success: false, message: 'PIN already exists' });
@@ -751,7 +751,7 @@ app.post('/api/admin/employees', async (req, res) => {
 
   const onboardingToken = randomUUID();
 
-  const { data: employee, error } = await supabase
+  const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .insert({
       name: name,
@@ -796,7 +796,7 @@ app.put('/api/admin/employees/:id', async (req, res) => {
   } = req.body;
 
   // Check if PIN already exists for another employee
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from('employees')
     .select('id')
     .eq('pin', pin)
@@ -807,7 +807,7 @@ app.put('/api/admin/employees/:id', async (req, res) => {
     return res.status(400).json({ success: false, message: 'PIN already exists' });
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('employees')
     .update({
       name: name,
@@ -836,20 +836,20 @@ app.delete('/api/admin/employees/:id', async (req, res) => {
   const { id } = req.params;
 
   // Get time entries for this employee
-  const { data: timeEntries } = await supabase
+  const { data: timeEntries } = await supabaseAdmin
     .from('time_entries')
     .select('id')
     .eq('employee_id', parseInt(id));
 
   // Delete related records
   for (const entry of (timeEntries || [])) {
-    await supabase.from('product_sales').delete().eq('time_entry_id', entry.id);
-    await supabase.from('client_entries').delete().eq('time_entry_id', entry.id);
+    await supabaseAdmin.from('product_sales').delete().eq('time_entry_id', entry.id);
+    await supabaseAdmin.from('client_entries').delete().eq('time_entry_id', entry.id);
   }
 
-  await supabase.from('invoices').delete().eq('employee_id', parseInt(id));
-  await supabase.from('time_entries').delete().eq('employee_id', parseInt(id));
-  await supabase.from('employees').delete().eq('id', parseInt(id));
+  await supabaseAdmin.from('invoices').delete().eq('employee_id', parseInt(id));
+  await supabaseAdmin.from('time_entries').delete().eq('employee_id', parseInt(id));
+  await supabaseAdmin.from('employees').delete().eq('id', parseInt(id));
 
   res.json({ success: true });
 });
@@ -858,7 +858,7 @@ app.delete('/api/admin/employees/:id', async (req, res) => {
 app.get('/api/admin/time-entries', async (req, res) => {
   const { startDate, endDate, employeeId } = req.query;
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('time_entries')
     .select(`
       id,
@@ -898,12 +898,12 @@ app.get('/api/admin/time-entries', async (req, res) => {
   // Transform and get client entries and product sales for each time entry
   const transformedEntries = [];
   for (const entry of (entries || [])) {
-    const { data: clients } = await supabase
+    const { data: clients } = await supabaseAdmin
       .from('client_entries')
       .select('id, client_name, procedure_name, notes, amount_earned, tip_amount, tip_received_cash')
       .eq('time_entry_id', entry.id);
 
-    const { data: productSales } = await supabase
+    const { data: productSales } = await supabaseAdmin
       .from('product_sales')
       .select('id, product_name, sale_amount, commission_amount, notes')
       .eq('time_entry_id', entry.id);
@@ -934,16 +934,16 @@ app.get('/api/admin/time-entries', async (req, res) => {
 app.delete('/api/admin/time-entries/:id', async (req, res) => {
   const { id } = req.params;
 
-  await supabase.from('product_sales').delete().eq('time_entry_id', parseInt(id));
-  await supabase.from('client_entries').delete().eq('time_entry_id', parseInt(id));
-  await supabase.from('time_entries').delete().eq('id', parseInt(id));
+  await supabaseAdmin.from('product_sales').delete().eq('time_entry_id', parseInt(id));
+  await supabaseAdmin.from('client_entries').delete().eq('time_entry_id', parseInt(id));
+  await supabaseAdmin.from('time_entries').delete().eq('id', parseInt(id));
 
   res.json({ success: true });
 });
 
 // Get all invoices (admin)
 app.get('/api/admin/invoices', async (req, res) => {
-  const { data: invoices, error } = await supabase
+  const { data: invoices, error } = await supabaseAdmin
     .from('invoices')
     .select(`
       *,
@@ -977,7 +977,7 @@ app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
 
   const { id } = req.params;
 
-  const { data: record, error } = await supabase
+  const { data: record, error } = await supabaseAdmin
     .from('employee_onboarding')
     .select(
       `id, employee_id, first_name, last_name, middle_name, preferred_name,
@@ -1017,7 +1017,7 @@ app.post('/api/admin/employees/:id/onboarding-token', async (req, res) => {
   const { id } = req.params;
   const newToken = randomUUID();
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('employees')
     .update({ onboarding_token: newToken, onboarding_completed_at: null })
     .eq('id', parseInt(id));
@@ -1043,7 +1043,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
     return res.status(400).json({ success: false, message: 'type must be sms or email' });
   }
 
-  const { data: employee, error } = await supabase
+  const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .select('id, name, email, phone, onboarding_token, onboarding_completed_at')
     .eq('id', parseInt(id))
@@ -1182,7 +1182,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
 app.get('/api/onboarding/:token/prefill', async (req, res) => {
   const { token } = req.params;
 
-  const { data: employee, error } = await supabase
+  const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .select(
       'id, name, email, phone, designation, contractor_type, pay_type, hourly_wage, additional_pay_rate, rate_notes, onboarding_completed_at',
@@ -1229,7 +1229,7 @@ app.post(
     const { fileType } = req.body; // 'driver_license' or 'insurance'
 
     // Validate token
-    const { data: employee, error: empError } = await supabase
+    const { data: employee, error: empError } = await supabaseAdmin
       .from('employees')
       .select('id, onboarding_completed_at')
       .eq('onboarding_token', token)
@@ -1282,7 +1282,7 @@ app.use((err, req, res, next) => {
 app.get('/onboarding/:token', async (req, res) => {
   const { token } = req.params;
 
-  const { data: employee, error } = await supabase
+  const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .select('id, name, onboarding_completed_at')
     .eq('onboarding_token', token)
@@ -1319,7 +1319,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
   const { token } = req.params;
 
   // Verify token
-  const { data: employee, error: empError } = await supabase
+  const { data: employee, error: empError } = await supabaseAdmin
     .from('employees')
     .select('id, name, onboarding_completed_at')
     .eq('onboarding_token', token)
@@ -1334,7 +1334,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
   }
 
   // Look up employee designation to determine conditional validation
-  const { data: empDetail } = await supabase
+  const { data: empDetail } = await supabaseAdmin
     .from('employees')
     .select('designation')
     .eq('id', employee.id)
@@ -1425,7 +1425,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
   };
 
   // Insert onboarding record
-  const { error: insertError } = await supabase.from('employee_onboarding').insert(onboardingRecord);
+  const { error: insertError } = await supabaseAdmin.from('employee_onboarding').insert(onboardingRecord);
 
   if (insertError) {
     console.error('[Onboarding] Insert error:', insertError);
@@ -1434,7 +1434,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
 
   // Mark employee as onboarded
   const now = new Date().toISOString();
-  await supabase
+  await supabaseAdmin
     .from('employees')
     .update({
       ic_agreement_signed: true,
