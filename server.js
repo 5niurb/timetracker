@@ -187,7 +187,7 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'LM PayTrack <paytrack@updates.lemedspa.com>',
+        from: 'LM PayTrack <paytrack@lemedspa.com>',
         to: recipients,
         cc: cc,
         subject: `Pay Period Invoice - ${employee.name} - ${periodStart} to ${periodEnd}`,
@@ -1159,8 +1159,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'LeMed Spa Onboarding <onboarding@updates.lemedspa.com>',
-          reply_to: 'ops@lemedspa.com',
+          from: 'LeMed Spa Onboarding <ops@lemedspa.com>',
           to: [employee.email],
           cc: ['lea@lemedspa.com'],
           subject: `LeMed Spa — Complete Your Onboarding`,

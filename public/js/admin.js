@@ -587,7 +587,7 @@
         label = 'Text Message Preview (from 213-444-2242)';
         preview = `Hi ${firstName}, this is LeMed Spa. Please complete your onboarding form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${link}\n\nQuestions? Reply to this text or call 818-463-3772.`;
       } else {
-        label = 'Email Preview (from onboarding@updates.lemedspa.com)';
+        label = 'Email Preview (from ops@lemedspa.com)';
         preview = `Subject: LeMed Spa — Complete Your Onboarding\nTo: ${emp?.email || window._preformEmployeeEmail || '(no email on file)'}\nCC: lea@lemedspa.com\n\n---\n\nHi ${firstName},\n\nWelcome to the LeMed Spa team! Before your start date, please complete the onboarding form linked below. This collects the information needed to set up your independent contractor agreement, tax documents, and payment details.\n\n${link}\n\nThe form takes approximately 10 minutes and covers:\n- Tax information (W-9)\n- Government ID\n- Professional license(s) and insurance (if applicable)\n- Payment preferences\n\nIf you have any questions, please reach out to us at ops@lemedspa.com or call 818-463-3772.\n\nWe look forward to working with you!\n\nLeMed Spa Operations\n17414 Ventura Blvd, Encino, CA 91316\n818-4MEDSPA (818-463-3772)`;
       }
 
