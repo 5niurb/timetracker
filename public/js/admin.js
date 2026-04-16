@@ -448,6 +448,17 @@
       salesCheck.checked = ['commission_sales', 'hourly_sales', 'hourly_all', 'commission_all'].includes(payType);
     }
 
+    function formatPfPhone(el) {
+      const digits = el.value.replace(/\D/g, '').slice(0, 10);
+      let formatted = '';
+      if (digits.length > 0) formatted = '(' + digits.slice(0, 3);
+      if (digits.length >= 3) formatted += ') ';
+      if (digits.length > 3) formatted += digits.slice(3, 6);
+      if (digits.length >= 6) formatted += '-';
+      if (digits.length > 6) formatted += digits.slice(6, 10);
+      el.value = formatted;
+    }
+
     // ============ Pre-Form (Add New Team Member) ============
 
     function openPreForm() {
