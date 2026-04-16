@@ -433,6 +433,17 @@
       line-height: 1.6;
     }
 
+    .subsection-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 14px;
+      margin-top: 24px;
+    }
+    .subsection-label:first-child { margin-top: 0; }
+
     select option { background: #1a1a1a; }
     textarea { resize: vertical; min-height: 80px; }
 
@@ -453,7 +464,7 @@
 
 <!-- Success screen (shown after submit) -->
 <div id="success-screen">
-  <div class="icon">✓</div>
+  <div class="icon">&#10003;</div>
   <h2>Onboarding Complete</h2>
   <p>Thank you — your information has been received.<br>
   LeMed will be in touch with next steps.</p>
@@ -470,11 +481,11 @@
     Please correct the highlighted fields below.
   </div>
 
-  <!-- Section 1: Personal Information -->
+  <!-- Section 1: Personal & Contact Information -->
   <div class="section">
     <div class="section-header">
       <div class="section-number">1</div>
-      <h2>Personal Information</h2>
+      <h2>Personal &amp; Contact Information</h2>
     </div>
     <div class="section-body">
       <div class="form-grid">
@@ -513,28 +524,9 @@
           <span class="field-error" id="err-date_of_birth"></span>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Section 2: Job Information (read-only, pre-filled by admin) -->
-  <div class="section" id="job-info-section" style="display:none;">
-    <div class="section-header">
-      <div class="section-number" style="background:#333;color:#999;">i</div>
-      <h2>Your Position</h2>
-    </div>
-    <div class="section-body">
-      <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">This information was set by LeMed administration. If anything looks incorrect, please contact your manager.</p>
-      <div class="job-info-grid" id="job-info-display"></div>
-    </div>
-  </div>
-
-  <!-- Section 3: Home Address -->
-  <div class="section">
-    <div class="section-header">
-      <div class="section-number">2</div>
-      <h2>Home Address</h2>
-    </div>
-    <div class="section-body">
+      <!-- Address sub-section -->
+      <p class="subsection-label">Home Address</p>
       <div class="form-grid">
         <div class="form-group span-2">
           <label>Street Address <span class="req">*</span></label>
@@ -575,10 +567,10 @@
     </div>
   </div>
 
-  <!-- Section 4: Tax / W-9 -->
+  <!-- Section 2: Tax / W-9 -->
   <div class="section">
     <div class="section-header">
-      <div class="section-number">3</div>
+      <div class="section-number">2</div>
       <h2>Tax Information (W-9)</h2>
     </div>
     <div class="section-body">
@@ -623,80 +615,79 @@
     </div>
   </div>
 
-  <!-- Section 5: License & Certifications -->
+  <!-- Section 3: Drivers License / Government ID -->
   <div class="section">
     <div class="section-header">
-      <div class="section-number">4</div>
-      <h2>License &amp; Certifications</h2>
+      <div class="section-number">3</div>
+      <h2>Drivers License / Government ID</h2>
     </div>
     <div class="section-body">
-
-      <!-- Driver's License -->
-      <div style="margin-bottom:24px;">
-        <p style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;">Driver's License</p>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>DL Number <span class="req">*</span></label>
-            <input type="text" id="driver_license_number" placeholder="e.g. D1234567">
-            <span class="field-error" id="err-driver_license_number"></span>
-          </div>
-          <div class="form-group">
-            <label>DL Issuing State <span class="req">*</span></label>
-            <select id="driver_license_state">
-              <option value="">— Select —</option>
-              <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
-              <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
-              <option>DC</option><option>FL</option><option>GA</option><option>HI</option>
-              <option>ID</option><option>IL</option><option>IN</option><option>IA</option>
-              <option>KS</option><option>KY</option><option>LA</option><option>ME</option>
-              <option>MD</option><option>MA</option><option>MI</option><option>MN</option>
-              <option>MS</option><option>MO</option><option>MT</option><option>NE</option>
-              <option>NV</option><option>NH</option><option>NJ</option><option>NM</option>
-              <option>NY</option><option>NC</option><option>ND</option><option>OH</option>
-              <option>OK</option><option>OR</option><option>PA</option><option>RI</option>
-              <option>SC</option><option>SD</option><option>TN</option><option>TX</option>
-              <option>UT</option><option>VT</option><option>VA</option><option>WA</option>
-              <option>WV</option><option>WI</option><option>WY</option>
-            </select>
-            <span class="field-error" id="err-driver_license_state"></span>
-          </div>
-          <div class="form-group span-2">
-            <label>Upload Driver's License (front) <span class="req">*</span></label>
-            <div class="file-upload-wrap">
-              <input type="file" class="file-upload-input" id="dl_upload_file" accept=".pdf,.jpg,.jpeg,.png"
-                onchange="handleFileSelect(this, 'driver_license', 'dl-upload-status')">
-              <span class="field-hint">PDF, JPG, or PNG — max 10 MB</span>
-              <span class="upload-status" id="dl-upload-status"></span>
-              <input type="hidden" id="driver_license_upload_path">
-              <span class="field-error" id="err-driver_license_upload_path"></span>
-            </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>DL / ID Number <span class="req">*</span></label>
+          <input type="text" id="driver_license_number" placeholder="e.g. D1234567">
+          <span class="field-error" id="err-driver_license_number"></span>
+        </div>
+        <div class="form-group">
+          <label>DL / ID Issuing State <span class="req">*</span></label>
+          <select id="driver_license_state">
+            <option value="">— Select —</option>
+            <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+            <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
+            <option>DC</option><option>FL</option><option>GA</option><option>HI</option>
+            <option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+            <option>KS</option><option>KY</option><option>LA</option><option>ME</option>
+            <option>MD</option><option>MA</option><option>MI</option><option>MN</option>
+            <option>MS</option><option>MO</option><option>MT</option><option>NE</option>
+            <option>NV</option><option>NH</option><option>NJ</option><option>NM</option>
+            <option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+            <option>OK</option><option>OR</option><option>PA</option><option>RI</option>
+            <option>SC</option><option>SD</option><option>TN</option><option>TX</option>
+            <option>UT</option><option>VT</option><option>VA</option><option>WA</option>
+            <option>WV</option><option>WI</option><option>WY</option>
+          </select>
+          <span class="field-error" id="err-driver_license_state"></span>
+        </div>
+        <div class="form-group span-2">
+          <label>Upload DL / ID (front) <span class="req">*</span></label>
+          <div class="file-upload-wrap">
+            <input type="file" class="file-upload-input" id="dl_upload_file" accept=".pdf,.jpg,.jpeg,.png"
+              onchange="handleFileSelect(this, 'driver_license', 'dl-upload-status')">
+            <span class="field-hint">PDF, JPG, or PNG — max 10 MB</span>
+            <span class="upload-status" id="dl-upload-status"></span>
+            <input type="hidden" id="driver_license_upload_path">
+            <span class="field-error" id="err-driver_license_upload_path"></span>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Professional Licenses -->
-      <div style="margin-bottom:24px;">
-        <p style="font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--gold);margin-bottom:4px;">Professional License(s) <span style="color:var(--error);">*</span></p>
-        <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">At least one professional license is required. Add all that apply.</p>
-        <div id="prof-licenses-container"></div>
-        <button type="button" class="btn-add-entry" onclick="addProfLicenseEntry()">+ Add License</button>
-        <span class="field-error" id="err-professional_licenses" style="display:block;margin-top:8px;"></span>
-      </div>
+  <!-- Section 4: Professional License(s) — conditional, only for clinical titles -->
+  <div class="section" id="section-prof-licenses" style="display:none;">
+    <div class="section-header">
+      <div class="section-number">4</div>
+      <h2>Professional License(s)</h2>
+    </div>
+    <div class="section-body">
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">At least one professional license is required. Add all that apply.</p>
+      <div id="prof-licenses-container"></div>
+      <button type="button" class="btn-add-entry" onclick="addProfLicenseEntry()">+ Add License</button>
+      <span class="field-error" id="err-professional_licenses" style="display:block;margin-top:8px;"></span>
 
       <!-- Certifications -->
-      <div>
+      <div style="margin-top:24px;">
         <div class="form-group">
           <label>Other Certifications &amp; Training</label>
           <textarea id="certifications" rows="3" placeholder="List any additional certifications, training, or credentials (CPR, OSHA, etc.)"></textarea>
           <span class="field-hint">Optional — free text, one per line or comma-separated</span>
         </div>
       </div>
-
     </div>
   </div>
 
-  <!-- Section 6: Insurance -->
-  <div class="section">
+  <!-- Section 5: Professional Liability Insurance — conditional, only for clinical titles -->
+  <div class="section" id="section-insurance" style="display:none;">
     <div class="section-header">
       <div class="section-number">5</div>
       <h2>Professional Liability Insurance</h2>
@@ -704,15 +695,17 @@
     <div class="section-body">
       <div class="form-grid">
         <div class="form-group">
-          <label>Insurance Company Name</label>
+          <label>Insurance Company Name <span class="req">*</span></label>
           <input type="text" id="insurance_company" placeholder="e.g. Proliability, CM&F">
+          <span class="field-error" id="err-insurance_company"></span>
         </div>
         <div class="form-group">
-          <label>Policy Number</label>
+          <label>Policy Number <span class="req">*</span></label>
           <input type="text" id="insurance_policy_number" placeholder="Policy #">
+          <span class="field-error" id="err-insurance_policy_number"></span>
         </div>
         <div class="form-group">
-          <label>Policy Expiration</label>
+          <label>Policy Expiration <span class="req">*</span></label>
           <input type="date" id="insurance_expiration">
           <span class="field-error" id="err-insurance_expiration"></span>
         </div>
@@ -728,7 +721,7 @@
           <input type="number" id="prof_liability_aggregate" min="0" step="1000">
         </div>
         <div class="form-group span-2">
-          <label>Upload Insurance Certificate</label>
+          <label>Upload Insurance Certificate <span class="req">*</span></label>
           <div class="file-upload-wrap">
             <input type="file" class="file-upload-input" id="ins_upload_file" accept=".pdf,.jpg,.jpeg,.png"
               onchange="handleFileSelect(this, 'insurance', 'ins-upload-status')">
@@ -741,10 +734,10 @@
     </div>
   </div>
 
-  <!-- Section 7: Banking -->
-  <div class="section">
+  <!-- Section 6: Banking -->
+  <div class="section" id="section-banking">
     <div class="section-header">
-      <div class="section-number">6</div>
+      <div class="section-number" id="banking-section-num">4</div>
       <h2>Payment &amp; Banking</h2>
     </div>
     <div class="section-body">
@@ -810,9 +803,9 @@
             <div class="form-group">
               <label>Routing Number (9 digits) <span class="req">*</span></label>
               <div class="sensitive-field-wrap">
-                <input type="password" id="bank_routing_raw" maxlength="9" placeholder="•••••••••"
+                <input type="password" id="bank_routing_raw" maxlength="9" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
                   autocomplete="off" oninput="updateRoutingMask()" onblur="validateRoutingField()">
-                <button type="button" class="reveal-btn" onclick="toggleReveal('bank_routing_raw', this)" aria-label="Show/hide routing">👁</button>
+                <button type="button" class="reveal-btn" onclick="toggleReveal('bank_routing_raw', this)" aria-label="Show/hide routing">&#128065;</button>
               </div>
               <div class="masked-preview" id="routing_mask_preview"></div>
               <span class="field-error" id="err-bank_routing_raw"></span>
@@ -820,9 +813,9 @@
             <div class="form-group">
               <label>Account Number <span class="req">*</span></label>
               <div class="sensitive-field-wrap">
-                <input type="password" id="bank_account_raw" maxlength="17" placeholder="•••••••••••"
+                <input type="password" id="bank_account_raw" maxlength="17" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
                   autocomplete="off" oninput="updateAccountMask()" onblur="validateAccountField()">
-                <button type="button" class="reveal-btn" onclick="toggleReveal('bank_account_raw', this)" aria-label="Show/hide account">👁</button>
+                <button type="button" class="reveal-btn" onclick="toggleReveal('bank_account_raw', this)" aria-label="Show/hide account">&#128065;</button>
               </div>
               <div class="masked-preview" id="account_mask_preview"></div>
               <span class="field-error" id="err-bank_account_raw"></span>
@@ -833,31 +826,38 @@
     </div>
   </div>
 
-  <!-- Section 8: Contract Details -->
+  <!-- Section 7: Contract Details -->
   <div class="section">
     <div class="section-header">
-      <div class="section-number">7</div>
+      <div class="section-number" id="contract-section-num">5</div>
       <h2>Contract Details</h2>
     </div>
     <div class="section-body">
+      <!-- Pre-filled job info (read-only, from admin) -->
+      <div id="job-info-section" style="display:none;margin-bottom:20px;">
+        <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">This information was set by LeMed administration. If anything looks incorrect, please contact your manager.</p>
+        <div class="job-info-grid" id="job-info-display"></div>
+      </div>
+
       <div class="form-grid">
         <div class="form-group span-2">
           <label>Desired Time Commitment <span class="req">*</span></label>
+          <span class="field-hint" style="margin-bottom:4px;">This is informational only and may be less than the time commitment needed for the position.</span>
           <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
             <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
               <input type="radio" name="time_commitment_bucket" value="under_15"
                 onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
-              Less than 15 hours / 1–2 days
+              Less than 15 hours / 1-2 days
             </label>
             <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
               <input type="radio" name="time_commitment_bucket" value="15_to_25"
                 onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
-              15–25 hours / 2–3 days
+              15-25 hours / 2-3 days
             </label>
             <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
               <input type="radio" name="time_commitment_bucket" value="25_to_35"
                 onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
-              25–35 hours / 3–4 days
+              25-35 hours / 3-4 days
             </label>
             <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
               <input type="radio" name="time_commitment_bucket" value="over_35"
@@ -869,16 +869,16 @@
         </div>
         <div class="form-group span-2">
           <label>Other Commitments / Disclosures</label>
-          <textarea id="other_commitments" rows="2" placeholder="Other employment or business activities that may conflict"></textarea>
+          <textarea id="other_commitments" rows="3" placeholder="Please provide relevant details for other jobs or business activities which have overlapping duties (e.g., employer, location, duties, approx. time commitment)"></textarea>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Section 9: Attestation -->
+  <!-- Section 8: Attestation -->
   <div class="section">
     <div class="section-header">
-      <div class="section-number">8</div>
+      <div class="section-number" id="attestation-section-num">6</div>
       <h2>Attestation &amp; Signature</h2>
     </div>
     <div class="section-body">
@@ -919,6 +919,15 @@
 </div>
 
 <script>
+  // ============================================================
+  // Constants
+  // ============================================================
+
+  const CLINICAL_TITLES = new Set(['Esthetician', 'Aesthetic Nurse', 'Aesthetic Nurse Practitioner', 'Physician']);
+
+  // Track whether this worker needs license/insurance sections
+  let isClinical = false;
+
   // ============================================================
   // Inline validation helpers (mirror of server-side logic)
   // ============================================================
@@ -985,16 +994,20 @@
       if (p.email) document.getElementById('email').value = p.email;
       if (p.phone) document.getElementById('mobile_phone').value = p.phone;
 
-      // Show job info section if any job data is present
+      // Determine if clinical title — show/hide license + insurance sections
+      isClinical = CLINICAL_TITLES.has(p.designation);
+      applyClinicalSections();
+
+      // Show job info in Contract Details section if any job data is present
       const hasJobInfo = p.designation || p.contractor_type || p.pay_type || p.hourly_wage || p.additional_pay_rate || p.rate_notes;
       if (hasJobInfo) {
         const display = document.getElementById('job-info-display');
         const items = [];
 
-        if (p.designation) items.push({ label: 'Position / Title', value: p.designation });
+        if (p.designation) items.push({ label: 'Job Title', value: p.designation });
 
         if (p.contractor_type) {
-          const typeLabel = p.contractor_type === 'contract' ? '1099 Contractor' : 'W-2 Employee';
+          const typeLabel = p.contractor_type === 'contract' ? 'Contract' : 'Full-time';
           items.push({ label: 'Job Type', value: typeLabel });
         }
 
@@ -1019,7 +1032,7 @@
         }
 
         if (p.rate_notes) {
-          items.push({ label: 'Rate Notes', value: p.rate_notes });
+          items.push({ label: 'Comments', value: p.rate_notes });
         }
 
         display.innerHTML = items.map(item => `
@@ -1033,6 +1046,26 @@
       }
     } catch (e) {
       // Prefill is best-effort — don't block the form
+    }
+  }
+
+  function applyClinicalSections() {
+    const licSection = document.getElementById('section-prof-licenses');
+    const insSection = document.getElementById('section-insurance');
+
+    if (isClinical) {
+      licSection.style.display = 'block';
+      insSection.style.display = 'block';
+      // Update section numbers for banking, contract, attestation
+      document.getElementById('banking-section-num').textContent = '6';
+      document.getElementById('contract-section-num').textContent = '7';
+      document.getElementById('attestation-section-num').textContent = '8';
+    } else {
+      licSection.style.display = 'none';
+      insSection.style.display = 'none';
+      document.getElementById('banking-section-num').textContent = '4';
+      document.getElementById('contract-section-num').textContent = '5';
+      document.getElementById('attestation-section-num').textContent = '6';
     }
   }
 
@@ -1094,9 +1127,9 @@
           <span class="field-error" id="err-lic_expiration_${idx}"></span>
         </div>
         <div class="form-group span-2">
-          <label>Verification URL</label>
-          <input type="url" id="lic_url_${idx}" placeholder="https://verify.example.com/license/...">
-          <span class="field-hint">Link to your state's license verification page (optional)</span>
+          <label>License Verification URL <span class="req">*</span></label>
+          <input type="url" id="lic_url_${idx}" placeholder="https://search.dca.ca.gov/...">
+          <span class="field-hint">Please provide a link to your current license information using the CA Dept of Consumer Affairs website (search.dca.ca.gov)</span>
           <span class="field-error" id="err-lic_url_${idx}"></span>
         </div>
       </div>
@@ -1162,15 +1195,14 @@
       if (!expiration) { setError(`lic_expiration_${id}`, 'Expiration date is required'); hasError = true; entryValid = false; }
       else clearError(`lic_expiration_${id}`);
 
-      if (license_url && !/^https?:\/\/.+/.test(license_url)) {
-        setError(`lic_url_${id}`, 'Must be a valid URL (https://...)');
+      if (!license_url || !/^https?:\/\/.+/.test(license_url)) {
+        setError(`lic_url_${id}`, 'Valid license verification URL is required (https://...)');
         hasError = true; entryValid = false;
       } else clearError(`lic_url_${id}`);
 
       if (entryValid) {
-        const lic = { type, number, status, expiration };
+        const lic = { type, number, status, expiration, license_url };
         if (type === 'Other') lic.type_other = type_other;
-        if (license_url) lic.license_url = license_url;
         licenses.push(lic);
       }
     });
@@ -1178,8 +1210,8 @@
     return { licenses, hasError };
   }
 
-  // Add one entry on load
-  addProfLicenseEntry();
+  // Add one entry on load (only if clinical — deferred until prefill completes)
+  // See loadPrefill → applyClinicalSections
 
   // ============================================================
   // File uploads
@@ -1191,7 +1223,7 @@
     if (!file) return;
 
     statusEl.className = 'upload-status';
-    statusEl.textContent = 'Uploading…';
+    statusEl.textContent = 'Uploading...';
 
     const formData = new FormData();
     formData.append('file', file);
@@ -1236,10 +1268,10 @@
     const inp = document.getElementById(id);
     if (inp.type === 'password') {
       inp.type = 'text';
-      btn.textContent = '🙈';
+      btn.textContent = '\uD83D\uDE48';
     } else {
       inp.type = 'password';
-      btn.textContent = '👁';
+      btn.textContent = '\uD83D\uDC41';
     }
   }
 
@@ -1247,7 +1279,7 @@
     if (!val) return '';
     const digits = val.replace(/\D/g, '');
     if (digits.length <= showLast) return '****';
-    return '•'.repeat(digits.length - showLast) + digits.slice(-showLast);
+    return '\u2022'.repeat(digits.length - showLast) + digits.slice(-showLast);
   }
 
   function updateTINMask() {
@@ -1257,7 +1289,7 @@
 
   function updateRoutingMask() {
     const val = document.getElementById('bank_routing_raw').value;
-    document.getElementById('routing_mask_preview').textContent = val ? 'Stored as: ••••• ' + val.slice(-4) : '';
+    document.getElementById('routing_mask_preview').textContent = val ? 'Stored as: \u2022\u2022\u2022\u2022\u2022 ' + val.slice(-4) : '';
   }
 
   function updateAccountMask() {
@@ -1320,7 +1352,7 @@
   function validateAccountField() {
     const val = document.getElementById('bank_account_raw').value;
     if (!val) { setError('bank_account_raw', 'Account number required'); return false; }
-    if (!validateBankAccount(val)) { setError('bank_account_raw', 'Must be 4–17 digits'); return false; }
+    if (!validateBankAccount(val)) { setError('bank_account_raw', 'Must be 4-17 digits'); return false; }
     clearError('bank_account_raw'); return true;
   }
 
@@ -1344,10 +1376,16 @@
   async function submitForm() {
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
-    btn.textContent = 'Submitting…';
+    btn.textContent = 'Submitting...';
 
-    // Collect professional licenses (with inline validation)
-    const { licenses, hasError: licError } = collectProfLicenses();
+    // Collect professional licenses (with inline validation) — only if clinical
+    let licenses = [];
+    let licError = false;
+    if (isClinical) {
+      const result = collectProfLicenses();
+      licenses = result.licenses;
+      licError = result.hasError;
+    }
 
     if (licError) {
       const banner = document.getElementById('form-error-banner');
@@ -1380,13 +1418,13 @@
       driver_license_state: document.getElementById('driver_license_state').value,
       driver_license_upload_path: document.getElementById('driver_license_upload_path').value,
       professional_licenses: licenses,
-      certifications: document.getElementById('certifications').value.trim(),
-      insurance_company: document.getElementById('insurance_company').value.trim(),
-      insurance_policy_number: document.getElementById('insurance_policy_number').value.trim(),
-      insurance_expiration: document.getElementById('insurance_expiration').value,
-      prof_liability_per_occurrence: document.getElementById('prof_liability_per_occurrence').value,
-      prof_liability_aggregate: document.getElementById('prof_liability_aggregate').value,
-      insurance_upload_path: document.getElementById('insurance_upload_path').value,
+      certifications: document.getElementById('certifications')?.value?.trim() || '',
+      insurance_company: document.getElementById('insurance_company')?.value?.trim() || '',
+      insurance_policy_number: document.getElementById('insurance_policy_number')?.value?.trim() || '',
+      insurance_expiration: document.getElementById('insurance_expiration')?.value || '',
+      prof_liability_per_occurrence: document.getElementById('prof_liability_per_occurrence')?.value || '',
+      prof_liability_aggregate: document.getElementById('prof_liability_aggregate')?.value || '',
+      insurance_upload_path: document.getElementById('insurance_upload_path')?.value || '',
       bank_name: document.getElementById('bank_name').value.trim(),
       bank_account_owner_name: document.getElementById('bank_account_owner_name').value.trim(),
       bank_account_type: document.getElementById('bank_account_type').value,

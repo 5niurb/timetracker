@@ -5,7 +5,7 @@ const path = require('path');
 const multer = require('multer');
 
 const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
-const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account } = require('./lib/onboarding-validation');
+const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account, CLINICAL_TITLES } = require('./lib/onboarding-validation');
 const { encryptValue } = require('./lib/crypto');
 const { randomUUID } = require('crypto');
 
@@ -1054,7 +1054,7 @@ app.get('/api/onboarding/:token/prefill', async (req, res) => {
 
   res.json({
     success: true,
-    data: {
+    prefill: {
       first_name,
       last_name,
       email: employee.email || '',
@@ -1182,9 +1182,18 @@ app.post('/api/onboarding/:token', async (req, res) => {
     return res.status(409).json({ success: false, message: 'Onboarding already completed' });
   }
 
+  // Look up employee designation to determine conditional validation
+  const { data: empDetail } = await supabase
+    .from('employees')
+    .select('designation')
+    .eq('id', employee.id)
+    .single();
+  const designation = empDetail?.designation || '';
+  const requireLicenseInsurance = CLINICAL_TITLES.has(designation);
+
   // Validate all fields
   const form = req.body;
-  const errors = validateOnboarding(form);
+  const errors = validateOnboarding(form, { requireLicenseInsurance });
 
   if (Object.keys(errors).length > 0) {
     return res.status(400).json({ success: false, errors });

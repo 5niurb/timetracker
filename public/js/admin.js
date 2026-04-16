@@ -379,16 +379,7 @@
           tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No employees yet</td></tr>';
         } else {
           tbody.innerHTML = employees.map(emp => {
-            const payTypeClass = `pay-type-${emp.pay_type || 'hourly'}`;
-            const payTypeLabels = {
-              'hourly': 'Hourly',
-              'commission_services': 'Services',
-              'commission_sales': 'Sales',
-              'hourly_services': 'Hourly + Serv',
-              'hourly_sales': 'Hourly + Sales',
-              'hourly_all': 'Hourly + All'
-            };
-            const payTypeLabel = payTypeLabels[emp.pay_type] || 'Hourly';
+            const jobTypeLabel = emp.contractor_type === 'contract' ? 'Contract' : emp.contractor_type === 'employee' ? 'Full-time' : '—';
 
             // Build onboarding cell
             let onboardingCell;
@@ -412,11 +403,11 @@
 
             return `
               <tr>
-                <td><strong>${escapeHtml(emp.name)}</strong></td>
+                <td><strong>${escapeHtml(emp.name)}</strong><br><span style="font-size:11px;color:#888;">${emp.email || ''}</span></td>
                 <td><code style="background: #1a1a1a; padding: 4px 8px; font-size: 12px; color: #888; border: 1px solid #333;">${emp.pin}</code></td>
-                <td style="font-size: 11px; color: #888;">${emp.email || '-'}</td>
-                <td><span class="pay-type-badge ${payTypeClass}">${payTypeLabel}</span></td>
-                <td>${emp.hourly_wage > 0 ? `$${parseFloat(emp.hourly_wage).toFixed(2)}/hr` : '-'}</td>
+                <td style="font-size: 12px;">${escapeHtml(emp.designation) || '<span style="color:#555;">—</span>'}</td>
+                <td style="font-size: 12px;">${jobTypeLabel}</td>
+                <td>${emp.hourly_wage > 0 ? `$${parseFloat(emp.hourly_wage).toFixed(2)}` : '-'}</td>
                 <td style="font-size: 11px; line-height: 1.6;">${onboardingCell}</td>
                 <td class="actions">
                   <button class="btn-warning" onclick="editEmployee(${emp.id})">Edit</button>
@@ -457,13 +448,14 @@
     }
 
     async function addEmployee() {
-      const name = document.getElementById('new-emp-name').value.trim();
+      const firstName = document.getElementById('new-emp-first-name').value.trim();
+      const lastName = document.getElementById('new-emp-last-name').value.trim();
+      const name = [firstName, lastName].filter(Boolean).join(' ');
       const pin = document.getElementById('new-emp-pin').value.trim();
       const email = document.getElementById('new-emp-email').value.trim();
       const phone = document.getElementById('new-emp-phone').value.trim();
-      const designation = document.getElementById('new-emp-designation').value.trim();
-      const contractorTypeEl = document.querySelector('input[name="new-contractor-type"]:checked');
-      const contractorType = contractorTypeEl ? contractorTypeEl.value : '';
+      const designation = document.getElementById('new-emp-designation').value;
+      const contractorType = document.getElementById('new-emp-contractor-type').value;
       const payType = getPayTypeFromCheckboxes('new-emp');
       const hourlyWage = parseFloat(document.getElementById('new-emp-hourly').value) || 0;
       const additionalPayRate = document.getElementById('new-emp-additional-pay-rate').value.trim();
@@ -475,8 +467,8 @@
       errorEl.style.borderColor = '';
       errorEl.style.color = '';
 
-      if (!name || !pin) {
-        errorEl.textContent = 'Please enter name and PIN';
+      if (!firstName || !lastName || !pin) {
+        errorEl.textContent = 'Please enter first name, last name, and PIN';
         errorEl.classList.add('show');
         return;
       }
@@ -508,12 +500,13 @@
         const data = await response.json();
 
         if (data.success) {
-          document.getElementById('new-emp-name').value = '';
+          document.getElementById('new-emp-first-name').value = '';
+          document.getElementById('new-emp-last-name').value = '';
           document.getElementById('new-emp-pin').value = '';
           document.getElementById('new-emp-email').value = '';
           document.getElementById('new-emp-phone').value = '';
           document.getElementById('new-emp-designation').value = '';
-          document.querySelectorAll('input[name="new-contractor-type"]').forEach((r) => (r.checked = false));
+          document.getElementById('new-emp-contractor-type').value = '';
           document.getElementById('new-emp-hourly-check').checked = true;
           document.getElementById('new-emp-services-check').checked = false;
           document.getElementById('new-emp-sales-check').checked = false;
@@ -546,15 +539,15 @@
       const emp = (window._employeesCache || []).find((e) => e.id === id);
       if (!emp) return;
       document.getElementById('edit-emp-id').value = id;
-      document.getElementById('edit-emp-name').value = emp.name || '';
+      // Split name into first/last
+      const nameParts = (emp.name || '').trim().split(/\s+/);
+      document.getElementById('edit-emp-first-name').value = nameParts[0] || '';
+      document.getElementById('edit-emp-last-name').value = nameParts.slice(1).join(' ') || '';
       document.getElementById('edit-emp-pin').value = emp.pin || '';
       document.getElementById('edit-emp-email').value = emp.email || '';
       document.getElementById('edit-emp-phone').value = emp.phone || '';
       document.getElementById('edit-emp-designation').value = emp.designation || '';
-      // Contractor type radio
-      document.querySelectorAll('input[name="edit-contractor-type"]').forEach((r) => {
-        r.checked = r.value === emp.contractor_type;
-      });
+      document.getElementById('edit-emp-contractor-type').value = emp.contractor_type || '';
       setCheckboxesFromPayType('edit-emp', emp.pay_type || 'hourly');
       document.getElementById('edit-emp-hourly').value = emp.hourly_wage || '';
       document.getElementById('edit-emp-additional-pay-rate').value = emp.additional_pay_rate || '';
@@ -565,13 +558,14 @@
 
     async function saveEmployee() {
       const id = document.getElementById('edit-emp-id').value;
-      const name = document.getElementById('edit-emp-name').value.trim();
+      const firstName = document.getElementById('edit-emp-first-name').value.trim();
+      const lastName = document.getElementById('edit-emp-last-name').value.trim();
+      const name = [firstName, lastName].filter(Boolean).join(' ');
       const pin = document.getElementById('edit-emp-pin').value.trim();
       const email = document.getElementById('edit-emp-email').value.trim();
       const phone = document.getElementById('edit-emp-phone').value.trim();
-      const designation = document.getElementById('edit-emp-designation').value.trim();
-      const contractorTypeEl = document.querySelector('input[name="edit-contractor-type"]:checked');
-      const contractorType = contractorTypeEl ? contractorTypeEl.value : '';
+      const designation = document.getElementById('edit-emp-designation').value;
+      const contractorType = document.getElementById('edit-emp-contractor-type').value;
       const payType = getPayTypeFromCheckboxes('edit-emp');
       const hourlyWage = parseFloat(document.getElementById('edit-emp-hourly').value) || 0;
       const additionalPayRateVal = document.getElementById('edit-emp-additional-pay-rate').value.trim();

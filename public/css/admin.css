@@ -265,9 +265,10 @@
 
     th, td {
       text-align: left;
-      padding: 14px 12px;
+      padding: 18px 12px;
       border-bottom: 1px solid #222;
       font-size: 13px;
+      line-height: 1.5;
     }
 
     th {

@@ -104,38 +104,50 @@
         <div class="card">
           <h3>Add New Employee</h3>
           <div class="inline-form">
+            <p style="font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #c9a84c; margin-bottom: 12px; border-bottom: 1px solid #222; padding-bottom: 8px;">Contact Information</p>
             <div class="form-group">
-              <label>Name</label>
-              <input type="text" id="new-emp-name" placeholder="Full name">
+              <label>First Name <span style="color: #ff6b6b;">*</span></label>
+              <input type="text" id="new-emp-first-name" placeholder="First name">
             </div>
             <div class="form-group">
-              <label>PIN (4 digits)</label>
-              <input type="text" id="new-emp-pin" maxlength="4" placeholder="1234">
+              <label>Last Name <span style="color: #ff6b6b;">*</span></label>
+              <input type="text" id="new-emp-last-name" placeholder="Last name">
             </div>
             <div class="form-group">
-              <label>Email (for invoices)</label>
+              <label>Email <span style="color: #ff6b6b;">*</span></label>
               <input type="email" id="new-emp-email" placeholder="email@example.com">
             </div>
             <div class="form-group">
-              <label>Phone</label>
+              <label>Mobile Phone</label>
               <input type="tel" id="new-emp-phone" placeholder="(310) 555-1234">
             </div>
             <div class="form-group">
-              <label>Job Position / Title</label>
-              <input type="text" id="new-emp-designation" placeholder="e.g. RN Injector, Esthetician">
+              <label>PIN (4 digits) <span style="color: #ff6b6b;">*</span></label>
+              <input type="text" id="new-emp-pin" maxlength="4" placeholder="1234">
+            </div>
+
+            <p style="font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #c9a84c; margin: 20px 0 12px; border-bottom: 1px solid #222; padding-bottom: 8px;">Job Information</p>
+            <div class="form-group">
+              <label>Job Title <span style="color: #ff6b6b;">*</span></label>
+              <select id="new-emp-designation">
+                <option value="">— Select —</option>
+                <option>Beauty Sales Consultant</option>
+                <option>Operations Consultant</option>
+                <option>Operations Manager</option>
+                <option>Esthetician</option>
+                <option>Medical Assistant</option>
+                <option>Aesthetic Nurse</option>
+                <option>Aesthetic Nurse Practitioner</option>
+                <option>Physician</option>
+              </select>
             </div>
             <div class="form-group">
-              <label>Job Type</label>
-              <div style="display: flex; gap: 16px; padding: 10px; background: #0a0a0a; border: 1px solid #333;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-                  <input type="radio" name="new-contractor-type" value="contract" id="new-contractor-contract">
-                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">1099 Contractor</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-                  <input type="radio" name="new-contractor-type" value="employee" id="new-contractor-employee">
-                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">W-2 Employee</span>
-                </label>
-              </div>
+              <label>Job Type <span style="color: #ff6b6b;">*</span></label>
+              <select id="new-emp-contractor-type">
+                <option value="">— Select —</option>
+                <option value="contract">Contract</option>
+                <option value="employee">Full-time</option>
+              </select>
             </div>
             <div class="form-group">
               <label>Pay Components</label>
@@ -155,7 +167,7 @@
               </div>
             </div>
             <div class="form-group">
-              <label>Pay Rate ($)</label>
+              <label>Pay Rate ($) <span style="color: #ff6b6b;">*</span></label>
               <input type="number" id="new-emp-hourly" step="0.01" min="0" placeholder="0.00">
             </div>
             <div class="form-group">
@@ -163,7 +175,7 @@
               <input type="number" id="new-emp-additional-pay-rate" step="0.01" min="0" placeholder="0.00">
             </div>
             <div class="form-group">
-              <label>Rate Notes <span style="font-weight: 300; color: #888;">(optional)</span></label>
+              <label>Comments <span style="font-weight: 300; color: #888;">(optional)</span></label>
               <input type="text" id="new-emp-rate-notes" placeholder="e.g. $X/unit for injectables">
             </div>
             <button class="btn-success" onclick="addEmployee()">Add</button>
@@ -179,9 +191,9 @@
                 <tr>
                   <th>Name</th>
                   <th>PIN</th>
-                  <th>Email</th>
-                  <th>Pay Type</th>
-                  <th>Hourly Wage</th>
+                  <th>Job Title</th>
+                  <th>Job Type</th>
+                  <th>Pay Rate</th>
                   <th>Onboarding</th>
                   <th>Actions</th>
                 </tr>
@@ -241,37 +253,46 @@
       <h3>Edit Employee</h3>
       <input type="hidden" id="edit-emp-id">
       <div class="form-group">
-        <label>Name</label>
-        <input type="text" id="edit-emp-name">
+        <label>First Name</label>
+        <input type="text" id="edit-emp-first-name">
+      </div>
+      <div class="form-group">
+        <label>Last Name</label>
+        <input type="text" id="edit-emp-last-name">
       </div>
       <div class="form-group">
         <label>PIN (4 digits)</label>
         <input type="text" id="edit-emp-pin" maxlength="4">
       </div>
       <div class="form-group">
-        <label>Email (for invoice CC)</label>
+        <label>Email</label>
         <input type="email" id="edit-emp-email" placeholder="email@example.com">
       </div>
       <div class="form-group">
-        <label>Phone</label>
+        <label>Mobile Phone</label>
         <input type="tel" id="edit-emp-phone" placeholder="(310) 555-1234">
       </div>
       <div class="form-group">
-        <label>Job Position / Title</label>
-        <input type="text" id="edit-emp-designation" placeholder="e.g. RN Injector, Esthetician">
+        <label>Job Title</label>
+        <select id="edit-emp-designation">
+          <option value="">— Select —</option>
+          <option>Beauty Sales Consultant</option>
+          <option>Operations Consultant</option>
+          <option>Operations Manager</option>
+          <option>Esthetician</option>
+          <option>Medical Assistant</option>
+          <option>Aesthetic Nurse</option>
+          <option>Aesthetic Nurse Practitioner</option>
+          <option>Physician</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Job Type</label>
-        <div style="display: flex; gap: 16px; padding: 10px; background: #0a0a0a; border: 1px solid #333;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-            <input type="radio" name="edit-contractor-type" value="contract" id="edit-contractor-contract">
-            <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">1099 Contractor</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-            <input type="radio" name="edit-contractor-type" value="employee" id="edit-contractor-employee">
-            <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">W-2 Employee</span>
-          </label>
-        </div>
+        <select id="edit-emp-contractor-type">
+          <option value="">— Select —</option>
+          <option value="contract">Contract</option>
+          <option value="employee">Full-time</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Pay Components</label>
@@ -299,7 +320,7 @@
         <input type="number" id="edit-emp-additional-pay-rate" step="0.01" min="0">
       </div>
       <div class="form-group">
-        <label>Rate Notes <span style="font-weight: 300; color: #888;">(optional)</span></label>
+        <label>Comments <span style="font-weight: 300; color: #888;">(optional)</span></label>
         <input type="text" id="edit-emp-rate-notes" placeholder="e.g. $X/unit for injectables">
       </div>
       <div class="alert error" id="edit-error"></div>
