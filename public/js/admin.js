@@ -164,7 +164,7 @@
         allEmployees = await response.json();
 
         const select = document.getElementById('filter-employee');
-        select.innerHTML = '<option value="">All Employees</option>' +
+        select.innerHTML = '<option value="">All Team Members</option>' +
           allEmployees.map(emp => `<option value="${emp.id}">${escapeHtml(emp.name)}</option>`).join('');
       } catch (error) {
         console.error('Error loading employees for filter:', error);
@@ -339,7 +339,7 @@
 
       const detailsHtml = `
         <div style="margin-bottom: 16px; color: #ccc; line-height: 1.8;">
-          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">EMPLOYEE:</strong> ${escapeHtml(entry.employee_name)}<br>
+          <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">TEAM MEMBER:</strong> ${escapeHtml(entry.employee_name)}<br>
           <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">DATE:</strong> ${formatDate(entry.date)}<br>
           <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">TIME:</strong> ${entry.start_time ? formatTime(entry.start_time) : '-'} - ${entry.end_time ? formatTime(entry.end_time) : '-'}<br>
           <strong style="color: #999; font-size: 11px; letter-spacing: 0.05em;">BREAK:</strong> ${entry.break_minutes || 0} minutes<br>
@@ -376,7 +376,7 @@
         const tbody = document.getElementById('employees-table');
 
         if (employees.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No employees yet</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No team members yet</td></tr>';
         } else {
           tbody.innerHTML = employees.map(emp => {
             const jobTypeLabel = emp.contractor_type === 'contract' ? 'Contract' : emp.contractor_type === 'employee' ? 'Full-time' : '—';
