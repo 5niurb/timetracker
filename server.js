@@ -1448,6 +1448,218 @@ app.post('/api/onboarding/:token', async (req, res) => {
   res.json({ success: true, message: 'Onboarding submitted successfully' });
 });
 
+// ============ TAX FILINGS ROUTES ============
+
+// List tax filings — optionally filtered by year
+app.get('/api/admin/tax-filings', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { year, employee_id } = req.query;
+
+  let query = supabaseAdmin
+    .from('tax_filings')
+    .select(
+      `id, employee_id, tax_year, form_type, filing_status, filed_at,
+       recipient_name, tin_last4, tin_type, federal_id_type,
+       box_1_nonemployee_comp, box_4_federal_tax_withheld,
+       address_city, address_state, address_zip,
+       source, notes, created_at, updated_at,
+       employees ( name, email )`,
+    )
+    .order('tax_year', { ascending: false })
+    .order('recipient_name', { ascending: true });
+
+  if (year) query = query.eq('tax_year', parseInt(year));
+  if (employee_id) query = query.eq('employee_id', parseInt(employee_id));
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
+});
+
+// Get a single tax filing by id
+app.get('/api/admin/tax-filings/:id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { data, error } = await supabaseAdmin
+    .from('tax_filings')
+    .select('*')
+    .eq('id', parseInt(req.params.id))
+    .single();
+
+  if (error) return res.status(404).json({ success: false, message: 'Not found' });
+  res.json(data);
+});
+
+// Create a tax filing
+app.post('/api/admin/tax-filings', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const body = req.body;
+
+  // Encrypt TIN if provided
+  let tin_encrypted = null;
+  let tin_last4 = body.tin_last4 || null;
+  if (body.tin_raw) {
+    tin_encrypted = await encryptValue(body.tin_raw);
+    tin_last4 = body.tin_raw.replace(/\D/g, '').slice(-4) || null;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('tax_filings')
+    .insert({
+      employee_id: body.employee_id ? parseInt(body.employee_id) : null,
+      tax_year: parseInt(body.tax_year),
+      form_type: body.form_type || '1099-NEC',
+      filing_status: body.filing_status || 'draft',
+      filed_at: body.filed_at || null,
+      payer_name: body.payer_name || 'LM Operations Inc',
+      payer_ein: body.payer_ein || null,
+      payer_state_no: body.payer_state_no || null,
+      reference_id: body.reference_id || null,
+      recipient_name: body.recipient_name,
+      recipient_second_name: body.recipient_second_name || null,
+      federal_id_type: body.federal_id_type ? parseInt(body.federal_id_type) : null,
+      tin_last4,
+      tin_encrypted,
+      second_tin_notice: body.second_tin_notice || false,
+      account_number: body.account_number || null,
+      office_code: body.office_code || null,
+      address_street: body.address_street || null,
+      address_street2: body.address_street2 || null,
+      address_city: body.address_city || null,
+      address_state: body.address_state || null,
+      address_zip: body.address_zip || null,
+      address_province: body.address_province || null,
+      address_country_code: body.address_country_code || 'US',
+      recipient_email: body.recipient_email || null,
+      box_1_nonemployee_comp: parseFloat(body.box_1_nonemployee_comp) || 0,
+      box_2_direct_sales: body.box_2_direct_sales || false,
+      box_3_golden_parachute: body.box_3_golden_parachute ? parseFloat(body.box_3_golden_parachute) : null,
+      box_4_federal_tax_withheld: body.box_4_federal_tax_withheld ? parseFloat(body.box_4_federal_tax_withheld) : null,
+      box_5_state_tax_withheld: body.box_5_state_tax_withheld ? parseFloat(body.box_5_state_tax_withheld) : null,
+      box_6_state: body.box_6_state || null,
+      box_7_state_income: body.box_7_state_income ? parseFloat(body.box_7_state_income) : null,
+      box_5b_local_tax_withheld: body.box_5b_local_tax_withheld ? parseFloat(body.box_5b_local_tax_withheld) : null,
+      box_6b_locality: body.box_6b_locality || null,
+      box_6b_locality_no: body.box_6b_locality_no || null,
+      box_7b_local_income: body.box_7b_local_income ? parseFloat(body.box_7b_local_income) : null,
+      source: body.source || 'manual',
+      notes: body.notes || null,
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ success: false, message: error.message });
+  res.json({ success: true, data });
+});
+
+// Update a tax filing (e.g., change status to 'filed', update compensation amounts)
+app.put('/api/admin/tax-filings/:id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const body = req.body;
+  const updates = { updated_at: new Date().toISOString() };
+
+  const allowed = [
+    'filing_status', 'filed_at', 'payer_name', 'payer_ein', 'payer_state_no', 'reference_id',
+    'recipient_name', 'recipient_second_name', 'federal_id_type', 'second_tin_notice',
+    'account_number', 'office_code', 'address_street', 'address_street2', 'address_city',
+    'address_state', 'address_zip', 'address_province', 'address_country_code', 'recipient_email',
+    'box_1_nonemployee_comp', 'box_2_direct_sales', 'box_3_golden_parachute',
+    'box_4_federal_tax_withheld', 'box_5_state_tax_withheld', 'box_6_state', 'box_7_state_income',
+    'box_5b_local_tax_withheld', 'box_6b_locality', 'box_6b_locality_no', 'box_7b_local_income',
+    'source', 'notes',
+  ];
+
+  for (const key of allowed) {
+    if (key in body) updates[key] = body[key];
+  }
+
+  // Handle TIN re-encryption if raw value supplied
+  if (body.tin_raw) {
+    updates.tin_encrypted = await encryptValue(body.tin_raw);
+    updates.tin_last4 = body.tin_raw.replace(/\D/g, '').slice(-4) || null;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('tax_filings')
+    .update(updates)
+    .eq('id', parseInt(req.params.id))
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ success: false, message: error.message });
+  res.json({ success: true, data });
+});
+
+// Delete a tax filing
+app.delete('/api/admin/tax-filings/:id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { error } = await supabaseAdmin.from('tax_filings').delete().eq('id', parseInt(req.params.id));
+  if (error) return res.status(400).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
+// Export tax filings for a year as Avalara/Track1099-compatible CSV
+// Matches the 1099-NEC CSV template columns used by LeMed
+app.get('/api/admin/tax-filings/export/:year', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const year = parseInt(req.params.year);
+
+  const { data, error } = await supabaseAdmin
+    .from('tax_filings')
+    .select('*')
+    .eq('tax_year', year)
+    .order('recipient_name', { ascending: true });
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+
+  const rows = data || [];
+  const headers = [
+    'Reference ID', "Recipient's Name", "Recipient's Second Name",
+    'Federal ID Type', 'Federal ID Number', 'Second TIN Notice', 'Account Number', 'Office Code',
+    'Street Address', 'Street Address 2', 'City', 'State', 'ZIP', 'Province', 'Country Code',
+    'Email',
+    'Box 1 Nonemployee Compensation', 'Box 2 Direct Sales Indicator',
+    'Box 3 Other Income', 'Box 4 Federal Income Tax Withheld',
+    'Box 5 State Tax Withheld', 'Box 6 State', "Payer's State No", 'Box 7 State Income',
+    'Box 5b Local Tax Withheld', 'Box 6b Locality', 'Box 6b Locality No', 'Box 7b Local Income',
+  ];
+
+  const escape = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const csvLines = [headers.join(',')];
+  for (const r of rows) {
+    csvLines.push([
+      r.reference_id, r.recipient_name, r.recipient_second_name,
+      r.federal_id_type, r.tin_last4 ? `***${r.tin_last4}` : '', r.second_tin_notice ? '1' : '', r.account_number, r.office_code,
+      r.address_street, r.address_street2, r.address_city, r.address_state, r.address_zip, r.address_province, r.address_country_code || 'US',
+      r.recipient_email,
+      r.box_1_nonemployee_comp, r.box_2_direct_sales ? '1' : '',
+      r.box_3_golden_parachute, r.box_4_federal_tax_withheld,
+      r.box_5_state_tax_withheld, r.box_6_state, r.payer_state_no, r.box_7_state_income,
+      r.box_5b_local_tax_withheld, r.box_6b_locality, r.box_6b_locality_no, r.box_7b_local_income,
+    ].map(escape).join(','));
+  }
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="1099-NEC-${year}.csv"`);
+  res.send(csvLines.join('\r\n'));
+});
+
 // Start server
 async function start() {
   await initDatabase();

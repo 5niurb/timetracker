@@ -1,3 +1,87 @@
+## Session — 2026-04-16 (tax_filings + 1099 import + RLS fix)
+
+**Focus:** 1099 data import, tax_filings table + API, RLS fix, new employees.
+
+**Accomplished:**
+- Fixed critical bug: all 59 server.js DB queries switched from anon key → `supabaseAdmin` (service role), which bypasses RLS. RLS stays enabled on `employees` + `employee_onboarding` per Supabase security advisory.
+- Created `tax_filings` table in production Supabase (migration 005-tax-filings.sql). RLS enabled.
+- Added 7 tax_filings API routes to server.js: list (filter by year/employee), get by id, create, update, delete, export CSV (Avalara/Track1099-compatible format).
+- Imported 2024 1099-NEC data for all 6 contractors from CSV:
+  - Jade Gonzales: $34,168.10 (SSN last4: 1530)
+  - Jodi Kay: $19,146.33 (SSN last4: 7478)
+  - Salakjit Hanna: $13,397.00 (SSN last4: 3613) ← NEW employee created
+  - Vayda Kasbah: $3,740.90 (SSN last4: 6454) ← NEW employee created
+  - Leena Osman: $1,140.00 (no SSN in CSV)
+  - Lucine Keseyan: $704.92 (SSN last4: 0041)
+- Created employee records for Vayda Kasbah (pin=6764) and Salakjit Hanna (pin=3157) — they had emails in the CSV but were previously skipped.
+- All TINs AES-256-GCM encrypted at rest.
+- Added supabase-schema.sql documentation for tax_filings.
+
+**Diagram:**
+```
+CSV (iCloudDrive)                     Supabase (production)
+1099-NEC 2024 data                    employees (7 contractors)
+  ↓ import-1099-2024.mjs               ├─ Jade Gonzales (id=11)
+  ↓ encrypt SSN → AES-256-GCM         ├─ Leena Osman (id=12)
+  ↓                                    ├─ Jodi Kay (id=13)
+  └──────────────────────────────────► ├─ Lucine Keseyan (id=14)
+                                        ├─ Vayda Kasbah (id=15) NEW
+                                        └─ Salakjit Hanna (id=16) NEW
+                                       tax_filings (6 rows, 2024)
+```
+
+**Current State:**
+- 7 tax_filings API routes live in server.js (deploying on push)
+- 6 tax_filing rows in production with encrypted TINs
+- 7 active contractors in employees table
+- RLS: enabled on employees + employee_onboarding, bypassed by service role
+
+**Issues:**
+- Vayda and Salakjit need onboarding links sent (emails available now)
+- Kirti Patel, Sheila Ewart, Lea Culver still not in system (no email in any source)
+- Leena Osman has no SSN in CSV — onboarding will need to collect it
+
+**Next Steps:**
+- Deploy: push server.js to trigger Render deploy
+- Send onboarding links to Vayda (vkasbah@hotmail.com) and Salakjit (salakjithanna@icloud.com)
+- Verify Twilio `+12134442242` is active for SMS send-link
+- W9 pre-population (mentioned in onboarding email — not yet built)
+- 1099 CSV export endpoint: test at `/api/admin/tax-filings/export/2024`
+- SPECS.md update for tax_filings feature
+
+---
+
+## Session — 2026-04-16 (E2E test + DB fixes)
+
+**Focus:** PayTrack onboarding E2E test — found and fixed two production bugs.
+
+**Accomplished:**
+- Ran full E2E: create employee → prefill → submit onboarding → verify DB → cleanup
+- **Bug 1:** `driver_license_number` column missing from `employee_onboarding` — added via Supabase MCP. Every onboarding submit was returning 500.
+- **Bug 2:** RLS enabled on `employees` + `employee_onboarding` with zero policies (deny-all). Disabled — paytrack uses its own auth, not Supabase Auth.
+- Updated `supabase-schema.sql` to full production schema (was missing employee_onboarding table and ~6 months of columns).
+
+**Diagram:**
+```
+Admin              Onboarding             DB (fixes applied)
+POST /employees → token                employees (RLS=off ✓)
+GET /prefill    → name/email/desig     employee_onboarding
+POST /onboarding → validate+encrypt → driver_license_number col added ✓
+employees.onboarding_completed_at ← marked
+```
+
+**Current State:** E2E passing. Both DB bugs fixed in production. Pushed to GitHub.
+
+**Issues:** None known.
+
+**Next Steps:**
+- SMS send link: verify Twilio `+12134442242` is active (untested live)
+- W9 pre-population (mentioned in onboarding email — not yet built)
+- 1099 CSV export (deferred)
+- SPECS.md update for v2 onboarding
+
+---
+
 ## Session — 2026-04-15
 
 **Focus:** Worker self-onboarding feature — end-to-end build
