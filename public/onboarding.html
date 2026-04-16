@@ -446,12 +446,12 @@
 
     /* Digit boxes (TIN + phone) */
     .tin-digit {
-      width: 28px;
-      height: 33px;
+      width: 24px;
+      height: 34px;
       text-align: center;
       font-size: 13px;
       font-family: 'Montserrat', sans-serif;
-      font-weight: 600;
+      font-weight: 500;
       background: var(--input-bg);
       border: 1px solid var(--border);
       color: var(--text);
@@ -462,6 +462,12 @@
       outline: none;
       background: #1a1a1a;
     }
+    .tin-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+    }
+    .tin-row .form-group { flex-shrink: 0; }
 
     select option { background: #1a1a1a; }
     textarea { resize: vertical; min-height: 80px; }
@@ -597,28 +603,29 @@
       <h2>Tax Information (W-9)</h2>
     </div>
     <div class="section-body">
-      <div class="form-grid">
-        <div class="form-group span-2">
+      <!-- TIN Type + digit boxes on same row -->
+      <div class="tin-row">
+        <div class="form-group" style="min-width:160px;">
           <label>TIN Type <span class="req">*</span></label>
-          <select id="tin_type" onchange="switchTINType()" style="max-width:320px;">
+          <select id="tin_type" onchange="switchTINType()">
             <option value="">— Select —</option>
-            <option value="SSN">SSN (Social Security Number)</option>
-            <option value="EIN">EIN (Employer ID Number)</option>
+            <option value="SSN">SSN</option>
+            <option value="EIN">EIN</option>
           </select>
           <span class="field-error" id="err-tin_type"></span>
         </div>
 
         <!-- SSN digit boxes: ###-##-#### -->
-        <div class="form-group span-2" id="tin-ssn-wrap" style="display:none;">
+        <div class="form-group" id="tin-ssn-wrap" style="display:none;">
           <label>Social Security Number <span class="req">*</span></label>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+          <div style="display:flex;align-items:center;gap:3px;">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="0" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="1" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="2" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:18px;padding:0 2px;">–</span>
+            <span style="color:var(--text-dim);font-size:14px;padding:0 1px;">–</span>
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="3" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="4" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:18px;padding:0 2px;">–</span>
+            <span style="color:var(--text-dim);font-size:14px;padding:0 1px;">–</span>
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="5" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="6" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="7" inputmode="numeric" autocomplete="off">
@@ -628,12 +635,12 @@
         </div>
 
         <!-- EIN digit boxes: ##-####### -->
-        <div class="form-group span-2" id="tin-ein-wrap" style="display:none;">
-          <label>Employer Identification Number <span class="req">*</span></label>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+        <div class="form-group" id="tin-ein-wrap" style="display:none;">
+          <label>Employer ID Number <span class="req">*</span></label>
+          <div style="display:flex;align-items:center;gap:3px;">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="0" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="1" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:18px;padding:0 2px;">–</span>
+            <span style="color:var(--text-dim);font-size:14px;padding:0 1px;">–</span>
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="2" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="3" inputmode="numeric" autocomplete="off">
             <input type="text" maxlength="1" class="tin-digit" data-tin-idx="4" inputmode="numeric" autocomplete="off">
@@ -644,9 +651,10 @@
           </div>
           <span class="field-error" id="err-tin_raw_ein"></span>
         </div>
+      </div>
+      <input type="hidden" id="tin_raw">
 
-        <!-- Hidden field for form submission (assembled from digit boxes) -->
-        <input type="hidden" id="tin_raw">
+      <div class="form-grid" style="margin-top:16px;">
         <div class="form-group">
           <label>Business / Entity Name</label>
           <input type="text" id="w9_entity_name">
