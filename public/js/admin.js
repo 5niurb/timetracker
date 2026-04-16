@@ -716,6 +716,17 @@
       return `<span style="background:#003d0f;color:#6bff6b;font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">EXP ${fmt}</span>`;
     }
 
+    function isItemCompliant(type, byType) {
+      const docs =
+        type === 'nda'
+          ? [...(byType['nda'] || []), ...(byType['contract'] || [])]
+          : byType[type] || [];
+      if (!docs.length) return false;
+      const meta = type === 'nda' ? { hasExpiry: false } : DOC_TYPE_META[type] || {};
+      if (!meta.hasExpiry) return true;
+      return docs.some((d) => !d.expiration_date || new Date(d.expiration_date) >= new Date());
+    }
+
     function renderComplianceDocs(designation, docs, employeeId) {
       const required = requiredDocTypes(designation);
       const byType = {};
@@ -724,15 +735,21 @@
         byType[d.document_type].push(d);
       });
 
-      // Types consumed by the required checklist (don't repeat in ADDITIONAL)
       const consumedTypes = new Set(required);
+      const allCompliant = required.every((t) => isItemCompliant(t, byType));
 
-      let html = '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-bottom:8px;">REQUIRED</div>';
+      const statusBadge = allCompliant
+        ? `<span style="background:#003d0f;color:#6bff6b;font-size:10px;font-weight:600;padding:3px 10px;letter-spacing:0.06em;border-radius:2px;">COMPLIANT</span>`
+        : `<span style="background:#3d0000;color:#ff6b6b;font-size:10px;font-weight:600;padding:3px 10px;letter-spacing:0.06em;border-radius:2px;">NOT COMPLIANT</span>`;
+
+      let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:10px;color:#666;letter-spacing:0.08em;">REQUIREMENTS</span>
+        ${statusBadge}
+      </div>`;
 
       required.forEach((type) => {
-        // NDA slot is satisfied by either an 'nda' doc or a 'contract' doc
         const isNda = type === 'nda';
-        const uploaded = isNda
+        const docsForSlot = isNda
           ? [...(byType['nda'] || []), ...(byType['contract'] || [])]
           : byType[type] || [];
         if (isNda) consumedTypes.add('contract');
@@ -741,20 +758,26 @@
           ? { label: 'NDA / Contractor Agreement', hasExpiry: false, hasLicenseNo: false }
           : DOC_TYPE_META[type] || { label: type };
 
-        if (!uploaded.length) {
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid #444;">
-            <span style="font-size:13px;color:#555;flex-shrink:0;">○</span>
-            <span style="font-size:12px;color:#555;flex:1;">${escapeHtml(meta.label)}</span>
+        const compliant = isItemCompliant(type, byType);
+        const checkColor = compliant ? '#6bff6b' : '#c9474f';
+        const borderColor = compliant ? '#2d6a2d' : '#6a2d2d';
+        const symbol = compliant ? '✓' : '✗';
+
+        if (!docsForSlot.length) {
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
+            <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
+            <span style="font-size:12px;color:#aaa;flex:1;">${escapeHtml(meta.label)}</span>
+            <span style="font-size:10px;color:#555;flex-shrink:0;">No document on file</span>
             <button onclick="focusUploadForType('${isNda ? 'nda' : type}')" style="font-size:10px;color:#c9a84c;background:none;border:1px solid #333;padding:2px 8px;cursor:pointer;flex-shrink:0;">+ Upload</button>
           </div>`;
         } else {
-          uploaded.forEach((d) => {
+          docsForSlot.forEach((d) => {
             const licLine =
               meta.hasLicenseNo && d.license_number
                 ? `<span style="font-size:10px;color:#888;white-space:nowrap;flex-shrink:0;">#${escapeHtml(d.license_number)}</span>`
                 : '';
-            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid #2d6a2d;">
-              <span style="font-size:13px;color:#6bff6b;flex-shrink:0;">✓</span>
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
+              <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
               <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(meta.label)}</span>
               ${licLine}
               ${expiryBadge(d.expiration_date)}
@@ -768,11 +791,11 @@
       const additionalTypes = Object.keys(byType).filter((t) => !consumedTypes.has(t));
       if (additionalTypes.length) {
         html +=
-          '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-top:14px;margin-bottom:8px;">ADDITIONAL</div>';
+          '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-top:14px;margin-bottom:8px;">ADDITIONAL DOCUMENTS</div>';
         additionalTypes.forEach((type) => {
           const meta = DOC_TYPE_META[type] || { label: type };
           byType[type].forEach((d) => {
-            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;">
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;margin-bottom:4px;">
               <span style="font-size:10px;background:#1a1a2e;color:#6b9fff;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">${escapeHtml(meta.label)}</span>
               <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(d.file_name || d.file_path)}</span>
               ${expiryBadge(d.expiration_date)}
