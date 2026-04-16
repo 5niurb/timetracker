@@ -741,7 +741,7 @@
   <div class="section" id="section-banking">
     <div class="section-header">
       <div class="section-number" id="banking-section-num">4</div>
-      <h2>Payment &amp; Banking</h2>
+      <h2>Payment Information</h2>
     </div>
     <div class="section-body">
       <!-- Always-visible bank info -->
@@ -760,7 +760,7 @@
 
       <!-- Payment method radio -->
       <div style="margin-top:18px;">
-        <label style="display:block;margin-bottom:10px;">Payment Method <span class="req">*</span></label>
+        <label style="display:block;margin-bottom:10px;">Preferred Payment Method <span class="req">*</span></label>
         <div style="display:flex;gap:28px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
             <input type="radio" name="payment_method" id="pm_zelle" value="zelle"
@@ -838,7 +838,6 @@
     <div class="section-body">
       <!-- Pre-filled job info (read-only, from admin) -->
       <div id="job-info-section" style="display:none;margin-bottom:20px;">
-        <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">This information was set by LeMed administration. If anything looks incorrect, please contact your manager.</p>
         <div class="job-info-grid" id="job-info-display"></div>
       </div>
 
@@ -1058,16 +1057,22 @@
           items.push({ label: 'Additional Pay Rate', value: `$${parseFloat(p.additional_pay_rate).toFixed(2)}` });
         }
 
-        if (p.rate_notes) {
-          items.push({ label: 'Comments', value: p.rate_notes });
-        }
-
         display.innerHTML = items.map(item => `
           <div class="job-info-item">
             <div class="job-info-label">${item.label}</div>
             <div class="job-info-value">${escapeHtml(item.value)}</div>
           </div>
         `).join('');
+
+        // Comments rendered as full-width block below the grid (same style as Other Commitments)
+        if (p.rate_notes) {
+          display.insertAdjacentHTML('afterend', `
+            <div style="margin-top:16px;">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;">Comments</div>
+              <div style="background:var(--input-bg);border:1px solid var(--border);padding:10px 12px;font-size:13px;color:var(--text-dim);min-height:60px;white-space:pre-wrap;">${escapeHtml(p.rate_notes)}</div>
+            </div>
+          `);
+        }
 
         document.getElementById('job-info-section').style.display = 'block';
       }
