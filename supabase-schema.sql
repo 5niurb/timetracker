@@ -2,10 +2,12 @@
 -- Run this SQL in Supabase SQL Editor to create the database tables
 -- Last updated: 2026-04-16 (synced with production schema)
 --
--- NOTE: RLS is intentionally DISABLED on all tables. PayTrack uses
--- its own auth layer (admin password + PIN). Do NOT enable RLS without
--- adding permissive policies first or all anon-key queries will return
--- empty results (deny-all default when RLS is on with no policies).
+-- NOTE: RLS is intentionally ENABLED on employees and employee_onboarding
+-- to block direct anon-key access (Supabase security advisory). The Express
+-- server uses the service-role key (supabaseAdmin) which bypasses RLS.
+-- Do NOT disable RLS on these tables — that re-exposes employee data publicly.
+-- Other tables (time_entries, invoices, etc.) do not require RLS as they
+-- contain no PII that could be exploited without also knowing employee IDs.
 
 -- ============ CORE TABLES ============
 
@@ -162,8 +164,14 @@ CREATE INDEX IF NOT EXISTS idx_invoices_pay_period ON invoices(pay_period_start,
 CREATE INDEX IF NOT EXISTS idx_onboarding_employee_id ON employee_onboarding(employee_id);
 CREATE INDEX IF NOT EXISTS idx_employees_onboarding_token ON employees(onboarding_token);
 
+-- ============ RLS ============
+-- Enable RLS on sensitive tables to block direct anon-key access.
+-- Server uses service-role key which bypasses RLS — no policies needed.
+
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_onboarding ENABLE ROW LEVEL SECURITY;
+
 -- ============ GRANTS ============
--- RLS is disabled; grant table access to anon + authenticated roles.
 
 GRANT ALL ON employees TO anon, authenticated;
 GRANT ALL ON time_entries TO anon, authenticated;
