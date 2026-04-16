@@ -445,30 +445,6 @@
     .subsection-label:first-child { margin-top: 0; }
 
     /* Digit boxes (TIN + phone) */
-    .tin-digit {
-      width: 24px;
-      height: 34px;
-      text-align: center;
-      font-size: 13px;
-      font-family: 'Montserrat', sans-serif;
-      font-weight: 500;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0;
-    }
-    .tin-digit:focus {
-      border-color: var(--gold);
-      outline: none;
-      background: #1a1a1a;
-    }
-    .tin-row {
-      display: flex;
-      gap: 16px;
-      align-items: flex-end;
-    }
-    .tin-row .form-group { flex-shrink: 0; }
-
     select option { background: #1a1a1a; }
     textarea { resize: vertical; min-height: 80px; }
 
@@ -603,58 +579,24 @@
       <h2>Tax Information (W-9)</h2>
     </div>
     <div class="section-body">
-      <!-- TIN Type + digit boxes on same row -->
-      <div class="tin-row">
-        <div class="form-group" style="min-width:160px;">
+      <div class="form-grid">
+        <div class="form-group">
           <label>TIN Type <span class="req">*</span></label>
-          <select id="tin_type" onchange="switchTINType()">
+          <select id="tin_type" onchange="updateTINPlaceholder()">
             <option value="">— Select —</option>
-            <option value="SSN">SSN</option>
-            <option value="EIN">EIN</option>
+            <option value="SSN">SSN (Social Security Number)</option>
+            <option value="EIN">EIN (Employer ID Number)</option>
           </select>
           <span class="field-error" id="err-tin_type"></span>
         </div>
-
-        <!-- SSN digit boxes: ###-##-#### -->
-        <div class="form-group" id="tin-ssn-wrap" style="display:none;">
-          <label>Social Security Number <span class="req">*</span></label>
-          <div style="display:flex;align-items:center;gap:3px;">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="0" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="1" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="2" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:14px;padding:0 1px;">–</span>
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="3" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="4" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:14px;padding:0 1px;">–</span>
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="5" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="6" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="7" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="8" inputmode="numeric" autocomplete="off">
-          </div>
+        <div class="form-group">
+          <label>Tax ID Number <span class="req">*</span></label>
+          <input type="text" id="tin_raw" placeholder="123-45-6789" autocomplete="off"
+            oninput="updateTINMask()" onblur="validateTINField()">
+          <div class="masked-preview" id="tin_mask_preview"></div>
+          <span class="field-hint">SSN: 123-45-6789 &nbsp;|&nbsp; EIN: 12-3456789</span>
           <span class="field-error" id="err-tin_raw"></span>
         </div>
-
-        <!-- EIN digit boxes: ##-####### -->
-        <div class="form-group" id="tin-ein-wrap" style="display:none;">
-          <label>Employer ID Number <span class="req">*</span></label>
-          <div style="display:flex;align-items:center;gap:3px;">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="0" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="1" inputmode="numeric" autocomplete="off">
-            <span style="color:var(--text-dim);font-size:14px;padding:0 1px;">–</span>
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="2" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="3" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="4" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="5" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="6" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="7" inputmode="numeric" autocomplete="off">
-            <input type="text" maxlength="1" class="tin-digit" data-tin-idx="8" inputmode="numeric" autocomplete="off">
-          </div>
-          <span class="field-error" id="err-tin_raw_ein"></span>
-        </div>
-      </div>
-      <input type="hidden" id="tin_raw">
-
-      <div class="form-grid" style="margin-top:16px;">
         <div class="form-group">
           <label>Business / Entity Name</label>
           <input type="text" id="w9_entity_name">
@@ -1050,76 +992,18 @@
     clearError('address_zip'); return true;
   }
 
-  // ============================================================
-  // TIN digit-box logic
-  // ============================================================
-
-  function switchTINType() {
-    const type = document.getElementById('tin_type').value;
-    document.getElementById('tin-ssn-wrap').style.display = type === 'SSN' ? 'block' : 'none';
-    document.getElementById('tin-ein-wrap').style.display = type === 'EIN' ? 'block' : 'none';
-    // Clear all digit boxes when switching
-    document.querySelectorAll('.tin-digit').forEach(d => d.value = '');
-    document.getElementById('tin_raw').value = '';
+  // TIN helpers
+  function updateTINPlaceholder() {
+    const t = document.getElementById('tin_type').value;
+    const inp = document.getElementById('tin_raw');
+    inp.placeholder = t === 'EIN' ? '12-3456789' : '123-45-6789';
     clearError('tin_type');
-    clearError('tin_raw');
-    clearError('tin_raw_ein');
   }
 
-  function assembleTIN() {
-    const type = document.getElementById('tin_type').value;
-    const wrap = type === 'SSN' ? document.getElementById('tin-ssn-wrap')
-               : type === 'EIN' ? document.getElementById('tin-ein-wrap')
-               : null;
-    if (!wrap) { document.getElementById('tin_raw').value = ''; return; }
-
-    const digits = Array.from(wrap.querySelectorAll('.tin-digit')).map(d => d.value).join('');
-    if (type === 'SSN' && digits.length === 9) {
-      document.getElementById('tin_raw').value = `${digits.slice(0,3)}-${digits.slice(3,5)}-${digits.slice(5)}`;
-    } else if (type === 'EIN' && digits.length === 9) {
-      document.getElementById('tin_raw').value = `${digits.slice(0,2)}-${digits.slice(2)}`;
-    } else {
-      document.getElementById('tin_raw').value = '';
-    }
+  function updateTINMask() {
+    const val = document.getElementById('tin_raw').value;
+    document.getElementById('tin_mask_preview').textContent = val ? 'Stored as: ' + maskValue(val) : '';
   }
-
-  // Wire up all digit boxes: auto-advance, backspace, paste, digits-only
-  function initDigitBoxes(wrapId) {
-    const wrap = document.getElementById(wrapId);
-    const boxes = wrap.querySelectorAll('.tin-digit');
-    boxes.forEach((box, i) => {
-      box.addEventListener('input', (e) => {
-        // digits only
-        box.value = box.value.replace(/\D/g, '').slice(0, 1);
-        if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
-        assembleTIN();
-      });
-      box.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !box.value && i > 0) {
-          boxes[i - 1].focus();
-          boxes[i - 1].value = '';
-          assembleTIN();
-        }
-      });
-      box.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pasted = (e.clipboardData.getData('text') || '').replace(/\D/g, '');
-        for (let j = 0; j < Math.min(pasted.length, boxes.length - i); j++) {
-          boxes[i + j].value = pasted[j];
-        }
-        const nextIdx = Math.min(i + pasted.length, boxes.length - 1);
-        boxes[nextIdx].focus();
-        assembleTIN();
-      });
-      // Validate on blur of last digit
-      if (i === boxes.length - 1) {
-        box.addEventListener('blur', () => validateTINField());
-      }
-    });
-  }
-
-  initDigitBoxes('tin-ssn-wrap');
-  initDigitBoxes('tin-ein-wrap');
 
   // ============================================================
   // Phone auto-format: (###) ###-####
@@ -1513,27 +1397,11 @@
 
   function validateTINField() {
     const type = document.getElementById('tin_type').value;
-    assembleTIN();
     const val = document.getElementById('tin_raw').value;
-    const errId = type === 'EIN' ? 'tin_raw_ein' : 'tin_raw';
-    // Clear both error slots
-    clearError('tin_raw'); clearError('tin_raw_ein');
-    if (!val) {
-      const el = document.getElementById('err-' + errId);
-      if (el) el.textContent = 'All digits are required';
-      return false;
-    }
-    if (type === 'SSN' && !validateSSN(val)) {
-      const el = document.getElementById('err-tin_raw');
-      if (el) el.textContent = 'Complete all 9 digits';
-      return false;
-    }
-    if (type === 'EIN' && !validateEIN(val)) {
-      const el = document.getElementById('err-tin_raw_ein');
-      if (el) el.textContent = 'Complete all 9 digits';
-      return false;
-    }
-    return true;
+    if (!val) { setError('tin_raw', 'Tax ID is required'); return false; }
+    if (type === 'SSN' && !validateSSN(val)) { setError('tin_raw', 'SSN format: 123-45-6789'); return false; }
+    if (type === 'EIN' && !validateEIN(val)) { setError('tin_raw', 'EIN format: 12-3456789'); return false; }
+    clearError('tin_raw'); return true;
   }
 
   function validateRoutingField() {
