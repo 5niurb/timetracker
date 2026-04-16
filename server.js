@@ -739,6 +739,7 @@ app.post('/api/admin/employees', async (req, res) => {
     payType,
     designation,
     contractorType,
+    startDate,
   } = req.body;
 
   // Check if PIN already exists
@@ -764,6 +765,7 @@ app.post('/api/admin/employees', async (req, res) => {
       pay_type: payType || 'hourly',
       designation: designation?.trim() || null,
       contractor_type: contractorType || null,
+      start_date: startDate || null,
       onboarding_token: onboardingToken,
     })
     .select()
@@ -1025,6 +1027,161 @@ app.post('/api/admin/employees/:id/onboarding-token', async (req, res) => {
   }
 
   res.json({ success: true, onboardingToken: newToken });
+});
+
+// Admin: send onboarding link via SMS or email
+app.post('/api/admin/employees/:id/send-link', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+  const { type } = req.body; // 'sms' or 'email'
+
+  if (!['sms', 'email'].includes(type)) {
+    return res.status(400).json({ success: false, message: 'type must be sms or email' });
+  }
+
+  const { data: employee, error } = await supabase
+    .from('employees')
+    .select('id, name, email, phone, onboarding_token, onboarding_completed_at')
+    .eq('id', parseInt(id))
+    .single();
+
+  if (error || !employee) {
+    return res.status(404).json({ success: false, message: 'Employee not found' });
+  }
+
+  if (!employee.onboarding_token) {
+    return res.status(400).json({ success: false, message: 'No onboarding token — generate one first' });
+  }
+
+  if (employee.onboarding_completed_at) {
+    return res.status(400).json({ success: false, message: 'Onboarding already completed' });
+  }
+
+  const firstName = (employee.name || '').split(' ')[0];
+  const onboardingUrl = `${req.protocol}://${req.get('host')}/onboarding/${employee.onboarding_token}`;
+
+  if (type === 'sms') {
+    if (!employee.phone) {
+      return res.status(400).json({ success: false, message: 'No phone number on file' });
+    }
+
+    const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
+    const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+    if (!TWILIO_SID || !TWILIO_TOKEN) {
+      return res.status(500).json({ success: false, message: 'Twilio not configured' });
+    }
+
+    const smsBody = `Hi ${firstName}, this is LeMed Spa. Please complete your onboarding form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${onboardingUrl}\n\nQuestions? Reply to this text or call 818-463-3772.`;
+
+    // Normalize phone to E.164
+    let toPhone = employee.phone.replace(/\D/g, '');
+    if (toPhone.length === 10) toPhone = '1' + toPhone;
+    if (!toPhone.startsWith('+')) toPhone = '+' + toPhone;
+
+    try {
+      const twilioRes = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Authorization: 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64'),
+          },
+          body: new URLSearchParams({
+            From: '+12134442242',
+            To: toPhone,
+            Body: smsBody,
+          }),
+        },
+      );
+
+      const result = await twilioRes.json();
+
+      if (twilioRes.ok) {
+        console.log(`[SendLink] SMS sent to ${toPhone} for employee ${id}, SID: ${result.sid}`);
+        return res.json({ success: true, message: `Text sent to ${employee.phone}` });
+      } else {
+        console.error('[SendLink] Twilio error:', result);
+        return res.status(500).json({ success: false, message: result.message || 'SMS failed' });
+      }
+    } catch (err) {
+      console.error('[SendLink] SMS error:', err.message);
+      return res.status(500).json({ success: false, message: 'Failed to send SMS' });
+    }
+  }
+
+  if (type === 'email') {
+    if (!employee.email) {
+      return res.status(400).json({ success: false, message: 'No email on file' });
+    }
+
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (!RESEND_API_KEY) {
+      return res.status(500).json({ success: false, message: 'Resend not configured' });
+    }
+
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
+        <div style="border-bottom: 2px solid #c9a84c; padding-bottom: 16px; margin-bottom: 24px;">
+          <h1 style="font-size: 20px; color: #222; margin: 0;">LeMed Spa</h1>
+        </div>
+        <p>Hi ${firstName},</p>
+        <p>Welcome to the LeMed Spa team! Before your start date, please complete the onboarding form linked below. This collects the information needed to set up your independent contractor agreement, tax documents, and payment details.</p>
+        <p style="margin: 28px 0;">
+          <a href="${onboardingUrl}" style="background: #c9a84c; color: #000; padding: 14px 32px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.5px;">Complete Onboarding Form</a>
+        </p>
+        <p>The form takes approximately 10 minutes and covers:</p>
+        <ul style="color: #555; line-height: 1.8;">
+          <li>Tax information (W-9)</li>
+          <li>Government ID</li>
+          <li>Professional license(s) and insurance (if applicable)</li>
+          <li>Payment preferences</li>
+        </ul>
+        <p>If you have any questions, please reach out to us at <a href="mailto:ops@lemedspa.com" style="color: #c9a84c;">ops@lemedspa.com</a> or call 818-463-3772.</p>
+        <p>We look forward to working with you!</p>
+        <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; color: #999; font-size: 12px;">
+          <strong>LeMed Spa Operations</strong><br>
+          17414 Ventura Blvd, Encino, CA 91316<br>
+          818-4MEDSPA (818-463-3772)
+        </div>
+      </div>
+    `;
+
+    try {
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'LeMed Spa Onboarding <onboarding@updates.lemedspa.com>',
+          reply_to: 'ops@lemedspa.com',
+          to: [employee.email],
+          cc: ['lea@lemedspa.com'],
+          subject: `LeMed Spa — Complete Your Onboarding`,
+          html: emailHtml,
+        }),
+      });
+
+      const result = await emailRes.json();
+
+      if (emailRes.ok) {
+        console.log(`[SendLink] Email sent to ${employee.email} for employee ${id}, ID: ${result.id}`);
+        return res.json({ success: true, message: `Email sent to ${employee.email}` });
+      } else {
+        console.error('[SendLink] Resend error:', result);
+        return res.status(500).json({ success: false, message: result.message || 'Email failed' });
+      }
+    } catch (err) {
+      console.error('[SendLink] Email error:', err.message);
+      return res.status(500).json({ success: false, message: 'Failed to send email' });
+    }
+  }
 });
 
 // Public: prefill data for onboarding form (returns employee job info for pre-population)

@@ -396,6 +396,7 @@
               onboardingCell = `
                 <span style="color: #c9a84c; font-size: 11px; letter-spacing: 0.05em;">PENDING</span>
                 <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="copyOnboardingLink('${emp.onboarding_token}')">Copy Link</button>
+                <button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px; background:#1a2a1a; border:1px solid #2a4a2a; color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
               `;
             } else {
               onboardingCell = `<span style="color: #555; font-size: 11px;">—</span>`;
@@ -447,33 +448,65 @@
       salesCheck.checked = ['commission_sales', 'hourly_sales', 'hourly_all', 'commission_all'].includes(payType);
     }
 
-    async function addEmployee() {
-      const firstName = document.getElementById('new-emp-first-name').value.trim();
-      const lastName = document.getElementById('new-emp-last-name').value.trim();
+    // ============ Pre-Form (Add New Team Member) ============
+
+    function openPreForm() {
+      document.getElementById('preform-overlay').classList.add('show');
+      document.getElementById('preform-fields').style.display = 'block';
+      document.getElementById('preform-success').style.display = 'none';
+      document.getElementById('preform-error').classList.remove('show');
+      // Reset fields
+      ['pf-first-name','pf-last-name','pf-email','pf-phone','pf-pin','pf-hourly',
+       'pf-additional-pay-rate','pf-rate-notes','pf-start-date'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      document.getElementById('pf-designation').value = '';
+      document.getElementById('pf-contractor-type').value = '';
+      document.getElementById('pf-hourly-check').checked = true;
+      document.getElementById('pf-services-check').checked = false;
+      document.getElementById('pf-sales-check').checked = false;
+    }
+
+    function closePreForm() {
+      document.getElementById('preform-overlay').classList.remove('show');
+      loadEmployees();
+    }
+
+    function copyPreFormLink() {
+      const url = document.getElementById('preform-onboarding-url').value;
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('preform-copy-btn');
+        btn.textContent = 'Copied!';
+        btn.style.color = '#6bff6b';
+        setTimeout(() => { btn.textContent = 'Copy'; btn.style.color = ''; }, 2000);
+      }).catch(() => prompt('Copy this link:', url));
+    }
+
+    async function submitPreForm() {
+      const firstName = document.getElementById('pf-first-name').value.trim();
+      const lastName = document.getElementById('pf-last-name').value.trim();
       const name = [firstName, lastName].filter(Boolean).join(' ');
-      const pin = document.getElementById('new-emp-pin').value.trim();
-      const email = document.getElementById('new-emp-email').value.trim();
-      const phone = document.getElementById('new-emp-phone').value.trim();
-      const designation = document.getElementById('new-emp-designation').value;
-      const contractorType = document.getElementById('new-emp-contractor-type').value;
-      const payType = getPayTypeFromCheckboxes('new-emp');
-      const hourlyWage = parseFloat(document.getElementById('new-emp-hourly').value) || 0;
-      const additionalPayRate = document.getElementById('new-emp-additional-pay-rate').value.trim();
-      const rateNotes = document.getElementById('new-emp-rate-notes').value.trim();
-      const errorEl = document.getElementById('emp-error');
+      const pin = document.getElementById('pf-pin').value.trim();
+      const email = document.getElementById('pf-email').value.trim();
+      const phone = document.getElementById('pf-phone').value.trim();
+      const designation = document.getElementById('pf-designation').value;
+      const contractorType = document.getElementById('pf-contractor-type').value;
+      const payType = getPayTypeFromCheckboxes('pf');
+      const hourlyWage = parseFloat(document.getElementById('pf-hourly').value) || 0;
+      const additionalPayRate = document.getElementById('pf-additional-pay-rate').value.trim();
+      const rateNotes = document.getElementById('pf-rate-notes').value.trim();
+      const startDate = document.getElementById('pf-start-date').value || null;
+      const errorEl = document.getElementById('preform-error');
 
       errorEl.classList.remove('show');
-      errorEl.style.background = '';
-      errorEl.style.borderColor = '';
-      errorEl.style.color = '';
 
-      if (!firstName || !lastName || !pin) {
-        errorEl.textContent = 'Please enter first name, last name, and PIN';
+      if (!firstName || !lastName) {
+        errorEl.textContent = 'First name and last name are required';
         errorEl.classList.add('show');
         return;
       }
-
-      if (!/^\d{4}$/.test(pin)) {
+      if (!pin || !/^\d{4}$/.test(pin)) {
         errorEl.textContent = 'PIN must be exactly 4 digits';
         errorEl.classList.add('show');
         return;
@@ -484,55 +517,131 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name,
-            pin,
-            email,
-            phone,
-            designation,
-            contractorType,
-            payType,
-            hourlyWage,
+            name, pin, email, phone, designation, contractorType,
+            payType, hourlyWage,
             additionalPayRate: additionalPayRate ? parseFloat(additionalPayRate) : null,
-            rateNotes,
+            rateNotes, startDate,
           }),
         });
 
         const data = await response.json();
 
         if (data.success) {
-          document.getElementById('new-emp-first-name').value = '';
-          document.getElementById('new-emp-last-name').value = '';
-          document.getElementById('new-emp-pin').value = '';
-          document.getElementById('new-emp-email').value = '';
-          document.getElementById('new-emp-phone').value = '';
-          document.getElementById('new-emp-designation').value = '';
-          document.getElementById('new-emp-contractor-type').value = '';
-          document.getElementById('new-emp-hourly-check').checked = true;
-          document.getElementById('new-emp-services-check').checked = false;
-          document.getElementById('new-emp-sales-check').checked = false;
-          document.getElementById('new-emp-hourly').value = '';
-          document.getElementById('new-emp-additional-pay-rate').value = '';
-          document.getElementById('new-emp-rate-notes').value = '';
-          loadEmployees();
+          // Show success state
+          const link = `${window.location.origin}/onboarding/${data.onboardingToken}`;
+          document.getElementById('preform-success-name').textContent = `${name} has been added. Share the onboarding link below.`;
+          document.getElementById('preform-onboarding-url').value = link;
+          window._preformEmployeeId = data.id;
+          window._preformEmployeeName = firstName;
+          window._preformEmployeePhone = phone;
+          window._preformEmployeeEmail = email;
+          window._preformOnboardingLink = link;
 
-          // Show onboarding link
-          if (data.onboardingToken) {
-            const token = data.onboardingToken;
-            const link = `${window.location.origin}/onboarding/${token}`;
-            errorEl.style.background = '#1a2a1a';
-            errorEl.style.borderColor = '#2a4a2a';
-            errorEl.style.color = '#6bff6b';
-            errorEl.innerHTML = `Employee added. <strong>Onboarding link:</strong> <a href="${link}" target="_blank" style="color: #c9a84c; word-break: break-all;">${link}</a> <button class="btn-secondary" style="margin-left: 8px; font-size: 10px; padding: 2px 8px;" onclick="copyOnboardingLink('${token}')">Copy</button>`;
-            errorEl.classList.add('show');
-          }
+          document.getElementById('preform-fields').style.display = 'none';
+          document.getElementById('preform-success').style.display = 'block';
         } else {
-          errorEl.textContent = data.message || 'Error adding employee';
+          errorEl.textContent = data.message || 'Error creating team member';
           errorEl.classList.add('show');
         }
       } catch (error) {
         errorEl.textContent = 'Connection error';
         errorEl.classList.add('show');
       }
+    }
+
+    // ============ Send Link Modal ============
+
+    let _sendLinkType = '';
+    let _sendLinkEmployeeId = null;
+
+    function openSendLink(empId) {
+      _sendLinkEmployeeId = empId;
+      // Find employee from cache
+      const emp = (window._employeesCache || []).find(e => e.id === empId);
+      const name = emp ? emp.name : (window._preformEmployeeName || 'team member');
+      document.getElementById('send-link-subtitle').textContent = `Send onboarding link to ${name}`;
+      document.getElementById('send-link-options').style.display = 'block';
+      document.getElementById('send-link-preview-wrap').style.display = 'none';
+      document.getElementById('send-link-sent').style.display = 'none';
+      document.getElementById('send-link-close-wrap').style.display = 'flex';
+      document.getElementById('send-link-modal').classList.add('show');
+    }
+
+    function openSendLinkEmail(empId) {
+      openSendLink(empId);
+      showSendPreview('email');
+    }
+
+    function showSendPreview(type) {
+      _sendLinkType = type;
+      const emp = (window._employeesCache || []).find(e => e.id === _sendLinkEmployeeId);
+      const firstName = emp ? (emp.name || '').split(' ')[0] : (window._preformEmployeeName || '');
+      const link = emp && emp.onboarding_token
+        ? `${window.location.origin}/onboarding/${emp.onboarding_token}`
+        : (window._preformOnboardingLink || '');
+
+      let preview = '';
+      let label = '';
+
+      if (type === 'sms') {
+        label = 'Text Message Preview (from 213-444-2242)';
+        preview = `Hi ${firstName}, this is LeMed Spa. Please complete your onboarding form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${link}\n\nQuestions? Reply to this text or call 818-463-3772.`;
+      } else {
+        label = 'Email Preview (from onboarding@updates.lemedspa.com)';
+        preview = `Subject: LeMed Spa — Complete Your Onboarding\nTo: ${emp?.email || window._preformEmployeeEmail || '(no email on file)'}\nCC: lea@lemedspa.com\n\n---\n\nHi ${firstName},\n\nWelcome to the LeMed Spa team! Before your start date, please complete the onboarding form linked below. This collects the information needed to set up your independent contractor agreement, tax documents, and payment details.\n\n${link}\n\nThe form takes approximately 10 minutes and covers:\n- Tax information (W-9)\n- Government ID\n- Professional license(s) and insurance (if applicable)\n- Payment preferences\n\nIf you have any questions, please reach out to us at ops@lemedspa.com or call 818-463-3772.\n\nWe look forward to working with you!\n\nLeMed Spa Operations\n17414 Ventura Blvd, Encino, CA 91316\n818-4MEDSPA (818-463-3772)`;
+      }
+
+      document.getElementById('send-preview-label').textContent = label;
+      document.getElementById('send-preview-body').textContent = preview;
+      document.getElementById('send-link-options').style.display = 'none';
+      document.getElementById('send-link-preview-wrap').style.display = 'block';
+      document.getElementById('send-link-close-wrap').style.display = 'none';
+    }
+
+    function backToSendOptions() {
+      document.getElementById('send-link-options').style.display = 'block';
+      document.getElementById('send-link-preview-wrap').style.display = 'none';
+      document.getElementById('send-link-close-wrap').style.display = 'flex';
+    }
+
+    async function confirmSendLink() {
+      const btn = document.getElementById('send-confirm-btn');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      try {
+        const password = sessionStorage.getItem('adminPasswordValue') || '';
+        const response = await fetch(`/api/admin/employees/${_sendLinkEmployeeId}/send-link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', password },
+          body: JSON.stringify({ type: _sendLinkType }),
+        });
+
+        const data = await response.json();
+
+        document.getElementById('send-link-preview-wrap').style.display = 'none';
+
+        if (data.success) {
+          document.getElementById('send-sent-msg').textContent = data.message;
+          document.getElementById('send-link-sent').style.display = 'block';
+        } else {
+          document.getElementById('send-sent-msg').textContent = data.message || 'Failed to send';
+          document.getElementById('send-sent-msg').style.color = '#ff6b6b';
+          document.getElementById('send-link-sent').style.display = 'block';
+        }
+
+        document.getElementById('send-link-close-wrap').style.display = 'flex';
+      } catch (err) {
+        alert('Network error sending link');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Send';
+    }
+
+    function closeSendLinkModal() {
+      document.getElementById('send-link-modal').classList.remove('show');
+      document.getElementById('send-sent-msg').style.color = '';
     }
 
     function editEmployee(id) {

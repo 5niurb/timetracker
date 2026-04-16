@@ -37,7 +37,7 @@
     <div class="container">
       <div class="tabs">
         <button class="tab active" onclick="showTab('review-entries')">Review Entries</button>
-        <button class="tab" onclick="showTab('employees')">Employees</button>
+        <button class="tab" onclick="showTab('employees')">Team Members</button>
         <button class="tab" onclick="showTab('reports')">Reports</button>
       </div>
 
@@ -99,92 +99,17 @@
         </div>
       </div>
 
-      <!-- Employees Tab -->
+      <!-- Team Members Tab -->
       <div id="tab-employees" class="tab-content" style="display: none;">
         <div class="card">
-          <h3>Add New Employee</h3>
-          <div class="inline-form">
-            <p style="font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #c9a84c; margin-bottom: 12px; border-bottom: 1px solid #222; padding-bottom: 8px;">Contact Information</p>
-            <div class="form-group">
-              <label>First Name <span style="color: #ff6b6b;">*</span></label>
-              <input type="text" id="new-emp-first-name" placeholder="First name">
-            </div>
-            <div class="form-group">
-              <label>Last Name <span style="color: #ff6b6b;">*</span></label>
-              <input type="text" id="new-emp-last-name" placeholder="Last name">
-            </div>
-            <div class="form-group">
-              <label>Email <span style="color: #ff6b6b;">*</span></label>
-              <input type="email" id="new-emp-email" placeholder="email@example.com">
-            </div>
-            <div class="form-group">
-              <label>Mobile Phone</label>
-              <input type="tel" id="new-emp-phone" placeholder="(310) 555-1234">
-            </div>
-            <div class="form-group">
-              <label>PIN (4 digits) <span style="color: #ff6b6b;">*</span></label>
-              <input type="text" id="new-emp-pin" maxlength="4" placeholder="1234">
-            </div>
-
-            <p style="font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #c9a84c; margin: 20px 0 12px; border-bottom: 1px solid #222; padding-bottom: 8px;">Job Information</p>
-            <div class="form-group">
-              <label>Job Title <span style="color: #ff6b6b;">*</span></label>
-              <select id="new-emp-designation">
-                <option value="">— Select —</option>
-                <option>Beauty Sales Consultant</option>
-                <option>Operations Consultant</option>
-                <option>Operations Manager</option>
-                <option>Esthetician</option>
-                <option>Medical Assistant</option>
-                <option>Aesthetic Nurse</option>
-                <option>Aesthetic Nurse Practitioner</option>
-                <option>Physician</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Job Type <span style="color: #ff6b6b;">*</span></label>
-              <select id="new-emp-contractor-type">
-                <option value="">— Select —</option>
-                <option value="contract">Contract</option>
-                <option value="employee">Full-time</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Pay Components</label>
-              <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #0a0a0a; border: 1px solid #333;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-                  <input type="checkbox" id="new-emp-hourly-check" style="width: 18px; height: 18px;">
-                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Hourly</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-                  <input type="checkbox" id="new-emp-services-check" style="width: 18px; height: 18px;">
-                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Service Commissions & Tips</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
-                  <input type="checkbox" id="new-emp-sales-check" style="width: 18px; height: 18px;">
-                  <span style="font-size: 12px; color: #ccc; text-transform: none; letter-spacing: normal;">Sales Commissions</span>
-                </label>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Pay Rate ($) <span style="color: #ff6b6b;">*</span></label>
-              <input type="number" id="new-emp-hourly" step="0.01" min="0" placeholder="0.00">
-            </div>
-            <div class="form-group">
-              <label>Additional Pay Rate ($) <span style="font-weight: 300; color: #888;">(optional)</span></label>
-              <input type="number" id="new-emp-additional-pay-rate" step="0.01" min="0" placeholder="0.00">
-            </div>
-            <div class="form-group">
-              <label>Comments <span style="font-weight: 300; color: #888;">(optional)</span></label>
-              <input type="text" id="new-emp-rate-notes" placeholder="e.g. $X/unit for injectables">
-            </div>
-            <button class="btn-success" onclick="addEmployee()">Add</button>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin-bottom: 0;">Team Members</h3>
+            <button class="btn-success" onclick="openPreForm()" style="padding: 10px 24px;">+ Add New Team Member</button>
           </div>
-          <div class="alert error" id="emp-error" style="margin-top: 12px;"></div>
         </div>
 
         <div class="card">
-          <h3>All Employees</h3>
+          <h3 style="display:none;">All</h3>
           <div style="overflow-x: auto;">
             <table>
               <thead>
@@ -361,6 +286,173 @@
       <div id="onboarding-details-content"></div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeOnboardingModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-Form Overlay (looks like onboarding form) -->
+  <div id="preform-overlay" class="preform-overlay">
+    <div class="preform-header">
+      <h2>New Team Member</h2>
+      <button class="btn-secondary" onclick="closePreForm()" style="padding: 8px 16px;">Cancel</button>
+    </div>
+    <div class="preform-body">
+
+      <!-- Success state (hidden by default) -->
+      <div id="preform-success" style="display:none; text-align:center; padding:40px 0;">
+        <div style="font-size:48px; margin-bottom:16px; color:#6bff6b;">&#10003;</div>
+        <h3 style="font-size:22px; color:#6bff6b; margin-bottom:12px;">Team Member Added</h3>
+        <p style="color:#888; font-size:13px; margin-bottom:24px;" id="preform-success-name"></p>
+        <div style="background:#111; border:1px solid #2a2a2a; padding:16px; margin-bottom:20px; text-align:left;">
+          <label style="font-size:10px; letter-spacing:0.1em; color:#888; text-transform:uppercase; margin-bottom:8px; display:block;">Onboarding Link</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="preform-onboarding-url" readonly style="flex:1; font-size:12px; background:#0a0a0a; border:1px solid #222; color:#c9a84c; padding:10px;">
+            <button class="btn-secondary" onclick="copyPreFormLink()" id="preform-copy-btn" style="padding:8px 14px; white-space:nowrap;">Copy</button>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; margin-bottom:20px;">
+          <button class="btn-primary" onclick="openSendLink(window._preformEmployeeId)" style="flex:1; background:#1a472a; color:#fff; border:1px solid #2a4a2a;">Send via Text</button>
+          <button class="btn-primary" onclick="openSendLinkEmail(window._preformEmployeeId)" style="flex:1; background:#1a2a3a; color:#fff; border:1px solid #2a4a6a;">Send via Email</button>
+        </div>
+        <button class="btn-secondary" onclick="closePreForm()" style="width:100%;">Done</button>
+      </div>
+
+      <!-- Form state -->
+      <div id="preform-fields">
+        <div class="alert error" id="preform-error" style="margin-bottom:16px;"></div>
+
+        <div class="pf-section">
+          <div class="pf-section-header">
+            <div class="pf-section-num">1</div>
+            <h3>Personal &amp; Contact Information</h3>
+          </div>
+          <div class="pf-section-body">
+            <div class="pf-grid">
+              <div class="form-group">
+                <label>First Name <span class="req">*</span></label>
+                <input type="text" id="pf-first-name" placeholder="First name">
+              </div>
+              <div class="form-group">
+                <label>Last Name <span class="req">*</span></label>
+                <input type="text" id="pf-last-name" placeholder="Last name">
+              </div>
+              <div class="form-group">
+                <label>Email <span class="req">*</span></label>
+                <input type="email" id="pf-email" placeholder="email@example.com">
+              </div>
+              <div class="form-group">
+                <label>Mobile Phone</label>
+                <input type="tel" id="pf-phone" placeholder="(310) 555-1234">
+              </div>
+              <div class="form-group">
+                <label>PIN (4 digits) <span class="req">*</span></label>
+                <input type="text" id="pf-pin" maxlength="4" placeholder="1234">
+                <span class="hint">Used for time-tracker login</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pf-section">
+          <div class="pf-section-header">
+            <div class="pf-section-num">2</div>
+            <h3>Job Information</h3>
+          </div>
+          <div class="pf-section-body">
+            <div class="pf-grid">
+              <div class="form-group">
+                <label>Job Title <span class="req">*</span></label>
+                <select id="pf-designation">
+                  <option value="">— Select —</option>
+                  <option>Beauty Sales Consultant</option>
+                  <option>Operations Consultant</option>
+                  <option>Operations Manager</option>
+                  <option>Esthetician</option>
+                  <option>Medical Assistant</option>
+                  <option>Aesthetic Nurse</option>
+                  <option>Aesthetic Nurse Practitioner</option>
+                  <option>Physician</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Job Type <span class="req">*</span></label>
+                <select id="pf-contractor-type">
+                  <option value="">— Select —</option>
+                  <option value="contract">Contract</option>
+                  <option value="employee">Full-time</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Pay Components</label>
+                <div style="display:flex; flex-direction:column; gap:8px; padding:10px; background:#0a0a0a; border:1px solid #333;">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="pf-hourly-check" style="width:18px;height:18px;">
+                    <span style="font-size:12px;color:#ccc;text-transform:none;letter-spacing:normal;">Hourly</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="pf-services-check" style="width:18px;height:18px;">
+                    <span style="font-size:12px;color:#ccc;text-transform:none;letter-spacing:normal;">Service Commissions & Tips</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="pf-sales-check" style="width:18px;height:18px;">
+                    <span style="font-size:12px;color:#ccc;text-transform:none;letter-spacing:normal;">Sales Commissions</span>
+                  </label>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Pay Rate ($) <span class="req">*</span></label>
+                <input type="number" id="pf-hourly" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label>Additional Pay Rate ($) <span style="font-weight:300;color:#666;">(optional)</span></label>
+                <input type="number" id="pf-additional-pay-rate" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label>Start Date <span style="font-weight:300;color:#666;">(approximate)</span></label>
+                <input type="date" id="pf-start-date">
+              </div>
+              <div class="form-group span-full">
+                <label>Comments <span style="font-weight:300;color:#666;">(optional)</span></label>
+                <input type="text" id="pf-rate-notes" placeholder="e.g. $X/unit for injectables">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="pf-submit" onclick="submitPreForm()">Create Team Member</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Link Modal -->
+  <div id="send-link-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+      <h3 id="send-link-title">Send Onboarding Link</h3>
+      <p style="color:#888;font-size:12px;margin-bottom:16px;" id="send-link-subtitle"></p>
+      <div id="send-link-options">
+        <div class="send-link-option" onclick="showSendPreview('sms')">
+          <div class="opt-title">Send via Text Message</div>
+          <div class="opt-detail">From: (213) 444-2242 — sent to team member's mobile phone</div>
+        </div>
+        <div class="send-link-option" onclick="showSendPreview('email')">
+          <div class="opt-title">Send via Email</div>
+          <div class="opt-detail">From: onboarding@updates.lemedspa.com — CC: lea@lemedspa.com</div>
+        </div>
+      </div>
+      <div id="send-link-preview-wrap" style="display:none;">
+        <p style="font-size:11px;color:#c9a84c;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;" id="send-preview-label"></p>
+        <div class="send-link-preview" id="send-preview-body"></div>
+        <div class="modal-actions">
+          <button class="btn-secondary" onclick="backToSendOptions()">Back</button>
+          <button class="btn-success" onclick="confirmSendLink()" id="send-confirm-btn">Send</button>
+        </div>
+      </div>
+      <div id="send-link-sent" style="display:none;text-align:center;padding:20px 0;">
+        <div style="font-size:32px;color:#6bff6b;margin-bottom:8px;">&#10003;</div>
+        <p style="color:#ccc;font-size:13px;" id="send-sent-msg"></p>
+      </div>
+      <div class="modal-actions" id="send-link-close-wrap">
+        <button class="btn-secondary" onclick="closeSendLinkModal()">Close</button>
       </div>
     </div>
   </div>
