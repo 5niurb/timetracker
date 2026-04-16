@@ -258,7 +258,7 @@ const validProfLicense = {
 const validForm = {
   first_name: 'Jane',
   last_name: 'Doe',
-  // mobile_phone is optional — omitted here to test that it's not required
+  mobile_phone: '3105551234',
   date_of_birth: fmt(adult),
   address_street: '123 Main St',
   address_city: 'Los Angeles',
@@ -272,6 +272,8 @@ const validForm = {
   professional_licenses: [validProfLicense],
   bank_name: 'Wells Fargo',
   bank_account_owner_name: 'Jane Doe',
+  prof_liability_per_occurrence: 1000000,
+  prof_liability_aggregate: 3000000,
   bank_routing_raw: '121000358',
   bank_account_raw: '12345678',
   payment_method: 'ach',
@@ -298,11 +300,11 @@ test('missing last_name fails', () => {
   assert.ok(errors.last_name, 'expected last_name error');
 });
 
-test('optional mobile_phone absent passes', () => {
+test('missing mobile_phone fails (now required)', () => {
   const form = { ...validForm };
   delete form.mobile_phone;
   const errors = v.validateOnboarding(form);
-  assert.ok(!errors.mobile_phone, 'mobile_phone should not be required');
+  assert.ok(errors.mobile_phone, 'mobile_phone should be required');
 });
 
 test('invalid mobile_phone fails when provided', () => {
@@ -386,6 +388,7 @@ console.log('\nFull form validateOnboarding (Zelle variant):');
 const validFormZelle = {
   first_name: 'Jane',
   last_name: 'Doe',
+  mobile_phone: '3105551234',
   date_of_birth: fmt(adult),
   address_street: '123 Main St',
   address_city: 'Los Angeles',
@@ -397,6 +400,8 @@ const validFormZelle = {
   driver_license_number: 'D1234567',
   driver_license_state: 'CA',
   professional_licenses: [validProfLicense],
+  prof_liability_per_occurrence: 1000000,
+  prof_liability_aggregate: 3000000,
   bank_name: 'Wells Fargo',
   bank_account_owner_name: 'Jane Doe',
   payment_method: 'zelle',

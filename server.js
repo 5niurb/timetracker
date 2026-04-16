@@ -1252,8 +1252,8 @@ app.post(
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    if (!['driver_license', 'insurance'].includes(fileType)) {
-      return res.status(400).json({ success: false, message: 'Invalid fileType — must be driver_license or insurance' });
+    if (!fileType || (!['driver_license', 'insurance'].includes(fileType) && !fileType.startsWith('license_'))) {
+      return res.status(400).json({ success: false, message: 'Invalid fileType' });
     }
 
     const ext = req.file.mimetype === 'application/pdf' ? 'pdf' : req.file.mimetype === 'image/png' ? 'png' : 'jpg';

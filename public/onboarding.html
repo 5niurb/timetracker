@@ -491,12 +491,14 @@
       <div class="form-grid">
         <div class="form-group">
           <label>First Name <span class="req">*</span></label>
-          <input type="text" id="first_name" autocomplete="given-name">
+          <input type="text" id="first_name" autocomplete="given-name"
+            onblur="validateRequired('first_name','First name')">
           <span class="field-error" id="err-first_name"></span>
         </div>
         <div class="form-group">
           <label>Last Name <span class="req">*</span></label>
-          <input type="text" id="last_name" autocomplete="family-name">
+          <input type="text" id="last_name" autocomplete="family-name"
+            onblur="validateRequired('last_name','Last name')">
           <span class="field-error" id="err-last_name"></span>
         </div>
         <div class="form-group">
@@ -509,13 +511,14 @@
         </div>
         <div class="form-group">
           <label>Email <span class="req">*</span></label>
-          <input type="email" id="email" autocomplete="email">
+          <input type="email" id="email" autocomplete="email"
+            onblur="validateEmailField()">
           <span class="field-error" id="err-email"></span>
         </div>
         <div class="form-group">
-          <label>Mobile Phone</label>
-          <input type="tel" id="mobile_phone" autocomplete="tel" placeholder="(310) 555-1234">
-          <span class="field-hint">Optional — for urgent communication</span>
+          <label>Mobile Phone <span class="req">*</span></label>
+          <input type="tel" id="mobile_phone" autocomplete="tel" placeholder="(310) 555-1234"
+            onblur="validatePhoneField()">
           <span class="field-error" id="err-mobile_phone"></span>
         </div>
         <div class="form-group">
@@ -543,7 +546,7 @@
           <select id="address_state" autocomplete="address-level1">
             <option value="">— Select —</option>
             <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
-            <option>CA</option><option>CO</option><option>CT</option><option>DE</option>
+            <option selected>CA</option><option>CO</option><option>CT</option><option>DE</option>
             <option>DC</option><option>FL</option><option>GA</option><option>HI</option>
             <option>ID</option><option>IL</option><option>IN</option><option>IA</option>
             <option>KS</option><option>KY</option><option>LA</option><option>ME</option>
@@ -560,7 +563,8 @@
         </div>
         <div class="form-group">
           <label>ZIP Code <span class="req">*</span></label>
-          <input type="text" id="address_zip" autocomplete="postal-code" maxlength="10" placeholder="90210">
+          <input type="text" id="address_zip" autocomplete="postal-code" maxlength="10" placeholder="90210"
+            onblur="validateZipField()">
           <span class="field-error" id="err-address_zip"></span>
         </div>
       </div>
@@ -594,8 +598,8 @@
         </div>
         <div class="form-group">
           <label>Business / Entity Name</label>
-          <span class="field-hint" style="margin-bottom:4px">If different from your name (sole prop: leave blank)</span>
           <input type="text" id="w9_entity_name">
+          <span class="field-hint">If different from your name (sole prop: leave blank)</span>
         </div>
         <div class="form-group">
           <label>Tax Classification <span class="req">*</span></label>
@@ -710,15 +714,14 @@
           <span class="field-error" id="err-insurance_expiration"></span>
         </div>
         <div class="form-group">
-          <!-- spacing -->
+          <label>Coverage — Per Occurrence ($) <span class="req">*</span></label>
+          <input type="number" id="prof_liability_per_occurrence" min="0" step="1000" placeholder="e.g. 1000000">
+          <span class="field-error" id="err-prof_liability_per_occurrence"></span>
         </div>
         <div class="form-group">
-          <label>Professional Liability (per occurrence) ($)</label>
-          <input type="number" id="prof_liability_per_occurrence" min="0" step="1000">
-        </div>
-        <div class="form-group">
-          <label>Professional Liability (aggregate — annual) ($)</label>
-          <input type="number" id="prof_liability_aggregate" min="0" step="1000">
+          <label>Coverage — Aggregate / Annual ($) <span class="req">*</span></label>
+          <input type="number" id="prof_liability_aggregate" min="0" step="1000" placeholder="e.g. 3000000">
+          <span class="field-error" id="err-prof_liability_aggregate"></span>
         </div>
         <div class="form-group span-2">
           <label>Upload Insurance Certificate <span class="req">*</span></label>
@@ -966,6 +969,35 @@
     return d > today;
   };
 
+  // Inline blur validators
+  function validateRequired(fieldId, label) {
+    const val = document.getElementById(fieldId).value.trim();
+    if (!val) { setError(fieldId, `${label} is required`); return false; }
+    clearError(fieldId); return true;
+  }
+
+  function validateEmailField() {
+    const val = document.getElementById('email').value.trim();
+    if (!val) { setError('email', 'Email is required'); return false; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { setError('email', 'Enter a valid email address'); return false; }
+    clearError('email'); return true;
+  }
+
+  function validatePhoneField() {
+    const val = document.getElementById('mobile_phone').value.trim();
+    if (!val) { setError('mobile_phone', 'Mobile phone is required'); return false; }
+    const digits = val.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 11) { setError('mobile_phone', 'Must be 10 digits (or 11 with country code)'); return false; }
+    clearError('mobile_phone'); return true;
+  }
+
+  function validateZipField() {
+    const val = document.getElementById('address_zip').value.trim();
+    if (!val) { setError('address_zip', 'ZIP code is required'); return false; }
+    if (!validateZip(val)) { setError('address_zip', 'Must be 5 or 9 digits'); return false; }
+    clearError('address_zip'); return true;
+  }
+
   // Set today's date on attestation
   const todayISO = new Date().toISOString().split('T')[0];
   document.getElementById('attestation_date').value = todayISO;
@@ -1131,6 +1163,15 @@
           <input type="url" id="lic_url_${idx}" placeholder="https://search.dca.ca.gov/...">
           <span class="field-hint">Please provide a link to your current license information using the CA Dept of Consumer Affairs website (search.dca.ca.gov)</span>
           <span class="field-error" id="err-lic_url_${idx}"></span>
+        </div>
+        <div class="form-group span-2">
+          <label>Upload License Screenshot <span style="font-weight:300;color:#666;">(optional)</span></label>
+          <div class="file-upload-wrap">
+            <input type="file" class="file-upload-input" id="lic_upload_${idx}" accept=".pdf,.jpg,.jpeg,.png"
+              onchange="handleFileSelect(this, 'license_${idx}', 'lic-upload-status-${idx}')">
+            <span class="field-hint">PDF, JPG, or PNG — max 10 MB</span>
+            <span class="upload-status" id="lic-upload-status-${idx}"></span>
+          </div>
         </div>
       </div>
     `;
