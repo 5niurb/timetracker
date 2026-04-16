@@ -1,3 +1,51 @@
+## Session — 2026-04-16 (status field + employee_documents + doc uploads)
+
+**Focus:** Employee status field, inactive contractors, compliance doc uploads.
+
+**Accomplished:**
+- Migration 006: Added `status TEXT DEFAULT 'active'` to `employees`; created `employee_documents` table (RLS enabled)
+- Created Kirti Patel (id=17, pin=8177, status=inactive, email=kirti821@gmail.com)
+- Created Sheila Ewart (id=18, pin=8182, status=inactive, email=she.ewart@gmail.com)
+- Uploaded 18 compliance documents to Supabase Storage `onboarding-documents` bucket and inserted `employee_documents` rows:
+  - Jade (11): DL, insurance, contract
+  - Jodi (13): esthetician license, W9
+  - Kirti (17): DL, insurance, W9, 2× other
+  - Lucine (14): W9, BRN license, NSO insurance, contractor agreement, BLS cert, CPR cert
+  - Vayda (15): W9
+  - Sheila (18): contractor agreement
+- Updated `server.js`: GET employees now returns `status`; PUT employees accepts + saves `status`
+- Updated `supabase-schema.sql` + `migrations/006_employee_status_and_documents.sql` (via Supabase MCP)
+
+**Diagram:**
+```
+iCloudDrive/LeMed Owners/1.0 LM Talent/
+  Jade/       Jodi Kay/    Kirti Patel/   Lucine Keseyan/  Vayda/  _old/Sheila E/
+    ↓ upload-employee-docs.mjs
+Supabase Storage: onboarding-documents/employee-{id}/
+    ↓ insert
+employee_documents table (18 rows)
+employees table: status col added; Kirti(17) + Sheila(18) = inactive
+```
+
+**Current State:**
+- 9 employees total: 7 active contractors + 2 inactive (Kirti, Sheila)
+- 18 docs in `employee_documents`, all with correct types and storage paths
+- tax_filings: 6 rows (2024 1099-NEC data, all encrypted TINs)
+
+**Issues:**
+- Leena Osman still has no SSN — onboarding will need to collect it
+- Sheila's `email with ID License W9.msg` not uploaded (Outlook .msg format, would need extraction)
+- Kirti's image0/image2 uploaded as `other` — unclear what they are
+
+**Next Steps:**
+- Push to GitHub → Render deploy (picks up server.js status field changes)
+- Lea Culver: no email in any source, cannot create record yet
+- W9 pre-population feature (mentioned in onboarding email)
+- Admin UI: show/filter by status, show documents tab in employee detail modal
+- SPECS.md update for status + employee_documents features
+
+---
+
 ## Session — 2026-04-16 (tax_filings + 1099 import + RLS fix)
 
 **Focus:** 1099 data import, tax_filings table + API, RLS fix, new employees.

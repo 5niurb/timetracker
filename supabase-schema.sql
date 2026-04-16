@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS employees (
   ic_agreement_signed_at TIMESTAMP WITH TIME ZONE,
   onboarding_token TEXT,
   onboarding_completed_at TIMESTAMP WITH TIME ZONE,
+  status TEXT DEFAULT 'active',                    -- 'active' | 'inactive'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -153,6 +154,22 @@ CREATE TABLE IF NOT EXISTS employee_onboarding (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- ============ EMPLOYEE DOCUMENTS TABLE ============
+-- Admin-uploaded compliance docs (ID, insurance, W9, contracts) per employee.
+-- Separate from employee_onboarding (which requires worker attestation).
+
+CREATE TABLE IF NOT EXISTS employee_documents (
+  id            bigint      PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  employee_id   integer     NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  document_type text        NOT NULL, -- 'driver_license' | 'insurance' | 'w9' | 'professional_license' | 'contract' | 'other'
+  file_path     text        NOT NULL, -- Supabase Storage path (bucket: onboarding-documents)
+  file_name     text,                 -- original filename
+  notes         text,
+  uploaded_at   timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE employee_documents ENABLE ROW LEVEL SECURITY;
+
 -- ============ TAX FILINGS TABLE ============
 -- Stores 1099-NEC and other annual tax filing data.
 -- Maps to Avalara/Track1099 CSV template columns.
@@ -228,6 +245,7 @@ CREATE INDEX IF NOT EXISTS idx_product_sales_time_entry_id ON product_sales(time
 CREATE INDEX IF NOT EXISTS idx_invoices_employee_id ON invoices(employee_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_pay_period ON invoices(pay_period_start, pay_period_end);
 CREATE INDEX IF NOT EXISTS idx_onboarding_employee_id ON employee_onboarding(employee_id);
+CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id ON employee_documents(employee_id);
 CREATE INDEX IF NOT EXISTS idx_employees_onboarding_token ON employees(onboarding_token);
 CREATE INDEX IF NOT EXISTS idx_tax_filings_employee_id ON tax_filings(employee_id);
 CREATE INDEX IF NOT EXISTS idx_tax_filings_year ON tax_filings(tax_year);
@@ -247,6 +265,7 @@ GRANT ALL ON client_entries TO anon, authenticated;
 GRANT ALL ON product_sales TO anon, authenticated;
 GRANT ALL ON invoices TO anon, authenticated;
 GRANT ALL ON employee_onboarding TO anon, authenticated;
+GRANT ALL ON employee_documents TO anon, authenticated;
 GRANT ALL ON tax_filings TO anon, authenticated;
 
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;

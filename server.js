@@ -719,7 +719,7 @@ app.get('/api/admin/employees', async (req, res) => {
   const { data: employees, error } = await supabaseAdmin
     .from('employees')
     .select(
-      'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, created_at, onboarding_token, onboarding_completed_at',
+      'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, status, created_at, onboarding_token, onboarding_completed_at',
     );
 
   res.json(employees || []);
@@ -793,6 +793,7 @@ app.put('/api/admin/employees/:id', async (req, res) => {
     payType,
     designation,
     contractorType,
+    status,
   } = req.body;
 
   // Check if PIN already exists for another employee
@@ -821,6 +822,7 @@ app.put('/api/admin/employees/:id', async (req, res) => {
       pay_type: payType || 'hourly',
       designation: designation?.trim() || null,
       contractor_type: contractorType || null,
+      status: status || 'active',
     })
     .eq('id', parseInt(id));
 
