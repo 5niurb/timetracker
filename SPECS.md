@@ -162,11 +162,110 @@
 
 ---
 
+## Worker Self-Onboarding (`/onboarding/:token`)
+
+### Overview
+
+Token-gated public form for workers to submit their own onboarding information. Replaces manual data collection. Admin generates a unique per-employee link; worker fills in and submits the form; admin reviews via the Employees tab.
+
+### User Flows
+
+**Admin flow:**
+1. Creates employee via Employees tab → server auto-generates `onboarding_token` (UUID v4)
+2. Onboarding link displayed in success banner after adding employee
+3. Employees tab shows per-employee status: Pending (token exists, not submitted) / Complete (with date + "View Details" button) / — (no token)
+4. Admin can view submitted data via "View Details" → modal with all fields (sensitive fields show last 4 only)
+
+**Worker flow:**
+1. Receives link `https://paytrack.lemedspa.app/onboarding/<uuid>`
+2. 8-section form rendered with dark + gold PayTrack styling
+3. Fills out all sections (see below)
+4. Submits → success screen replaces form (non-reversible, no back button)
+5. Already-submitted tokens show graceful "already received" message
+
+### Form Sections
+
+1. **Identity** — First name (required), last name (required), date of birth (required, ≥18), home phone, work phone
+2. **Address** — Street (required), city (required), state (required, 2-char US allowlist), ZIP (required, 5 or 9 digits)
+3. **Tax (W-9)** — TIN type (SSN/EIN), TIN number, W-9 tax classification, W-9 signature date
+4. **License** — License number, state, expiration (must be future if provided)
+5. **Insurance** — Company, policy number, expiration (must be future if provided)
+6. **Driver's License** — Number, state, expiry (must be future if provided)
+7. **Banking** — Bank name (required), account owner (required), account type (required), payment method (direct_deposit/check/zelle). Direct deposit: routing + account number required. Zelle: contact required.
+8. **Attestation** — IC agreement version display, checkbox certification (required), typed signature (required), date (required)
+
+### Sensitive Field Handling
+
+- SSN/EIN: `type="password"` with 👁/🙈 reveal toggle. Shown as `***-**-XXXX` after blur.
+- Routing/account numbers: Same `type="password"` treatment.
+- Server never logs raw values. Database stores `*_encrypted` column (plaintext with `TODO(security): add pgsodium encryption`) + `*_last4` masked value always stored.
+- Admin modal shows only `*_last4` values (e.g., `*****6789`).
+
+### Validation (client + server)
+
+| Field | Rule |
+|-------|------|
+| SSN | `/^\d{3}-\d{2}-\d{4}$/` |
+| EIN | `/^\d{2}-\d{7}$/` |
+| ZIP | 5 digits or 9 digits (with or without dash) |
+| Phone | ≥10 digits when stripped of formatting, ≤15 |
+| State | 2-char uppercase allowlist (50 states + DC) |
+| Bank routing | 9 digits + ABA checksum: `(3*(d1+d4+d7) + 7*(d2+d5+d8) + (d3+d6+d9)) % 10 === 0` |
+| Bank account | 4–17 digits |
+| Date of birth | Past date, worker must be ≥18 years old |
+| License/insurance expiration | Must be strictly future if provided |
+| Attestation | Checkbox required, typed signature required, date required |
+
+### API Endpoints
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/onboarding/:token` | None (token validates) | Render onboarding form |
+| POST | `/api/onboarding/:token` | None (token validates) | Submit onboarding data |
+| GET | `/api/admin/employees/:id/onboarding` | Admin password header | Fetch submitted data (masked) |
+| POST | `/api/admin/employees/:id/onboarding-token` | Admin password header | Regenerate token |
+
+### Database Changes (migration `002-worker-onboarding.sql`)
+
+**`employees` table — 8 new columns:**
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `phone` | TEXT | Primary phone |
+| `designation` | TEXT | Job title/role |
+| `contractor_type` | TEXT | Classification (W-2/1099) |
+| `start_date` | DATE | Employment start |
+| `ic_agreement_signed` | BOOLEAN | IC agreement accepted |
+| `ic_agreement_signed_at` | TIMESTAMPTZ | When signed |
+| `onboarding_token` | TEXT UNIQUE | UUID for form link |
+| `onboarding_completed_at` | TIMESTAMPTZ | When form was submitted |
+
+**New `employee_onboarding` table (~35 columns):** Full form submission, one row per employee. Identity, address, tax, license, insurance, banking fields. `tin_encrypted`, `bank_routing_encrypted`, `bank_account_encrypted` stored with TODO(security) comments. `*_last4` columns always populated. `submitted_at`, `ip_address`, `ic_agreement_version` for audit trail.
+
+### Validation Library (`lib/onboarding-validation.js`)
+
+Shared module used by both server.js and tests. Exports: `validateSSN`, `validateEIN`, `validateZip`, `validatePhone`, `validateState`, `validateBankRouting`, `validateBankAccount`, `validateDOB`, `validateFutureDate`, `extractLast4SSN`, `extractLast4Routing`, `extractLast4Account`, `validateOnboarding`.
+
+### Tests (`test/validation.test.js`)
+
+50 tests — written red-first, confirmed failing before implementation. Covers all validators + full form validation.
+
+### Design Decisions
+
+- Token security: UUID v4 via `crypto.randomUUID()` (Node built-in, no dependency)
+- Encryption deferred: plaintext + `TODO(security): add pgsodium` comments rather than wiring pgsodium (non-trivial setup). Always store last4 masked values.
+- No Resend email notifications (explicitly out of scope)
+- No 1099 export (out of scope)
+- Never store plaintext SSN/EIN in plain database columns — only in `*_encrypted` columns
+
+---
+
 ## Database Schema
 
 | Table | Purpose | Key fields |
 |-------|---------|-----------|
-| `employees` | Staff profiles | name, pin, email, hourly_wage, commission_rate, pay_type |
+| `employees` | Staff profiles | name, pin, email, hourly_wage, commission_rate, pay_type, onboarding_token, onboarding_completed_at |
+| `employee_onboarding` | Worker onboarding submissions | employee_id, personal info, address, tax (W-9), license, banking, attestation |
 | `time_entries` | Daily hours | employee_id, date, start_time, end_time, break_minutes, hours |
 | `client_entries` | Service work | time_entry_id, client_name, procedure_name, amount_earned, tip_amount, tip_received_cash |
 | `product_sales` | Sales commissions | time_entry_id, product_name, sale_amount, commission_amount |
@@ -212,3 +311,6 @@ Components included depend on employee's `pay_type` setting.
 | 2026-01 | Dark + gold theme | Consistent brand across all LM properties |
 | 2026-01 | Commission type toggle (% vs flat) | Accommodates different compensation structures |
 | 2026-02 | Tips owed tracking | Separates cash tips already paid from tips still owed |
+| 2026-04 | Worker self-onboarding via token link | Replaces manual data collection; UUID token is single-use per employee |
+| 2026-04 | Plaintext + TODO(security) for sensitive fields | pgsodium encryption deferred; last4 masks always stored; encryption TODO visible |
+| 2026-04 | Admin password stored in sessionStorage | Needed to authenticate `/api/admin/employees/:id/onboarding` from the browser |

@@ -118,6 +118,7 @@
 
         if (data.success) {
           sessionStorage.setItem('adminAuth', 'true');
+          sessionStorage.setItem('adminPasswordValue', password);
           showScreen('admin-screen');
           updatePeriodDisplay();
           loadEmployeesForFilter();
@@ -135,6 +136,7 @@
 
     function adminLogout() {
       sessionStorage.removeItem('adminAuth');
+      sessionStorage.removeItem('adminPasswordValue');
       showScreen('login-screen');
       document.getElementById('admin-password').value = '';
     }
@@ -372,7 +374,7 @@
         const tbody = document.getElementById('employees-table');
 
         if (employees.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No employees yet</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No employees yet</td></tr>';
         } else {
           tbody.innerHTML = employees.map(emp => {
             const payTypeClass = `pay-type-${emp.pay_type || 'hourly'}`;
@@ -386,6 +388,26 @@
             };
             const payTypeLabel = payTypeLabels[emp.pay_type] || 'Hourly';
 
+            // Build onboarding cell
+            let onboardingCell;
+            if (emp.onboarding_completed_at) {
+              const completedDate = new Date(emp.onboarding_completed_at).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric'
+              });
+              onboardingCell = `
+                <span style="color: #6bff6b; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;">✓ COMPLETE</span>
+                <br><span style="font-size: 10px; color: #666;">${completedDate}</span>
+                <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="viewOnboardingDetails(${emp.id})">View Details</button>
+              `;
+            } else if (emp.onboarding_token) {
+              onboardingCell = `
+                <span style="color: #c9a84c; font-size: 11px; letter-spacing: 0.05em;">PENDING</span>
+                <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="copyOnboardingLink('${emp.onboarding_token}')">Copy Link</button>
+              `;
+            } else {
+              onboardingCell = `<span style="color: #555; font-size: 11px;">—</span>`;
+            }
+
             return `
               <tr>
                 <td><strong>${escapeHtml(emp.name)}</strong></td>
@@ -393,6 +415,7 @@
                 <td style="font-size: 11px; color: #888;">${emp.email || '-'}</td>
                 <td><span class="pay-type-badge ${payTypeClass}">${payTypeLabel}</span></td>
                 <td>${emp.hourly_wage > 0 ? `$${parseFloat(emp.hourly_wage).toFixed(2)}/hr` : '-'}</td>
+                <td style="font-size: 11px; line-height: 1.6;">${onboardingCell}</td>
                 <td class="actions">
                   <button class="btn-warning" onclick="editEmployee(${emp.id}, '${escapeHtml(emp.name)}', '${emp.pin}', '${escapeHtml(emp.email || '')}', '${emp.pay_type || 'hourly'}', ${emp.hourly_wage || 0})">Edit</button>
                   <button class="btn-danger" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')">Delete</button>
@@ -440,6 +463,9 @@
       const errorEl = document.getElementById('emp-error');
 
       errorEl.classList.remove('show');
+      errorEl.style.background = '';
+      errorEl.style.borderColor = '';
+      errorEl.style.color = '';
 
       if (!name || !pin) {
         errorEl.textContent = 'Please enter name and PIN';
@@ -471,6 +497,17 @@
           document.getElementById('new-emp-sales-check').checked = false;
           document.getElementById('new-emp-hourly').value = '';
           loadEmployees();
+
+          // Show onboarding link if token was returned
+          if (data.employee && data.employee.onboarding_token) {
+            const token = data.employee.onboarding_token;
+            const link = `${window.location.origin}/onboarding/${token}`;
+            errorEl.style.background = '#1a2a1a';
+            errorEl.style.borderColor = '#2a4a2a';
+            errorEl.style.color = '#6bff6b';
+            errorEl.innerHTML = `Employee added. <strong>Onboarding link:</strong> <a href="${link}" target="_blank" style="color: #c9a84c; word-break: break-all;">${link}</a> <button class="btn-secondary" style="margin-left: 8px; font-size: 10px; padding: 2px 8px;" onclick="copyOnboardingLink('${token}')">Copy</button>`;
+            errorEl.classList.add('show');
+          }
         } else {
           errorEl.textContent = data.message || 'Error adding employee';
           errorEl.classList.add('show');
@@ -737,6 +774,117 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    function copyOnboardingLink(token) {
+      const link = `${window.location.origin}/onboarding/${token}`;
+      navigator.clipboard.writeText(link).then(() => {
+        // Flash feedback
+        const btn = event.target;
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.color = '#6bff6b';
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.style.color = '';
+        }, 2000);
+      }).catch(() => {
+        prompt('Copy this link:', link);
+      });
+    }
+
+    async function viewOnboardingDetails(employeeId) {
+      try {
+        const password = sessionStorage.getItem('adminPasswordValue') || '';
+        const response = await fetch(`/api/admin/employees/${employeeId}/onboarding`, {
+          headers: { password }
+        });
+
+        if (response.status === 404) {
+          alert('No onboarding data found for this employee.');
+          return;
+        }
+
+        if (!response.ok) {
+          alert('Error loading onboarding data.');
+          return;
+        }
+
+        const data = await response.json();
+        const o = data.onboarding;
+        if (!o) {
+          alert('No onboarding submission found.');
+          return;
+        }
+
+        const completedAt = o.submitted_at ? new Date(o.submitted_at).toLocaleString('en-US', {
+          month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+        }) : '—';
+
+        function row(label, val) {
+          if (!val) return '';
+          return `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">${label}</td><td style="color:#ccc;font-size:13px;padding:6px 0;">${escapeHtml(String(val))}</td></tr>`;
+        }
+
+        function section(title) {
+          return `<tr><td colspan="2" style="padding:16px 0 4px;color:#c9a84c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;border-bottom:1px solid #222;">${title}</td></tr>`;
+        }
+
+        const html = `
+          <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+            ${section('Identity')}
+            ${row('First Name', o.first_name)}
+            ${row('Last Name', o.last_name)}
+            ${row('Date of Birth', o.date_of_birth)}
+            ${row('Home Phone', o.home_phone)}
+            ${row('Work Phone', o.work_phone)}
+            ${section('Address')}
+            ${row('Street', o.address_street)}
+            ${row('City', o.address_city)}
+            ${row('State', o.address_state)}
+            ${row('ZIP', o.address_zip)}
+            ${section('Tax (W-9)')}
+            ${row('TIN Type', o.tin_type)}
+            ${row('TIN (last 4)', o.tin_last4 ? `***-**-${o.tin_last4}` : '')}
+            ${row('Classification', o.w9_tax_classification)}
+            ${row('W-9 Signed', o.w9_signed_at)}
+            ${section('License & Insurance')}
+            ${row('License #', o.license_number)}
+            ${row('License State', o.license_state)}
+            ${row('License Expires', o.license_expiration)}
+            ${row("Driver's License #", o.driver_license_number)}
+            ${row("Driver's License State", o.driver_license_state)}
+            ${row("Driver's License Exp.", o.driver_license_expiry)}
+            ${row('Insurance Co.', o.insurance_company)}
+            ${row('Policy #', o.insurance_policy_number)}
+            ${row('Insurance Expires', o.insurance_expiration)}
+            ${section('Banking')}
+            ${row('Bank Name', o.bank_name)}
+            ${row('Account Owner', o.bank_account_owner_name)}
+            ${row('Account Type', o.bank_account_type)}
+            ${row('Payment Method', o.payment_method)}
+            ${row('Routing (last 4)', o.bank_routing_last4 ? `*****${o.bank_routing_last4}` : '')}
+            ${row('Account (last 4)', o.bank_account_last4 ? `*****${o.bank_account_last4}` : '')}
+            ${row('Zelle Contact', o.zelle_contact)}
+            ${section('Contract & Attestation')}
+            ${row('IC Agreement', o.ic_agreement_version)}
+            ${row('Signature', o.attestation_signature)}
+            ${row('Signature Date', o.attestation_date)}
+            ${row('Submitted', completedAt)}
+            ${row('IP Address', o.ip_address)}
+          </table>
+        `;
+
+        document.getElementById('onboarding-details-content').innerHTML = html;
+        document.getElementById('onboarding-modal').classList.add('show');
+      } catch (error) {
+        console.error('Error loading onboarding details:', error);
+        alert('Failed to load onboarding details.');
+      }
+    }
+
+    function closeOnboardingModal() {
+      document.getElementById('onboarding-modal').classList.remove('show');
     }
 
     // Check if already logged in
