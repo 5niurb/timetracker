@@ -724,16 +724,28 @@
         byType[d.document_type].push(d);
       });
 
+      // Types consumed by the required checklist (don't repeat in ADDITIONAL)
+      const consumedTypes = new Set(required);
+
       let html = '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-bottom:8px;">REQUIRED</div>';
 
       required.forEach((type) => {
-        const meta = DOC_TYPE_META[type] || { label: type };
-        const uploaded = byType[type] || [];
+        // NDA slot is satisfied by either an 'nda' doc or a 'contract' doc
+        const isNda = type === 'nda';
+        const uploaded = isNda
+          ? [...(byType['nda'] || []), ...(byType['contract'] || [])]
+          : byType[type] || [];
+        if (isNda) consumedTypes.add('contract');
+
+        const meta = isNda
+          ? { label: 'NDA / Contractor Agreement', hasExpiry: false, hasLicenseNo: false }
+          : DOC_TYPE_META[type] || { label: type };
+
         if (!uploaded.length) {
           html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid #444;">
             <span style="font-size:13px;color:#555;flex-shrink:0;">○</span>
             <span style="font-size:12px;color:#555;flex:1;">${escapeHtml(meta.label)}</span>
-            <button onclick="focusUploadForType('${type}')" style="font-size:10px;color:#c9a84c;background:none;border:1px solid #333;padding:2px 8px;cursor:pointer;flex-shrink:0;">+ Upload</button>
+            <button onclick="focusUploadForType('${isNda ? 'nda' : type}')" style="font-size:10px;color:#c9a84c;background:none;border:1px solid #333;padding:2px 8px;cursor:pointer;flex-shrink:0;">+ Upload</button>
           </div>`;
         } else {
           uploaded.forEach((d) => {
@@ -753,7 +765,7 @@
         }
       });
 
-      const additionalTypes = Object.keys(byType).filter((t) => !required.includes(t));
+      const additionalTypes = Object.keys(byType).filter((t) => !consumedTypes.has(t));
       if (additionalTypes.length) {
         html +=
           '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-top:14px;margin-bottom:8px;">ADDITIONAL</div>';
