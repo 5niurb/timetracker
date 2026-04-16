@@ -198,8 +198,28 @@ Token-gated public form for workers to submit their own onboarding information. 
 
 - SSN/EIN: `type="password"` with 👁/🙈 reveal toggle. Shown as `***-**-XXXX` after blur.
 - Routing/account numbers: Same `type="password"` treatment.
-- Server never logs raw values. Database stores `*_encrypted` column (plaintext with `TODO(security): add pgsodium encryption`) + `*_last4` masked value always stored.
+- Server never logs raw values. Database stores `*_encrypted` column (AES-256-GCM ciphertext) + `*_last4` masked value always stored.
 - Admin modal shows only `*_last4` values (e.g., `*****6789`).
+
+### Encryption
+
+**Algorithm:** AES-256-GCM (authenticated encryption — detects tampering).
+
+**Ciphertext encoding:** `base64(IV(12 bytes) || authTag(16 bytes) || ciphertext(N bytes))` stored in TEXT columns.
+
+**Encrypted columns:** `tin_encrypted`, `bank_routing_encrypted`, `bank_account_encrypted`.
+
+**Key location:** `PAYTRACK_ENCRYPTION_KEY` env var — base64-encoded 32 bytes. Set in Render env vars. Never committed to git.
+
+**Key generation:** `node scripts/generate-encryption-key.mjs` — run once, set in Render and local `.env`.
+
+**Startup check:** Server calls `process.exit(1)` on startup if `PAYTRACK_ENCRYPTION_KEY` is missing or decodes to a length other than 32 bytes.
+
+**Decrypt path:** `lib/crypto.js` `decryptValue()` — used by future 1099 export workflow. Admin "View Details" modal shows only `*_last4` and never calls `decryptValue`.
+
+**Key rotation procedure:** Generate new key → set in Render env vars → run a one-time migration script to re-encrypt all existing rows with the new key → remove old key. (No rows exist as of first deploy; this procedure applies to future rotations.)
+
+**Library:** Node built-in `crypto` module (`createCipheriv`/`createDecipheriv`). No added dependencies.
 
 ### Validation (client + server)
 
@@ -244,7 +264,7 @@ Token-gated public form for workers to submit their own onboarding information. 
 | `onboarding_token` | TEXT UNIQUE | UUID for form link |
 | `onboarding_completed_at` | TIMESTAMPTZ | When form was submitted |
 
-**New `employee_onboarding` table (~35 columns):** Full form submission, one row per employee. Identity, address, tax, license, insurance, banking fields. `tin_encrypted`, `bank_routing_encrypted`, `bank_account_encrypted` stored with TODO(security) comments. `*_last4` columns always populated. `submitted_at`, `ip_address`, `ic_agreement_version` for audit trail.
+**New `employee_onboarding` table (~35 columns):** Full form submission, one row per employee. Identity, address, tax, license, insurance, banking fields. `tin_encrypted`, `bank_routing_encrypted`, `bank_account_encrypted` stored as AES-256-GCM ciphertext. `*_last4` columns always populated. `submitted_at`, `ip_address`, `ic_agreement_version` for audit trail.
 
 **Migration 003 applied 2026-04-16:**
 - `time_commitment_hours_per_week` (INTEGER) removed; replaced by `time_commitment_bucket` TEXT CHECK IN (under_15, 15_to_25, 25_to_35, over_35)
@@ -254,14 +274,16 @@ Token-gated public form for workers to submit their own onboarding information. 
 
 Shared module used by both server.js and tests. Exports: `validateSSN`, `validateEIN`, `validateZip`, `validatePhone`, `validateState`, `validateBankRouting`, `validateBankAccount`, `validateDOB`, `validateFutureDate`, `extractLast4SSN`, `extractLast4Routing`, `extractLast4Account`, `validateOnboarding`.
 
-### Tests (`test/validation.test.js`)
+### Tests
 
-70 tests — Phase 1.5 tests written red-first before implementation. Covers all validators + full form validation + conditional ACH/Zelle rules + time_commitment_bucket enum.
+- `test/validation.test.js` — 70 tests covering all validators + full form validation + conditional ACH/Zelle rules + time_commitment_bucket enum. Written red-first.
+- `test/crypto.test.js` — 23 tests covering AES-256-GCM round-trip, non-determinism (random IV), tampering rejection, wrong-key rejection, empty string, null/undefined passthrough, `isEncrypted` heuristic, `generateKey`, and invalid key detection. Written red-first.
 
 ### Design Decisions
 
 - Token security: UUID v4 via `crypto.randomUUID()` (Node built-in, no dependency)
-- Encryption deferred: plaintext + `TODO(security): add pgsodium` comments rather than wiring pgsodium (non-trivial setup). Always store last4 masked values.
+- Encryption: AES-256-GCM via Node built-in `crypto` module. No new dependencies. Key in env var. Startup fails loudly if key is missing or wrong length.
+- pgsodium not used: application-layer AES-256-GCM chosen over pgsodium for simpler setup and no Supabase extension dependency. Same security guarantees for this use case.
 - No Resend email notifications (explicitly out of scope)
 - No 1099 export (out of scope)
 - Never store plaintext SSN/EIN in plain database columns — only in `*_encrypted` columns
@@ -320,5 +342,5 @@ Components included depend on employee's `pay_type` setting.
 | 2026-01 | Commission type toggle (% vs flat) | Accommodates different compensation structures |
 | 2026-02 | Tips owed tracking | Separates cash tips already paid from tips still owed |
 | 2026-04 | Worker self-onboarding via token link | Replaces manual data collection; UUID token is single-use per employee |
-| 2026-04 | Plaintext + TODO(security) for sensitive fields | pgsodium encryption deferred; last4 masks always stored; encryption TODO visible |
+| 2026-04 | AES-256-GCM for onboarding sensitive fields | Application-layer encryption via Node built-in crypto. Key in Render env var. Startup guard if key missing. |
 | 2026-04 | Admin password stored in sessionStorage | Needed to authenticate `/api/admin/employees/:id/onboarding` from the browser |

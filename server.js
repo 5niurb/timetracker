@@ -5,6 +5,7 @@ const path = require('path');
 
 const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
 const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account } = require('./lib/onboarding-validation');
+const { encryptValue } = require('./lib/crypto');
 const { randomUUID } = require('crypto');
 
 const app = express();
@@ -23,6 +24,25 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('ERROR: SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required');
   console.error('Please set these in your Render environment variables');
   process.exit(1);
+}
+
+// Encryption key — required for onboarding PII storage
+if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
+  console.error('ERROR: PAYTRACK_ENCRYPTION_KEY environment variable is required');
+  console.error('Generate one with: node scripts/generate-encryption-key.mjs');
+  console.error('Then set it in Render environment variables and local .env');
+  process.exit(1);
+}
+// Validate key length at startup (fail fast — don't wait for first onboarding submission)
+{
+  const keyBuf = Buffer.from(process.env.PAYTRACK_ENCRYPTION_KEY, 'base64');
+  if (keyBuf.length !== 32) {
+    console.error(
+      `ERROR: PAYTRACK_ENCRYPTION_KEY must decode to 32 bytes (got ${keyBuf.length}). ` +
+        'Regenerate with: node scripts/generate-encryption-key.mjs',
+    );
+    process.exit(1);
+  }
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -1026,9 +1046,13 @@ app.post('/api/onboarding/:token', async (req, res) => {
     ? extractLast4Account(form.bank_account_raw)
     : null;
 
-  // TODO(security): encrypt tin_encrypted, bank_routing_encrypted, bank_account_encrypted
-  //   via pgsodium.crypto_aead_det_encrypt() with a tenant-level key before storing.
-  //   For now storing plaintext — encrypt tomorrow.
+  // Encrypt sensitive fields with AES-256-GCM before storing
+  const [tin_encrypted, bank_routing_encrypted, bank_account_encrypted] = await Promise.all([
+    encryptValue(form.tin_raw || null),
+    form.payment_method === 'ach' ? encryptValue(form.bank_routing_raw || null) : Promise.resolve(null),
+    form.payment_method === 'ach' ? encryptValue(form.bank_account_raw || null) : Promise.resolve(null),
+  ]);
+
   const onboardingRecord = {
     employee_id: employee.id,
     first_name: form.first_name.trim(),
@@ -1045,7 +1069,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
     address_zip: form.address_zip?.trim() || null,
     tin_last4,
     tin_type: form.tin_type || null,
-    tin_encrypted: form.tin_raw || null, // TODO(security): encrypt with pgsodium
+    tin_encrypted,
     w9_entity_name: form.w9_entity_name?.trim() || null,
     w9_tax_classification: form.w9_tax_classification || null,
     w9_exempt_payee_code: form.w9_exempt_payee_code?.trim() || null,
@@ -1068,11 +1092,9 @@ app.post('/api/onboarding/:token', async (req, res) => {
     bank_account_type: form.payment_method === 'ach' ? (form.bank_account_type || null) : null,
     bank_routing_last4: form.payment_method === 'ach' ? bank_routing_last4 : null,
     bank_account_last4: form.payment_method === 'ach' ? bank_account_last4 : null,
-    // Only store ACH sensitive fields for ACH payments; discard if Zelle to avoid stale data
-    bank_routing_encrypted:
-      form.payment_method === 'ach' ? (form.bank_routing_raw || null) : null, // TODO(security): encrypt
-    bank_account_encrypted:
-      form.payment_method === 'ach' ? (form.bank_account_raw || null) : null, // TODO(security): encrypt
+    // Encrypted ACH fields — null for Zelle path (no stale plaintext left behind)
+    bank_routing_encrypted,
+    bank_account_encrypted,
     payment_method: form.payment_method || null,
     zelle_contact: form.zelle_contact?.trim() || null,
     time_commitment_bucket: form.time_commitment_bucket || null,

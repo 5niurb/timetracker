@@ -1,3 +1,5 @@
+@../CLAUDE.md
+
 # CLAUDE.md — timetracker (LM PayTrack)
 
 ## Session Management
