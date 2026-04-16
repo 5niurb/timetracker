@@ -371,6 +371,8 @@
         const response = await fetch('/api/admin/employees');
         const employees = await response.json();
 
+        window._employeesCache = employees;
+
         const tbody = document.getElementById('employees-table');
 
         if (employees.length === 0) {
@@ -417,7 +419,7 @@
                 <td>${emp.hourly_wage > 0 ? `$${parseFloat(emp.hourly_wage).toFixed(2)}/hr` : '-'}</td>
                 <td style="font-size: 11px; line-height: 1.6;">${onboardingCell}</td>
                 <td class="actions">
-                  <button class="btn-warning" onclick="editEmployee(${emp.id}, '${escapeHtml(emp.name)}', '${emp.pin}', '${escapeHtml(emp.email || '')}', '${emp.pay_type || 'hourly'}', ${emp.hourly_wage || 0})">Edit</button>
+                  <button class="btn-warning" onclick="editEmployee(${emp.id})">Edit</button>
                   <button class="btn-danger" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')">Delete</button>
                 </td>
               </tr>
@@ -458,8 +460,14 @@
       const name = document.getElementById('new-emp-name').value.trim();
       const pin = document.getElementById('new-emp-pin').value.trim();
       const email = document.getElementById('new-emp-email').value.trim();
+      const phone = document.getElementById('new-emp-phone').value.trim();
+      const designation = document.getElementById('new-emp-designation').value.trim();
+      const contractorTypeEl = document.querySelector('input[name="new-contractor-type"]:checked');
+      const contractorType = contractorTypeEl ? contractorTypeEl.value : '';
       const payType = getPayTypeFromCheckboxes('new-emp');
       const hourlyWage = parseFloat(document.getElementById('new-emp-hourly').value) || 0;
+      const additionalPayRate = document.getElementById('new-emp-additional-pay-rate').value.trim();
+      const rateNotes = document.getElementById('new-emp-rate-notes').value.trim();
       const errorEl = document.getElementById('emp-error');
 
       errorEl.classList.remove('show');
@@ -483,7 +491,18 @@
         const response = await fetch('/api/admin/employees', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, pin, email, payType, hourlyWage })
+          body: JSON.stringify({
+            name,
+            pin,
+            email,
+            phone,
+            designation,
+            contractorType,
+            payType,
+            hourlyWage,
+            additionalPayRate: additionalPayRate ? parseFloat(additionalPayRate) : null,
+            rateNotes,
+          }),
         });
 
         const data = await response.json();
@@ -492,15 +511,20 @@
           document.getElementById('new-emp-name').value = '';
           document.getElementById('new-emp-pin').value = '';
           document.getElementById('new-emp-email').value = '';
+          document.getElementById('new-emp-phone').value = '';
+          document.getElementById('new-emp-designation').value = '';
+          document.querySelectorAll('input[name="new-contractor-type"]').forEach((r) => (r.checked = false));
           document.getElementById('new-emp-hourly-check').checked = true;
           document.getElementById('new-emp-services-check').checked = false;
           document.getElementById('new-emp-sales-check').checked = false;
           document.getElementById('new-emp-hourly').value = '';
+          document.getElementById('new-emp-additional-pay-rate').value = '';
+          document.getElementById('new-emp-rate-notes').value = '';
           loadEmployees();
 
-          // Show onboarding link if token was returned
-          if (data.employee && data.employee.onboarding_token) {
-            const token = data.employee.onboarding_token;
+          // Show onboarding link
+          if (data.onboardingToken) {
+            const token = data.onboardingToken;
             const link = `${window.location.origin}/onboarding/${token}`;
             errorEl.style.background = '#1a2a1a';
             errorEl.style.borderColor = '#2a4a2a';
@@ -518,13 +542,23 @@
       }
     }
 
-    function editEmployee(id, name, pin, email, payType, hourlyWage) {
+    function editEmployee(id) {
+      const emp = (window._employeesCache || []).find((e) => e.id === id);
+      if (!emp) return;
       document.getElementById('edit-emp-id').value = id;
-      document.getElementById('edit-emp-name').value = name;
-      document.getElementById('edit-emp-pin').value = pin;
-      document.getElementById('edit-emp-email').value = email || '';
-      setCheckboxesFromPayType('edit-emp', payType || 'hourly');
-      document.getElementById('edit-emp-hourly').value = hourlyWage || '';
+      document.getElementById('edit-emp-name').value = emp.name || '';
+      document.getElementById('edit-emp-pin').value = emp.pin || '';
+      document.getElementById('edit-emp-email').value = emp.email || '';
+      document.getElementById('edit-emp-phone').value = emp.phone || '';
+      document.getElementById('edit-emp-designation').value = emp.designation || '';
+      // Contractor type radio
+      document.querySelectorAll('input[name="edit-contractor-type"]').forEach((r) => {
+        r.checked = r.value === emp.contractor_type;
+      });
+      setCheckboxesFromPayType('edit-emp', emp.pay_type || 'hourly');
+      document.getElementById('edit-emp-hourly').value = emp.hourly_wage || '';
+      document.getElementById('edit-emp-additional-pay-rate').value = emp.additional_pay_rate || '';
+      document.getElementById('edit-emp-rate-notes').value = emp.rate_notes || '';
       document.getElementById('edit-error').classList.remove('show');
       document.getElementById('edit-modal').classList.add('show');
     }
@@ -534,8 +568,14 @@
       const name = document.getElementById('edit-emp-name').value.trim();
       const pin = document.getElementById('edit-emp-pin').value.trim();
       const email = document.getElementById('edit-emp-email').value.trim();
+      const phone = document.getElementById('edit-emp-phone').value.trim();
+      const designation = document.getElementById('edit-emp-designation').value.trim();
+      const contractorTypeEl = document.querySelector('input[name="edit-contractor-type"]:checked');
+      const contractorType = contractorTypeEl ? contractorTypeEl.value : '';
       const payType = getPayTypeFromCheckboxes('edit-emp');
       const hourlyWage = parseFloat(document.getElementById('edit-emp-hourly').value) || 0;
+      const additionalPayRateVal = document.getElementById('edit-emp-additional-pay-rate').value.trim();
+      const rateNotes = document.getElementById('edit-emp-rate-notes').value.trim();
       const errorEl = document.getElementById('edit-error');
 
       errorEl.classList.remove('show');
@@ -556,7 +596,18 @@
         const response = await fetch(`/api/admin/employees/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, pin, email, payType, hourlyWage })
+          body: JSON.stringify({
+            name,
+            pin,
+            email,
+            phone,
+            designation,
+            contractorType,
+            payType,
+            hourlyWage,
+            additionalPayRate: additionalPayRateVal ? parseFloat(additionalPayRateVal) : null,
+            rateNotes,
+          }),
         });
 
         const data = await response.json();
@@ -811,7 +862,7 @@
         }
 
         const data = await response.json();
-        const o = data.onboarding;
+        const o = data.data;
         if (!o) {
           alert('No onboarding submission found.');
           return;
@@ -830,14 +881,28 @@
           return `<tr><td colspan="2" style="padding:16px 0 4px;color:#c9a84c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;border-bottom:1px solid #222;">${title}</td></tr>`;
         }
 
+        // Format professional licenses array for display
+        let profLicensesHtml = '';
+        if (o.professional_licenses && o.professional_licenses.length > 0) {
+          o.professional_licenses.forEach((lic, i) => {
+            const licType = lic.type === 'Other' ? `Other (${lic.type_other || ''})` : lic.type;
+            profLicensesHtml += row(`License ${i + 1} Type`, licType);
+            profLicensesHtml += row(`License ${i + 1} #`, lic.number);
+            profLicensesHtml += row(`License ${i + 1} Status`, lic.status);
+            profLicensesHtml += row(`License ${i + 1} Expires`, lic.expiration);
+            if (lic.license_url) {
+              profLicensesHtml += `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">License ${i + 1} URL</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="${escapeHtml(lic.license_url)}" target="_blank" style="color:#c9a84c;">${escapeHtml(lic.license_url)}</a></td></tr>`;
+            }
+          });
+        }
+
         const html = `
           <table style="width:100%;border-collapse:collapse;margin-top:8px;">
             ${section('Identity')}
             ${row('First Name', o.first_name)}
             ${row('Last Name', o.last_name)}
             ${row('Date of Birth', o.date_of_birth)}
-            ${row('Home Phone', o.home_phone)}
-            ${row('Work Phone', o.work_phone)}
+            ${row('Mobile Phone', o.mobile_phone)}
             ${section('Address')}
             ${row('Street', o.address_street)}
             ${row('City', o.address_city)}
@@ -847,17 +912,18 @@
             ${row('TIN Type', o.tin_type)}
             ${row('TIN (last 4)', o.tin_last4 ? `***-**-${o.tin_last4}` : '')}
             ${row('Classification', o.w9_tax_classification)}
-            ${row('W-9 Signed', o.w9_signed_at)}
-            ${section('License & Insurance')}
-            ${row('License #', o.license_number)}
-            ${row('License State', o.license_state)}
-            ${row('License Expires', o.license_expiration)}
-            ${row("Driver's License #", o.driver_license_number)}
-            ${row("Driver's License State", o.driver_license_state)}
-            ${row("Driver's License Exp.", o.driver_license_expiry)}
+            ${section("Driver's License")}
+            ${row("DL Number", o.driver_license_number)}
+            ${row("DL State", o.driver_license_state)}
+            ${o.driver_license_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">DL Upload</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="${escapeHtml(o.driver_license_upload_path)}" target="_blank" style="color:#c9a84c;">View file</a></td></tr>` : ''}
+            ${section('Professional Licenses')}
+            ${profLicensesHtml || '<tr><td colspan="2" style="color:#555;font-size:12px;padding:6px 0;">None provided</td></tr>'}
+            ${o.certifications ? `${section('Certifications')}${row('Certifications', o.certifications)}` : ''}
+            ${section('Professional Liability Insurance')}
             ${row('Insurance Co.', o.insurance_company)}
             ${row('Policy #', o.insurance_policy_number)}
             ${row('Insurance Expires', o.insurance_expiration)}
+            ${o.insurance_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">Insurance Cert</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="${escapeHtml(o.insurance_upload_path)}" target="_blank" style="color:#c9a84c;">View file</a></td></tr>` : ''}
             ${section('Banking')}
             ${row('Bank Name', o.bank_name)}
             ${row('Account Owner', o.bank_account_owner_name)}

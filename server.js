@@ -2,6 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 
 const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
 const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account } = require('./lib/onboarding-validation');
@@ -46,6 +47,26 @@ if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Service-role client for storage uploads (bypasses RLS on storage bucket)
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin = SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : supabase; // fallback to anon if not set (dev only)
+
+// Multer: memory storage — files buffered in memory, then pushed to Supabase Storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+    if (allowed.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, JPG, and PNG files are accepted'));
+    }
+  },
+});
 
 // Keep-alive ping to prevent Render spin down
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
@@ -698,7 +719,7 @@ app.get('/api/admin/employees', async (req, res) => {
   const { data: employees, error } = await supabase
     .from('employees')
     .select(
-      'id, name, pin, email, hourly_wage, commission_rate, pay_type, created_at, onboarding_token, onboarding_completed_at',
+      'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, created_at, onboarding_token, onboarding_completed_at',
     );
 
   res.json(employees || []);
@@ -706,7 +727,19 @@ app.get('/api/admin/employees', async (req, res) => {
 
 // Add new employee — auto-generates onboarding_token
 app.post('/api/admin/employees', async (req, res) => {
-  const { name, pin, email, hourlyWage, commissionRate, payType } = req.body;
+  const {
+    name,
+    pin,
+    email,
+    phone,
+    hourlyWage,
+    additionalPayRate,
+    rateNotes,
+    commissionRate,
+    payType,
+    designation,
+    contractorType,
+  } = req.body;
 
   // Check if PIN already exists
   const { data: existing } = await supabase.from('employees').select('id').eq('pin', pin).single();
@@ -723,9 +756,14 @@ app.post('/api/admin/employees', async (req, res) => {
       name: name,
       pin: pin,
       email: email || null,
+      phone: phone?.trim() || null,
       hourly_wage: hourlyWage || 0,
+      additional_pay_rate: additionalPayRate ? parseFloat(additionalPayRate) : null,
+      rate_notes: rateNotes?.trim() || null,
       commission_rate: commissionRate || 0,
       pay_type: payType || 'hourly',
+      designation: designation?.trim() || null,
+      contractor_type: contractorType || null,
       onboarding_token: onboardingToken,
     })
     .select()
@@ -741,7 +779,19 @@ app.post('/api/admin/employees', async (req, res) => {
 // Update employee
 app.put('/api/admin/employees/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, pin, email, hourlyWage, commissionRate, payType } = req.body;
+  const {
+    name,
+    pin,
+    email,
+    phone,
+    hourlyWage,
+    additionalPayRate,
+    rateNotes,
+    commissionRate,
+    payType,
+    designation,
+    contractorType,
+  } = req.body;
 
   // Check if PIN already exists for another employee
   const { data: existing } = await supabase
@@ -761,9 +811,14 @@ app.put('/api/admin/employees/:id', async (req, res) => {
       name: name,
       pin: pin,
       email: email || null,
+      phone: phone?.trim() || null,
       hourly_wage: hourlyWage || 0,
+      additional_pay_rate: additionalPayRate ? parseFloat(additionalPayRate) : null,
+      rate_notes: rateNotes?.trim() || null,
       commission_rate: commissionRate || 0,
-      pay_type: payType || 'hourly'
+      pay_type: payType || 'hourly',
+      designation: designation?.trim() || null,
+      contractor_type: contractorType || null,
     })
     .eq('id', parseInt(id));
 
@@ -924,19 +979,17 @@ app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
     .from('employee_onboarding')
     .select(
       `id, employee_id, first_name, last_name, middle_name, preferred_name,
-       other_email, home_phone, work_phone, date_of_birth,
+       mobile_phone, date_of_birth,
        address_street, address_city, address_state, address_zip,
-       tin_last4, tin_type, w9_entity_name, w9_tax_classification,
-       w9_exempt_payee_code, w9_signed_at, w9_collected_at,
-       license_number, license_expiration, certifications,
-       driver_license_no, driver_license_expiry,
-       insurer_name, insurance_expiration,
+       tin_last4, tin_type, w9_entity_name, w9_tax_classification, w9_collected_at,
+       driver_license_number, driver_license_state, driver_license_upload_path,
+       professional_licenses,
+       insurer_name, insurance_policy_number, insurance_expiration, insurance_upload_path,
        prof_liability_per_occurrence, prof_liability_aggregate,
        bank_name, bank_account_owner_name, bank_account_type,
        bank_routing_last4, bank_account_last4,
        payment_method, zelle_contact,
-       time_commitment_hours_per_week, services_offered,
-       other_commitments, exhibit_a_rate, exhibit_a_rate_notes,
+       time_commitment_bucket, other_commitments,
        attestation_checked, attestation_signature, attestation_date,
        submitted_at`,
     )
@@ -972,6 +1025,106 @@ app.post('/api/admin/employees/:id/onboarding-token', async (req, res) => {
   }
 
   res.json({ success: true, onboardingToken: newToken });
+});
+
+// Public: prefill data for onboarding form (returns employee job info for pre-population)
+app.get('/api/onboarding/:token/prefill', async (req, res) => {
+  const { token } = req.params;
+
+  const { data: employee, error } = await supabase
+    .from('employees')
+    .select(
+      'id, name, email, phone, designation, contractor_type, pay_type, hourly_wage, additional_pay_rate, rate_notes, onboarding_completed_at',
+    )
+    .eq('onboarding_token', token)
+    .single();
+
+  if (error || !employee) {
+    return res.status(404).json({ success: false, message: 'Invalid onboarding link' });
+  }
+
+  if (employee.onboarding_completed_at) {
+    return res.status(409).json({ success: false, message: 'Onboarding already completed' });
+  }
+
+  // Split name into first/last for pre-fill (best effort)
+  const nameParts = (employee.name || '').trim().split(/\s+/);
+  const first_name = nameParts[0] || '';
+  const last_name = nameParts.slice(1).join(' ') || '';
+
+  res.json({
+    success: true,
+    data: {
+      first_name,
+      last_name,
+      email: employee.email || '',
+      phone: employee.phone || '',
+      designation: employee.designation || '',
+      contractor_type: employee.contractor_type || '',
+      pay_type: employee.pay_type || '',
+      hourly_wage: employee.hourly_wage || '',
+      additional_pay_rate: employee.additional_pay_rate || '',
+      rate_notes: employee.rate_notes || '',
+    },
+  });
+});
+
+// Public: upload a file during onboarding (driver license or insurance certificate)
+app.post(
+  '/api/onboarding/:token/upload',
+  upload.single('file'),
+  async (req, res) => {
+    const { token } = req.params;
+    const { fileType } = req.body; // 'driver_license' or 'insurance'
+
+    // Validate token
+    const { data: employee, error: empError } = await supabase
+      .from('employees')
+      .select('id, onboarding_completed_at')
+      .eq('onboarding_token', token)
+      .single();
+
+    if (empError || !employee) {
+      return res.status(404).json({ success: false, message: 'Invalid onboarding link' });
+    }
+
+    if (employee.onboarding_completed_at) {
+      return res.status(409).json({ success: false, message: 'Onboarding already completed' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    if (!['driver_license', 'insurance'].includes(fileType)) {
+      return res.status(400).json({ success: false, message: 'Invalid fileType — must be driver_license or insurance' });
+    }
+
+    const ext = req.file.mimetype === 'application/pdf' ? 'pdf' : req.file.mimetype === 'image/png' ? 'png' : 'jpg';
+    const storagePath = `employee-${employee.id}/${fileType}-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('onboarding-documents')
+      .upload(storagePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('[Upload] Storage error:', uploadError);
+      return res.status(500).json({ success: false, message: 'File upload failed. Please try again.' });
+    }
+
+    res.json({ success: true, path: storagePath });
+  },
+);
+
+// Multer error handler (file too large, wrong type)
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message?.includes('Only PDF')) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+  next(err);
 });
 
 // Public: serve onboarding page (validates token)
@@ -1053,15 +1206,23 @@ app.post('/api/onboarding/:token', async (req, res) => {
     form.payment_method === 'ach' ? encryptValue(form.bank_account_raw || null) : Promise.resolve(null),
   ]);
 
+  // Parse professional_licenses — may arrive as JSON string from FormData
+  let professionalLicenses = form.professional_licenses;
+  if (typeof professionalLicenses === 'string') {
+    try {
+      professionalLicenses = JSON.parse(professionalLicenses);
+    } catch {
+      professionalLicenses = [];
+    }
+  }
+
   const onboardingRecord = {
     employee_id: employee.id,
     first_name: form.first_name.trim(),
     last_name: form.last_name.trim(),
     middle_name: form.middle_name?.trim() || null,
     preferred_name: form.preferred_name?.trim() || null,
-    other_email: form.other_email?.trim() || null,
-    home_phone: form.home_phone?.trim() || null,
-    work_phone: form.work_phone?.trim() || null,
+    mobile_phone: form.mobile_phone?.trim() || null,
     date_of_birth: form.date_of_birth || null,
     address_street: form.address_street?.trim() || null,
     address_city: form.address_city?.trim() || null,
@@ -1072,15 +1233,14 @@ app.post('/api/onboarding/:token', async (req, res) => {
     tin_encrypted,
     w9_entity_name: form.w9_entity_name?.trim() || null,
     w9_tax_classification: form.w9_tax_classification || null,
-    w9_exempt_payee_code: form.w9_exempt_payee_code?.trim() || null,
-    w9_signed_at: form.w9_signed_at || null,
-    license_number: form.license_number?.trim() || null,
-    license_expiration: form.license_expiration || null,
-    certifications: form.certifications?.trim() || null,
-    driver_license_no: form.driver_license_no?.trim() || null,
-    driver_license_expiry: form.driver_license_expiry || null,
+    driver_license_number: form.driver_license_number?.trim() || null,
+    driver_license_state: form.driver_license_state || null,
+    driver_license_upload_path: form.driver_license_upload_path || null,
+    professional_licenses: Array.isArray(professionalLicenses) ? professionalLicenses : [],
     insurer_name: form.insurer_name?.trim() || null,
+    insurance_policy_number: form.insurance_policy_number?.trim() || null,
     insurance_expiration: form.insurance_expiration || null,
+    insurance_upload_path: form.insurance_upload_path || null,
     prof_liability_per_occurrence: form.prof_liability_per_occurrence
       ? parseFloat(form.prof_liability_per_occurrence)
       : null,
@@ -1098,10 +1258,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
     payment_method: form.payment_method || null,
     zelle_contact: form.zelle_contact?.trim() || null,
     time_commitment_bucket: form.time_commitment_bucket || null,
-    services_offered: Array.isArray(form.services_offered) ? form.services_offered : [],
     other_commitments: form.other_commitments?.trim() || null,
-    exhibit_a_rate: form.exhibit_a_rate ? parseFloat(form.exhibit_a_rate) : null,
-    exhibit_a_rate_notes: form.exhibit_a_rate_notes?.trim() || null,
     attestation_checked: true,
     attestation_signature: form.attestation_signature.trim(),
     attestation_date: form.attestation_date,
