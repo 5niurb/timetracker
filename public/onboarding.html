@@ -770,7 +770,7 @@
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
             <input type="radio" name="payment_method" id="pm_ach" value="ach"
               onchange="togglePaymentFields()" style="width:16px;height:16px;accent-color:var(--gold);">
-            ACH (bank account details below)
+            ACH
           </label>
         </div>
         <span class="field-error" id="err-payment_method" style="display:block;margin-top:6px;"></span>
@@ -882,15 +882,9 @@
   <div class="section">
     <div class="section-header">
       <div class="section-number" id="attestation-section-num">6</div>
-      <h2>Attestation &amp; Signature</h2>
+      <h2>Acknowledgment &amp; Attestation</h2>
     </div>
     <div class="section-body">
-      <div class="attestation-box">
-        <p class="attestation-text">
-          Under penalty of perjury, I certify that: (1) The number shown on this form is my correct taxpayer identification number; (2) I am not subject to backup withholding; (3) I am a U.S. citizen or other U.S. person; and (4) all information provided above is true and accurate to the best of my knowledge.
-        </p>
-      </div>
-
       <div class="checkbox-row">
         <input type="checkbox" id="attestation_checked" onchange="validateAttestation()">
         <span>I certify that the information provided is true and accurate to the best of my knowledge. <strong style="color:var(--error)">*</strong></span>
@@ -1046,11 +1040,12 @@
         if (p.pay_type) {
           const payLabels = {
             hourly: 'Hourly',
-            commission_services: 'Service Commissions',
-            commission_sales: 'Sales Commissions',
-            hourly_services: 'Hourly + Service Commissions',
-            hourly_sales: 'Hourly + Sales Commissions',
-            hourly_all: 'Hourly + All Commissions',
+            commission_services: 'Commission',
+            commission_sales: 'Commission',
+            commission_all: 'Commission',
+            hourly_services: 'Hourly + Commission',
+            hourly_sales: 'Hourly + Commission',
+            hourly_all: 'Hourly + Commission',
           };
           items.push({ label: 'Pay Type', value: payLabels[p.pay_type] || p.pay_type });
         }
