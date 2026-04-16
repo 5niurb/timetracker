@@ -402,9 +402,13 @@
               onboardingCell = `<span style="color: #555; font-size: 11px;">—</span>`;
             }
 
+            const statusBadge = emp.status === 'inactive'
+              ? '<span style="font-size:10px;background:#2a1a1a;color:#c9474f;padding:1px 6px;border-radius:2px;margin-left:6px;">INACTIVE</span>'
+              : '';
+
             return `
-              <tr>
-                <td><strong>${escapeHtml(emp.name)}</strong><br><span style="font-size:11px;color:#888;">${emp.email || ''}</span></td>
+              <tr style="${emp.status === 'inactive' ? 'opacity:0.6;' : ''}">
+                <td><strong>${escapeHtml(emp.name)}</strong>${statusBadge}<br><span style="font-size:11px;color:#888;">${emp.email || ''}</span></td>
                 <td><code style="background: #1a1a1a; padding: 4px 8px; font-size: 12px; color: #888; border: 1px solid #333;">${emp.pin}</code></td>
                 <td style="font-size: 12px;">${escapeHtml(emp.designation) || '<span style="color:#555;">—</span>'}</td>
                 <td style="font-size: 12px;">${jobTypeLabel}</td>
@@ -655,7 +659,6 @@
       const emp = (window._employeesCache || []).find((e) => e.id === id);
       if (!emp) return;
       document.getElementById('edit-emp-id').value = id;
-      // Split name into first/last
       const nameParts = (emp.name || '').trim().split(/\s+/);
       document.getElementById('edit-emp-first-name').value = nameParts[0] || '';
       document.getElementById('edit-emp-last-name').value = nameParts.slice(1).join(' ') || '';
@@ -664,12 +667,106 @@
       document.getElementById('edit-emp-phone').value = emp.phone || '';
       document.getElementById('edit-emp-designation').value = emp.designation || '';
       document.getElementById('edit-emp-contractor-type').value = emp.contractor_type || '';
+      document.getElementById('edit-emp-status').value = emp.status || 'active';
       setCheckboxesFromPayType('edit-emp', emp.pay_type || 'hourly');
       document.getElementById('edit-emp-hourly').value = emp.hourly_wage || '';
       document.getElementById('edit-emp-additional-pay-rate').value = emp.additional_pay_rate || '';
       document.getElementById('edit-emp-rate-notes').value = emp.rate_notes || '';
       document.getElementById('edit-error').classList.remove('show');
+      document.getElementById('edit-doc-status').textContent = '';
+      document.getElementById('edit-doc-file').value = '';
       document.getElementById('edit-modal').classList.add('show');
+      loadEmployeeDocs(id);
+    }
+
+    const DOC_TYPE_LABELS = {
+      w9: 'W-9',
+      driver_license: "Driver's License",
+      insurance: 'Insurance',
+      professional_license: 'Professional License',
+      contract: 'Contract',
+      other: 'Other',
+    };
+
+    async function loadEmployeeDocs(employeeId) {
+      const listEl = document.getElementById('edit-docs-list');
+      listEl.innerHTML = '<span style="color:#555;font-size:12px;">Loading…</span>';
+      try {
+        const res = await fetch(`/api/admin/employees/${employeeId}/documents`, {
+          headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
+        });
+        const docs = await res.json();
+        if (!docs.length) {
+          listEl.innerHTML = '<span style="color:#555;font-size:12px;">No documents on file.</span>';
+          return;
+        }
+        listEl.innerHTML = docs
+          .map(
+            (d) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;">
+            <span style="font-size:10px;background:#1a1a2e;color:#6b9fff;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">${DOC_TYPE_LABELS[d.document_type] || d.document_type}</span>
+            <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(d.file_name || d.file_path)}</span>
+            ${d.url ? `<a href="${d.url}" target="_blank" style="font-size:11px;color:#c9a84c;text-decoration:none;flex-shrink:0;">View</a>` : ''}
+            <button onclick="deleteEmployeeDoc(${d.id}, ${employeeId})" style="background:none;border:none;color:#c9474f;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Delete">×</button>
+          </div>`,
+          )
+          .join('');
+      } catch (e) {
+        listEl.innerHTML = '<span style="color:#c9474f;font-size:12px;">Failed to load documents.</span>';
+      }
+    }
+
+    async function uploadEmployeeDoc() {
+      const employeeId = document.getElementById('edit-emp-id').value;
+      const docType = document.getElementById('edit-doc-type').value;
+      const fileInput = document.getElementById('edit-doc-file');
+      const statusEl = document.getElementById('edit-doc-status');
+
+      if (!fileInput.files.length) {
+        statusEl.style.color = '#c9474f';
+        statusEl.textContent = 'Select a file first.';
+        return;
+      }
+
+      statusEl.style.color = '#888';
+      statusEl.textContent = 'Uploading…';
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('document_type', docType);
+
+      try {
+        const res = await fetch(`/api/admin/employees/${employeeId}/documents`, {
+          method: 'POST',
+          headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
+          body: formData,
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusEl.style.color = '#6bff6b';
+          statusEl.textContent = 'Uploaded!';
+          fileInput.value = '';
+          loadEmployeeDocs(employeeId);
+        } else {
+          statusEl.style.color = '#c9474f';
+          statusEl.textContent = data.message || 'Upload failed.';
+        }
+      } catch (e) {
+        statusEl.style.color = '#c9474f';
+        statusEl.textContent = 'Connection error.';
+      }
+    }
+
+    async function deleteEmployeeDoc(docId, employeeId) {
+      if (!confirm('Remove this document?')) return;
+      const res = await fetch(`/api/admin/employee-documents/${docId}`, {
+        method: 'DELETE',
+        headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadEmployeeDocs(employeeId);
+      }
     }
 
     async function saveEmployee() {
@@ -686,6 +783,7 @@
       const hourlyWage = parseFloat(document.getElementById('edit-emp-hourly').value) || 0;
       const additionalPayRateVal = document.getElementById('edit-emp-additional-pay-rate').value.trim();
       const rateNotes = document.getElementById('edit-emp-rate-notes').value.trim();
+      const status = document.getElementById('edit-emp-status').value;
       const errorEl = document.getElementById('edit-error');
 
       errorEl.classList.remove('show');
@@ -717,6 +815,7 @@
             hourlyWage,
             additionalPayRate: additionalPayRateVal ? parseFloat(additionalPayRateVal) : null,
             rateNotes,
+            status,
           }),
         });
 

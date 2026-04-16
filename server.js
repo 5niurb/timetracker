@@ -1662,6 +1662,101 @@ app.get('/api/admin/tax-filings/export/:year', async (req, res) => {
   res.send(csvLines.join('\r\n'));
 });
 
+// ============ EMPLOYEE DOCUMENTS ROUTES ============
+
+// GET /api/admin/employees/:id/documents — list docs with signed download URLs
+app.get('/api/admin/employees/:id/documents', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { data, error } = await supabaseAdmin
+    .from('employee_documents')
+    .select('id, document_type, file_path, file_name, notes, uploaded_at')
+    .eq('employee_id', parseInt(req.params.id))
+    .order('uploaded_at', { ascending: false });
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+
+  // Generate signed URLs (1 hour)
+  const docs = await Promise.all(
+    (data || []).map(async (doc) => {
+      const { data: signed } = await supabaseAdmin.storage
+        .from('onboarding-documents')
+        .createSignedUrl(doc.file_path, 3600);
+      return { ...doc, url: signed?.signedUrl || null };
+    }),
+  );
+
+  res.json(docs);
+});
+
+// POST /api/admin/employees/:id/documents — upload a new doc
+app.post(
+  '/api/admin/employees/:id/documents',
+  upload.single('file'),
+  async (req, res) => {
+    const { password } = req.headers;
+    if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const employeeId = parseInt(req.params.id);
+    const { document_type, notes } = req.body;
+
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    if (!document_type) return res.status(400).json({ success: false, message: 'document_type required' });
+
+    const ext = (req.file.originalname.split('.').pop() || 'bin').toLowerCase();
+    const storagePath = `employee-${employeeId}/${document_type}-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('onboarding-documents')
+      .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+
+    if (uploadError) return res.status(500).json({ success: false, message: 'File upload failed' });
+
+    const { data, error } = await supabaseAdmin
+      .from('employee_documents')
+      .insert({
+        employee_id: employeeId,
+        document_type,
+        file_path: storagePath,
+        file_name: req.file.originalname,
+        notes: notes || null,
+      })
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ success: false, message: error.message });
+    res.json({ success: true, doc: data });
+  },
+);
+
+// DELETE /api/admin/employee-documents/:docId — remove a doc
+app.delete('/api/admin/employee-documents/:docId', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  // Fetch path before deleting
+  const { data: doc } = await supabaseAdmin
+    .from('employee_documents')
+    .select('file_path')
+    .eq('id', parseInt(req.params.docId))
+    .single();
+
+  if (!doc) return res.status(404).json({ success: false, message: 'Document not found' });
+
+  // Remove from storage
+  await supabaseAdmin.storage.from('onboarding-documents').remove([doc.file_path]);
+
+  // Remove DB row
+  const { error } = await supabaseAdmin
+    .from('employee_documents')
+    .delete()
+    .eq('id', parseInt(req.params.docId));
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
 // Start server
 async function start() {
   await initDatabase();
