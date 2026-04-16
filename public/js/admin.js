@@ -679,14 +679,115 @@
       loadEmployeeDocs(id);
     }
 
-    const DOC_TYPE_LABELS = {
-      w9: 'W-9',
-      driver_license: "Driver's License",
-      insurance: 'Insurance',
-      professional_license: 'Professional License',
-      contract: 'Contract',
-      other: 'Other',
+    const CLINICAL_DESIGNATIONS = new Set([
+      'Esthetician',
+      'Medical Assistant',
+      'Aesthetic Nurse',
+      'Aesthetic Nurse Practitioner',
+      'Physician',
+    ]);
+
+    const DOC_TYPE_META = {
+      w9: { label: 'W-9', hasExpiry: false, hasLicenseNo: false },
+      driver_license: { label: "Driver's License / Gov ID", hasExpiry: false, hasLicenseNo: false },
+      nda: { label: 'Non-Disclosure Agreement', hasExpiry: false, hasLicenseNo: false },
+      professional_license: { label: 'Professional License', hasExpiry: true, hasLicenseNo: true },
+      insurance: { label: 'Insurance Certificate', hasExpiry: true, hasLicenseNo: false },
+      contract: { label: 'Contractor Agreement', hasExpiry: false, hasLicenseNo: false },
+      other: { label: 'Other', hasExpiry: false, hasLicenseNo: false },
     };
+
+    function requiredDocTypes(designation) {
+      const base = ['w9', 'driver_license', 'nda'];
+      return CLINICAL_DESIGNATIONS.has(designation) ? [...base, 'professional_license', 'insurance'] : base;
+    }
+
+    function expiryBadge(dateStr) {
+      if (!dateStr) return '';
+      const exp = new Date(dateStr);
+      const days = Math.floor((exp - new Date()) / 86400000);
+      const fmt = exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      if (days < 0)
+        return `<span style="background:#3d0000;color:#ff6b6b;font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">EXPIRED ${fmt}</span>`;
+      if (days <= 30)
+        return `<span style="background:#3d1a00;color:#ff9f43;font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">EXP ${fmt}</span>`;
+      if (days <= 90)
+        return `<span style="background:#2d2a00;color:#f9ca24;font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">EXP ${fmt}</span>`;
+      return `<span style="background:#003d0f;color:#6bff6b;font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">EXP ${fmt}</span>`;
+    }
+
+    function renderComplianceDocs(designation, docs, employeeId) {
+      const required = requiredDocTypes(designation);
+      const byType = {};
+      docs.forEach((d) => {
+        if (!byType[d.document_type]) byType[d.document_type] = [];
+        byType[d.document_type].push(d);
+      });
+
+      let html = '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-bottom:8px;">REQUIRED</div>';
+
+      required.forEach((type) => {
+        const meta = DOC_TYPE_META[type] || { label: type };
+        const uploaded = byType[type] || [];
+        if (!uploaded.length) {
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid #444;">
+            <span style="font-size:13px;color:#555;flex-shrink:0;">○</span>
+            <span style="font-size:12px;color:#555;flex:1;">${escapeHtml(meta.label)}</span>
+            <button onclick="focusUploadForType('${type}')" style="font-size:10px;color:#c9a84c;background:none;border:1px solid #333;padding:2px 8px;cursor:pointer;flex-shrink:0;">+ Upload</button>
+          </div>`;
+        } else {
+          uploaded.forEach((d) => {
+            const licLine =
+              meta.hasLicenseNo && d.license_number
+                ? `<span style="font-size:10px;color:#888;white-space:nowrap;flex-shrink:0;">#${escapeHtml(d.license_number)}</span>`
+                : '';
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid #2d6a2d;">
+              <span style="font-size:13px;color:#6bff6b;flex-shrink:0;">✓</span>
+              <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(meta.label)}</span>
+              ${licLine}
+              ${expiryBadge(d.expiration_date)}
+              ${d.url ? `<a href="${d.url}" target="_blank" style="font-size:11px;color:#c9a84c;text-decoration:none;flex-shrink:0;">View</a>` : ''}
+              <button onclick="deleteEmployeeDoc(${d.id}, ${employeeId})" style="background:none;border:none;color:#c9474f;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Delete">×</button>
+            </div>`;
+          });
+        }
+      });
+
+      const additionalTypes = Object.keys(byType).filter((t) => !required.includes(t));
+      if (additionalTypes.length) {
+        html +=
+          '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-top:14px;margin-bottom:8px;">ADDITIONAL</div>';
+        additionalTypes.forEach((type) => {
+          const meta = DOC_TYPE_META[type] || { label: type };
+          byType[type].forEach((d) => {
+            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;">
+              <span style="font-size:10px;background:#1a1a2e;color:#6b9fff;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">${escapeHtml(meta.label)}</span>
+              <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(d.file_name || d.file_path)}</span>
+              ${expiryBadge(d.expiration_date)}
+              ${d.url ? `<a href="${d.url}" target="_blank" style="font-size:11px;color:#c9a84c;text-decoration:none;flex-shrink:0;">View</a>` : ''}
+              <button onclick="deleteEmployeeDoc(${d.id}, ${employeeId})" style="background:none;border:none;color:#c9474f;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Delete">×</button>
+            </div>`;
+          });
+        });
+      }
+
+      return html;
+    }
+
+    function onDocTypeChange() {
+      const type = document.getElementById('edit-doc-type').value;
+      const meta = DOC_TYPE_META[type] || {};
+      document.getElementById('edit-doc-license-row').style.display = meta.hasLicenseNo ? 'flex' : 'none';
+      document.getElementById('edit-doc-expiry-row').style.display = meta.hasExpiry ? 'flex' : 'none';
+    }
+
+    function focusUploadForType(type) {
+      const sel = document.getElementById('edit-doc-type');
+      sel.value = type;
+      onDocTypeChange();
+      sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      sel.focus();
+    }
 
     async function loadEmployeeDocs(employeeId) {
       const listEl = document.getElementById('edit-docs-list');
@@ -696,21 +797,8 @@
           headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
         });
         const docs = await res.json();
-        if (!docs.length) {
-          listEl.innerHTML = '<span style="color:#555;font-size:12px;">No documents on file.</span>';
-          return;
-        }
-        listEl.innerHTML = docs
-          .map(
-            (d) => `
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;">
-            <span style="font-size:10px;background:#1a1a2e;color:#6b9fff;padding:2px 7px;border-radius:2px;white-space:nowrap;flex-shrink:0;">${DOC_TYPE_LABELS[d.document_type] || d.document_type}</span>
-            <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(d.file_name || d.file_path)}</span>
-            ${d.url ? `<a href="${d.url}" target="_blank" style="font-size:11px;color:#c9a84c;text-decoration:none;flex-shrink:0;">View</a>` : ''}
-            <button onclick="deleteEmployeeDoc(${d.id}, ${employeeId})" style="background:none;border:none;color:#c9474f;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Delete">×</button>
-          </div>`,
-          )
-          .join('');
+        const designation = document.getElementById('edit-emp-designation').value;
+        listEl.innerHTML = renderComplianceDocs(designation, docs, employeeId);
       } catch (e) {
         listEl.innerHTML = '<span style="color:#c9474f;font-size:12px;">Failed to load documents.</span>';
       }
@@ -734,6 +822,10 @@
       const formData = new FormData();
       formData.append('file', fileInput.files[0]);
       formData.append('document_type', docType);
+      const expiry = document.getElementById('edit-doc-expiry').value;
+      const license = document.getElementById('edit-doc-license').value.trim();
+      if (expiry) formData.append('expiration_date', expiry);
+      if (license) formData.append('license_number', license);
 
       try {
         const res = await fetch(`/api/admin/employees/${employeeId}/documents`, {
@@ -746,6 +838,8 @@
           statusEl.style.color = '#6bff6b';
           statusEl.textContent = 'Uploaded!';
           fileInput.value = '';
+          document.getElementById('edit-doc-expiry').value = '';
+          document.getElementById('edit-doc-license').value = '';
           loadEmployeeDocs(employeeId);
         } else {
           statusEl.style.color = '#c9474f';

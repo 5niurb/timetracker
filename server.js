@@ -1671,7 +1671,7 @@ app.get('/api/admin/employees/:id/documents', async (req, res) => {
 
   const { data, error } = await supabaseAdmin
     .from('employee_documents')
-    .select('id, document_type, file_path, file_name, notes, uploaded_at')
+    .select('id, document_type, file_path, file_name, notes, uploaded_at, expiration_date, license_number')
     .eq('employee_id', parseInt(req.params.id))
     .order('uploaded_at', { ascending: false });
 
@@ -1699,7 +1699,7 @@ app.post(
     if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const employeeId = parseInt(req.params.id);
-    const { document_type, notes } = req.body;
+    const { document_type, notes, expiration_date, license_number } = req.body;
 
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
     if (!document_type) return res.status(400).json({ success: false, message: 'document_type required' });
@@ -1721,6 +1721,8 @@ app.post(
         file_path: storagePath,
         file_name: req.file.originalname,
         notes: notes || null,
+        expiration_date: expiration_date || null,
+        license_number: license_number || null,
       })
       .select()
       .single();
@@ -1729,6 +1731,31 @@ app.post(
     res.json({ success: true, doc: data });
   },
 );
+
+// PATCH /api/admin/employee-documents/:docId — update expiry/license without re-uploading
+app.patch('/api/admin/employee-documents/:docId', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { expiration_date, license_number, notes } = req.body;
+  const updates = {};
+  if (expiration_date !== undefined) updates.expiration_date = expiration_date || null;
+  if (license_number !== undefined) updates.license_number = license_number || null;
+  if (notes !== undefined) updates.notes = notes || null;
+
+  if (!Object.keys(updates).length)
+    return res.status(400).json({ success: false, message: 'Nothing to update' });
+
+  const { data, error } = await supabaseAdmin
+    .from('employee_documents')
+    .update(updates)
+    .eq('id', parseInt(req.params.docId))
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true, doc: data });
+});
 
 // DELETE /api/admin/employee-documents/:docId — remove a doc
 app.delete('/api/admin/employee-documents/:docId', async (req, res) => {

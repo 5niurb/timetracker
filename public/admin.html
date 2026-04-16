@@ -426,14 +426,23 @@
         <!-- Upload new doc -->
         <div style="background: #0a0a0a; border: 1px solid #333; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
           <div style="font-size: 11px; color: #888; letter-spacing: 0.05em;">UPLOAD NEW DOCUMENT</div>
-          <select id="edit-doc-type" style="font-size: 12px; padding: 6px 8px; background: #111; border: 1px solid #333; color: #e0d8c8;">
+          <select id="edit-doc-type" onchange="onDocTypeChange()" style="font-size: 12px; padding: 6px 8px; background: #111; border: 1px solid #333; color: #e0d8c8;">
             <option value="w9">W-9</option>
             <option value="driver_license">Driver's License / Gov ID</option>
-            <option value="insurance">Insurance Certificate</option>
+            <option value="nda">Non-Disclosure Agreement</option>
             <option value="professional_license">Professional License</option>
+            <option value="insurance">Insurance Certificate</option>
             <option value="contract">Contractor Agreement</option>
             <option value="other">Other</option>
           </select>
+          <div id="edit-doc-license-row" style="display: none; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; color: #888;">License Number</label>
+            <input type="text" id="edit-doc-license" placeholder="e.g. 171374" style="font-size: 12px; padding: 5px 8px; background: #111; border: 1px solid #333; color: #e0d8c8;">
+          </div>
+          <div id="edit-doc-expiry-row" style="display: none; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; color: #888;">Expiration Date</label>
+            <input type="date" id="edit-doc-expiry" style="font-size: 12px; padding: 5px 8px; background: #111; border: 1px solid #333; color: #e0d8c8;">
+          </div>
           <input type="file" id="edit-doc-file" style="font-size: 12px; color: #ccc;">
           <div style="display: flex; gap: 8px; align-items: center;">
             <button class="btn-secondary" style="font-size: 11px; padding: 5px 14px;" onclick="uploadEmployeeDoc()">Upload</button>
