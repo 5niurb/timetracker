@@ -590,32 +590,53 @@
       <h2>Payment &amp; Banking</h2>
     </div>
     <div class="section-body">
+      <!-- Always-visible bank info -->
       <div class="form-grid">
         <div class="form-group">
-          <label>Payment Method <span class="req">*</span></label>
-          <select id="payment_method" onchange="toggleBankingFields()">
-            <option value="">— Select —</option>
-            <option value="direct_deposit">Direct Deposit (ACH)</option>
-            <option value="zelle">Zelle</option>
-            <option value="check">Check</option>
-          </select>
-          <span class="field-error" id="err-payment_method"></span>
+          <label>Bank Name <span class="req">*</span></label>
+          <input type="text" id="bank_name">
+          <span class="field-error" id="err-bank_name"></span>
+        </div>
+        <div class="form-group">
+          <label>Account Owner Name <span class="req">*</span></label>
+          <input type="text" id="bank_account_owner_name">
+          <span class="field-error" id="err-bank_account_owner_name"></span>
         </div>
       </div>
 
-      <div id="bank-fields">
-        <div style="margin-top:16px;">
+      <!-- Payment method radio — Zelle or ACH -->
+      <div style="margin-top:18px;">
+        <label style="display:block;margin-bottom:10px;">Payment Method <span class="req">*</span></label>
+        <div style="display:flex;gap:28px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="radio" name="payment_method" id="pm_zelle" value="zelle"
+              onchange="togglePaymentFields()" style="width:16px;height:16px;accent-color:var(--gold);">
+            Zelle (use contact info above)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="radio" name="payment_method" id="pm_ach" value="ach"
+              onchange="togglePaymentFields()" style="width:16px;height:16px;accent-color:var(--gold);">
+            ACH (use bank account details below)
+          </label>
+        </div>
+        <span class="field-error" id="err-payment_method" style="display:block;margin-top:6px;"></span>
+      </div>
+
+      <!-- Zelle contact — always visible (used regardless) -->
+      <div style="margin-top:16px;">
+        <div class="form-group">
+          <label>Zelle Contact Info (email or phone) <span class="req" id="zelle-req-marker">*</span></label>
+          <input type="text" id="zelle_contact" placeholder="jane@example.com or (310) 555-1234">
+          <span class="field-hint">The email or phone number registered with your Zelle account</span>
+          <span class="field-error" id="err-zelle_contact"></span>
+        </div>
+      </div>
+
+      <!-- ACH block — hidden unless ACH selected -->
+      <div id="ach-fields" style="display:none;margin-top:18px;transition:opacity 0.2s;" aria-hidden="true">
+        <div style="border-top:1px solid var(--border);padding-top:16px;">
+          <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;letter-spacing:0.3px;">ACH PAYMENT BANK ACCOUNT DETAILS</p>
           <div class="form-grid">
-            <div class="form-group">
-              <label>Bank Name <span class="req">*</span></label>
-              <input type="text" id="bank_name">
-              <span class="field-error" id="err-bank_name"></span>
-            </div>
-            <div class="form-group">
-              <label>Account Owner Name <span class="req">*</span></label>
-              <input type="text" id="bank_account_owner_name">
-              <span class="field-error" id="err-bank_account_owner_name"></span>
-            </div>
             <div class="form-group">
               <label>Account Type <span class="req">*</span></label>
               <select id="bank_account_type">
@@ -624,6 +645,9 @@
                 <option value="savings">Savings</option>
               </select>
               <span class="field-error" id="err-bank_account_type"></span>
+            </div>
+            <div class="form-group">
+              <!-- placeholder column -->
             </div>
             <div class="form-group">
               <label>Routing Number (9 digits) <span class="req">*</span></label>
@@ -648,14 +672,6 @@
           </div>
         </div>
       </div>
-
-      <div id="zelle-fields" style="display:none; margin-top:16px;">
-        <div class="form-group">
-          <label>Zelle Phone or Email <span class="req">*</span></label>
-          <input type="text" id="zelle_contact">
-          <span class="field-error" id="err-zelle_contact"></span>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -667,9 +683,31 @@
     </div>
     <div class="section-body">
       <div class="form-grid">
-        <div class="form-group">
-          <label>Estimated Hours / Week</label>
-          <input type="number" id="time_commitment_hours_per_week" min="1" max="168">
+        <div class="form-group span-2">
+          <label>Estimated Time Commitment <span class="req">*</span></label>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px;">
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+              <input type="radio" name="time_commitment_bucket" value="under_15"
+                onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
+              Less than 15 hours / 1–2 days
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+              <input type="radio" name="time_commitment_bucket" value="15_to_25"
+                onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
+              15–25 hours / 2–3 days
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+              <input type="radio" name="time_commitment_bucket" value="25_to_35"
+                onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
+              25–35 hours / 3–4 days
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer;">
+              <input type="radio" name="time_commitment_bucket" value="over_35"
+                onchange="clearError('time_commitment_bucket')" style="width:16px;height:16px;accent-color:var(--gold);">
+              More than 35 hours / More than 4 days
+            </label>
+          </div>
+          <span class="field-error" id="err-time_commitment_bucket" style="margin-top:4px;"></span>
         </div>
         <div class="form-group">
           <label>Agreed Rate ($/hr or flat)</label>
@@ -815,10 +853,20 @@
     inp.placeholder = t === 'EIN' ? '12-3456789' : '123-45-6789';
   }
 
-  function toggleBankingFields() {
-    const method = document.getElementById('payment_method').value;
-    document.getElementById('bank-fields').style.display = method === 'direct_deposit' ? 'block' : 'none';
-    document.getElementById('zelle-fields').style.display = method === 'zelle' ? 'block' : 'none';
+  function togglePaymentFields() {
+    const method = document.querySelector('input[name="payment_method"]:checked')?.value || '';
+    const achBlock = document.getElementById('ach-fields');
+    const zelleReqMarker = document.getElementById('zelle-req-marker');
+    if (method === 'ach') {
+      achBlock.style.display = 'block';
+      achBlock.setAttribute('aria-hidden', 'false');
+    } else {
+      achBlock.style.display = 'none';
+      achBlock.setAttribute('aria-hidden', 'true');
+    }
+    // Zelle contact is always required when Zelle, optional when ACH
+    zelleReqMarker.style.display = method === 'ach' ? 'none' : 'inline';
+    clearError('payment_method');
   }
 
   function setError(field, msg) {
@@ -908,9 +956,10 @@
       bank_account_type: document.getElementById('bank_account_type').value,
       bank_routing_raw: document.getElementById('bank_routing_raw').value.trim(),
       bank_account_raw: document.getElementById('bank_account_raw').value.trim(),
-      payment_method: document.getElementById('payment_method').value,
+      payment_method: document.querySelector('input[name="payment_method"]:checked')?.value || '',
       zelle_contact: document.getElementById('zelle_contact').value.trim(),
-      time_commitment_hours_per_week: document.getElementById('time_commitment_hours_per_week').value,
+      time_commitment_bucket:
+        document.querySelector('input[name="time_commitment_bucket"]:checked')?.value || '',
       services_offered: services,
       other_commitments: document.getElementById('other_commitments').value.trim(),
       exhibit_a_rate: document.getElementById('exhibit_a_rate').value,

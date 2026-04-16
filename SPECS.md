@@ -191,7 +191,7 @@ Token-gated public form for workers to submit their own onboarding information. 
 4. **License** — License number, state, expiration (must be future if provided)
 5. **Insurance** — Company, policy number, expiration (must be future if provided)
 6. **Driver's License** — Number, state, expiry (must be future if provided)
-7. **Banking** — Bank name (required), account owner (required), account type (required), payment method (direct_deposit/check/zelle). Direct deposit: routing + account number required. Zelle: contact required.
+7. **Banking** — Bank name (required), account owner name (required). Payment method radio: **Zelle** (use contact info above) or **ACH** (use bank account details below) — required. Zelle contact field always visible (required when Zelle). ACH block hidden until ACH selected; account type + routing + account number required when ACH. Routing/account numbers NOT stored for Zelle submissions.
 8. **Attestation** — IC agreement version display, checkbox certification (required), typed signature (required), date (required)
 
 ### Sensitive Field Handling
@@ -215,6 +215,10 @@ Token-gated public form for workers to submit their own onboarding information. 
 | Date of birth | Past date, worker must be ≥18 years old |
 | License/insurance expiration | Must be strictly future if provided |
 | Attestation | Checkbox required, typed signature required, date required |
+| Time commitment bucket | One of under_15, 15_to_25, 25_to_35, over_35 (required) |
+| Payment method | zelle or ach only (required); other values rejected |
+| Routing + account | Required when payment_method=ach; ignored (not stored) when zelle |
+| Zelle contact | Required when payment_method=zelle |
 
 ### API Endpoints
 
@@ -225,7 +229,7 @@ Token-gated public form for workers to submit their own onboarding information. 
 | GET | `/api/admin/employees/:id/onboarding` | Admin password header | Fetch submitted data (masked) |
 | POST | `/api/admin/employees/:id/onboarding-token` | Admin password header | Regenerate token |
 
-### Database Changes (migration `002-worker-onboarding.sql`)
+### Database Changes
 
 **`employees` table — 8 new columns:**
 
@@ -242,13 +246,17 @@ Token-gated public form for workers to submit their own onboarding information. 
 
 **New `employee_onboarding` table (~35 columns):** Full form submission, one row per employee. Identity, address, tax, license, insurance, banking fields. `tin_encrypted`, `bank_routing_encrypted`, `bank_account_encrypted` stored with TODO(security) comments. `*_last4` columns always populated. `submitted_at`, `ip_address`, `ic_agreement_version` for audit trail.
 
+**Migration 003 applied 2026-04-16:**
+- `time_commitment_hours_per_week` (INTEGER) removed; replaced by `time_commitment_bucket` TEXT CHECK IN (under_15, 15_to_25, 25_to_35, over_35)
+- `payment_method` constrained to CHECK IN (zelle, ach); values direct_deposit and check no longer accepted
+
 ### Validation Library (`lib/onboarding-validation.js`)
 
 Shared module used by both server.js and tests. Exports: `validateSSN`, `validateEIN`, `validateZip`, `validatePhone`, `validateState`, `validateBankRouting`, `validateBankAccount`, `validateDOB`, `validateFutureDate`, `extractLast4SSN`, `extractLast4Routing`, `extractLast4Account`, `validateOnboarding`.
 
 ### Tests (`test/validation.test.js`)
 
-50 tests — written red-first, confirmed failing before implementation. Covers all validators + full form validation.
+70 tests — Phase 1.5 tests written red-first before implementation. Covers all validators + full form validation + conditional ACH/Zelle rules + time_commitment_bucket enum.
 
 ### Design Decisions
 

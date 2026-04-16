@@ -141,7 +141,8 @@ const validForm = {
   bank_account_type: 'checking',
   bank_routing_raw: '121000358',
   bank_account_raw: '12345678',
-  payment_method: 'direct_deposit',
+  payment_method: 'ach',
+  time_commitment_bucket: '25_to_35',
   attestation_checked: true,
   attestation_signature: 'Jane Doe',
   attestation_date: fmt(today),
@@ -174,6 +175,148 @@ test('attestation not checked fails', () => {
   const form = { ...validForm, attestation_checked: false };
   const errors = v.validateOnboarding(form);
   assert.ok(errors.attestation_checked, 'expected attestation error');
+});
+
+// ---- time_commitment_bucket ----
+console.log('\ntime_commitment_bucket validation:');
+const VALID_BUCKETS = ['under_15', '15_to_25', '25_to_35', 'over_35'];
+
+// validateTimeBucket function tests
+if (v.validateTimeBucket) {
+  VALID_BUCKETS.forEach(b => {
+    test(`accepts valid bucket "${b}"`, () => assert.equal(v.validateTimeBucket(b), true));
+  });
+  test('rejects bucket "40_hours"', () => assert.equal(v.validateTimeBucket('40_hours'), false));
+  test('rejects bucket empty string', () => assert.equal(v.validateTimeBucket(''), false));
+  test('rejects bucket null', () => assert.equal(v.validateTimeBucket(null), false));
+} else {
+  test('validateTimeBucket exported', () => { throw new Error('validateTimeBucket not exported'); });
+}
+
+// Full form: time_commitment_bucket required
+console.log('\ntime_commitment_bucket in full form:');
+const validFormBucket = {
+  first_name: 'Jane',
+  last_name: 'Doe',
+  home_phone: '3105551234',
+  date_of_birth: fmt(adult),
+  address_street: '123 Main St',
+  address_city: 'Los Angeles',
+  address_state: 'CA',
+  address_zip: '90210',
+  tin_type: 'SSN',
+  tin_raw: '123-45-6789',
+  w9_tax_classification: 'individual',
+  w9_signed_at: fmt(today),
+  bank_name: 'Wells Fargo',
+  bank_account_owner_name: 'Jane Doe',
+  payment_method: 'zelle',
+  zelle_contact: 'jane@example.com',
+  time_commitment_bucket: '15_to_25',
+  attestation_checked: true,
+  attestation_signature: 'Jane Doe',
+  attestation_date: fmt(today),
+};
+
+test('valid bucket "15_to_25" passes full form', () => {
+  const errors = v.validateOnboarding(validFormBucket);
+  assert.ok(!errors.time_commitment_bucket, `unexpected error: ${errors.time_commitment_bucket}`);
+});
+test('missing time_commitment_bucket fails', () => {
+  const form = { ...validFormBucket, time_commitment_bucket: '' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.time_commitment_bucket, 'expected time_commitment_bucket error');
+});
+test('invalid bucket string fails', () => {
+  const form = { ...validFormBucket, time_commitment_bucket: 'part_time' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.time_commitment_bucket, 'expected time_commitment_bucket error');
+});
+
+// ---- payment_method enum (zelle | ach) ----
+console.log('\npayment_method enum validation:');
+test('payment_method "zelle" passes', () => {
+  const form = { ...validFormBucket, payment_method: 'zelle', zelle_contact: 'jane@example.com' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(!errors.payment_method, `unexpected error: ${errors.payment_method}`);
+});
+test('payment_method "ach" passes', () => {
+  const form = {
+    ...validFormBucket,
+    payment_method: 'ach',
+    bank_routing_raw: '121000358',
+    bank_account_raw: '12345678',
+  };
+  const errors = v.validateOnboarding(form);
+  assert.ok(!errors.payment_method, `unexpected error: ${errors.payment_method}`);
+});
+test('payment_method "direct_deposit" rejected', () => {
+  const form = { ...validFormBucket, payment_method: 'direct_deposit' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.payment_method, 'expected payment_method error');
+});
+test('payment_method "check" rejected', () => {
+  const form = { ...validFormBucket, payment_method: 'check' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.payment_method, 'expected payment_method error');
+});
+
+// ---- Conditional ACH validation ----
+console.log('\nConditional ACH validation:');
+test('ACH missing routing → error', () => {
+  const form = {
+    ...validFormBucket,
+    payment_method: 'ach',
+    bank_routing_raw: '',
+    bank_account_raw: '12345678',
+  };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.bank_routing_raw, 'expected bank_routing_raw error for ACH');
+});
+test('ACH missing account → error', () => {
+  const form = {
+    ...validFormBucket,
+    payment_method: 'ach',
+    bank_routing_raw: '121000358',
+    bank_account_raw: '',
+  };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.bank_account_raw, 'expected bank_account_raw error for ACH');
+});
+test('Zelle missing routing → OK (not required)', () => {
+  const form = {
+    ...validFormBucket,
+    payment_method: 'zelle',
+    zelle_contact: 'jane@example.com',
+    bank_routing_raw: '',
+    bank_account_raw: '',
+  };
+  const errors = v.validateOnboarding(form);
+  assert.ok(!errors.bank_routing_raw, 'bank_routing_raw should NOT be required for Zelle');
+  assert.ok(!errors.bank_account_raw, 'bank_account_raw should NOT be required for Zelle');
+});
+test('Zelle missing account → OK (not required)', () => {
+  const form = {
+    ...validFormBucket,
+    payment_method: 'zelle',
+    zelle_contact: 'jane@example.com',
+    bank_account_raw: '',
+  };
+  const errors = v.validateOnboarding(form);
+  assert.ok(!errors.bank_account_raw, 'bank_account_raw should not be required for Zelle');
+});
+
+// ---- zelle_contact required when zelle ----
+console.log('\nzelle_contact validation:');
+test('Zelle missing zelle_contact → error', () => {
+  const form = { ...validFormBucket, payment_method: 'zelle', zelle_contact: '' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(errors.zelle_contact, 'expected zelle_contact error');
+});
+test('Zelle with zelle_contact → no error', () => {
+  const form = { ...validFormBucket, payment_method: 'zelle', zelle_contact: 'jane@example.com' };
+  const errors = v.validateOnboarding(form);
+  assert.ok(!errors.zelle_contact, `unexpected zelle_contact error: ${errors.zelle_contact}`);
 });
 
 // ---- Summary ----

@@ -1065,16 +1065,17 @@ app.post('/api/onboarding/:token', async (req, res) => {
       : null,
     bank_name: form.bank_name?.trim() || null,
     bank_account_owner_name: form.bank_account_owner_name?.trim() || null,
-    bank_account_type: form.bank_account_type || null,
-    bank_routing_last4,
-    bank_account_last4,
-    bank_routing_encrypted: form.bank_routing_raw || null, // TODO(security): encrypt with pgsodium
-    bank_account_encrypted: form.bank_account_raw || null, // TODO(security): encrypt with pgsodium
+    bank_account_type: form.payment_method === 'ach' ? (form.bank_account_type || null) : null,
+    bank_routing_last4: form.payment_method === 'ach' ? bank_routing_last4 : null,
+    bank_account_last4: form.payment_method === 'ach' ? bank_account_last4 : null,
+    // Only store ACH sensitive fields for ACH payments; discard if Zelle to avoid stale data
+    bank_routing_encrypted:
+      form.payment_method === 'ach' ? (form.bank_routing_raw || null) : null, // TODO(security): encrypt
+    bank_account_encrypted:
+      form.payment_method === 'ach' ? (form.bank_account_raw || null) : null, // TODO(security): encrypt
     payment_method: form.payment_method || null,
     zelle_contact: form.zelle_contact?.trim() || null,
-    time_commitment_hours_per_week: form.time_commitment_hours_per_week
-      ? parseInt(form.time_commitment_hours_per_week)
-      : null,
+    time_commitment_bucket: form.time_commitment_bucket || null,
     services_offered: Array.isArray(form.services_offered) ? form.services_offered : [],
     other_commitments: form.other_commitments?.trim() || null,
     exhibit_a_rate: form.exhibit_a_rate ? parseFloat(form.exhibit_a_rate) : null,
