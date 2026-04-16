@@ -116,32 +116,57 @@
 
 ---
 
-### Employees Tab
+### Team Members Tab (formerly "Employees")
 
-**Purpose:** Staff management — add, edit, delete employees.
+**Purpose:** Staff management — add, edit, delete team members.
 
 **Components:**
-- Employee list
-- Add form: name, PIN, email, hourly wage, pay type checkboxes
-- Edit/delete actions
+- Team member table: Name (with email below), PIN, Job Title, Job Type, Pay Rate, Onboarding status, Actions
+- "Add New Team Member" button → full-screen pre-form overlay
+- Edit/delete actions per row
+- Row spacing: 18px padding, 1.5 line-height
+
+**Pre-Form (Add New Team Member):**
+
+Full-screen overlay (onboarding-form styled) with:
+- Personal & Contact Info: First Name, Last Name, Email, Mobile Phone (auto-format `(###) ###-####`)
+- Job Info: Job Title (dropdown: 8 titles), Job Type (Contract/Full-time), Pay Components (checkboxes), Pay Rate, Additional Pay Rate, Comments
+- Start Date (optional, approximate)
+- PIN auto-generated (random 4-digit) on creation — not in pre-form
+
+**Job Titles:** Esthetician, Aesthetic Nurse, Aesthetic Nurse Practitioner, Physician, Front Desk, Office Manager, Marketing, Other
+
+**Job Types:** Contract, Full-time
+
+**Send Link Modal (post-creation):**
+
+After creating team member, shows:
+- Onboarding link (copyable)
+- "Send via SMS" button → preview → confirm (sends via Twilio from +12134442242)
+- "Send via Email" button → preview → confirm (sends via Resend from ops@lemedspa.com, CC lea@lemedspa.com)
+- "Done" button → refreshes team members list
 
 **Pay Types (checkbox combinations):**
 
 | Pay Type | Hourly | Service Commissions | Sales Commissions |
 |----------|--------|--------------------|--------------------|
 | `hourly` | ✓ | | |
-| `commission_services` | | ✓ | |
-| `commission_sales` | | | ✓ |
+| `commission` | | ✓ and/or ✓ | |
 | `hourly_services` | ✓ | ✓ | |
 | `hourly_sales` | ✓ | | ✓ |
 | `hourly_all` | ✓ | ✓ | ✓ |
 
 **Acceptance Criteria:**
-- [ ] Add employee with all fields
-- [ ] PIN must be unique 4-digit
-- [ ] Pay type checkboxes map to correct database value
-- [ ] Edit updates all fields
+- [ ] "Add New Team Member" button opens full-screen pre-form overlay
+- [ ] Pre-form validates required fields (first name, last name, email)
+- [ ] Phone auto-formats as `(###) ###-####` on input
+- [ ] PIN auto-generated (4-digit random) on creation
+- [ ] After creation: send link modal with SMS/Email options
+- [ ] SMS sends via Twilio REST API
+- [ ] Email sends via Resend with approved "LeMed Spa family" verbiage
+- [ ] Edit modal: split first/last name, job title dropdown, job type dropdown
 - [ ] Delete with confirmation (prevents accidental removal)
+- [ ] All labels say "Team Member" (not "Employee")
 
 ---
 
@@ -185,14 +210,14 @@ Token-gated public form for workers to submit their own onboarding information. 
 
 ### Form Sections
 
-1. **Identity** — First name (required), last name (required), date of birth (required, ≥18), home phone, work phone
-2. **Address** — Street (required), city (required), state (required, 2-char US allowlist), ZIP (required, 5 or 9 digits)
-3. **Tax (W-9)** — TIN type (SSN/EIN), TIN number, W-9 tax classification, W-9 signature date
-4. **License** — License number, state, expiration (must be future if provided)
-5. **Insurance** — Company, policy number, expiration (must be future if provided)
-6. **Driver's License** — Number, state, expiry (must be future if provided)
-7. **Banking** — Bank name (required), account owner name (required). Payment method radio: **Zelle** (use contact info above) or **ACH** (use bank account details below) — required. Zelle contact field always visible (required when Zelle). ACH block hidden until ACH selected; account type + routing + account number required when ACH. Routing/account numbers NOT stored for Zelle submissions.
-8. **Attestation** — IC agreement version display, checkbox certification (required), typed signature (required), date (required)
+1. **Personal & Contact Information** — First name (required, blur-validated), last name (required, blur-validated), date of birth (required, ≥18), home phone, mobile phone (required, auto-format `(###) ###-####`, blur-validated), email (blur-validated), address subsection: street (required), city (required), state (CA preselected, 2-char US allowlist), ZIP (required, 5 or 9 digits, blur-validated)
+2. **Tax (W-9)** — TIN type (SSN/EIN), TIN number (standard text input with format validation based on type), W-9 tax classification (with Business/Entity Name hint below input), W-9 signature date
+3. **Drivers License / Government ID** — DL/ID number, state, expiry (must be future if provided)
+4. **Professional License** *(clinical titles only: Esthetician, Aesthetic Nurse, Aesthetic Nurse Practitioner, Physician)* — Dynamic license entries with: license type, number, state, expiry (must be future), verification URL (required, with DCA guidance text), optional file upload per entry. Add/remove license entries.
+5. **Insurance** *(clinical titles only)* — Company, policy number, expiry, per-occurrence coverage amount (required), aggregate coverage amount (required)
+6. **Payment Information** — Bank name (required), account owner name (required). "Preferred Payment Method" radio: **Zelle** or **ACH**. Zelle contact field (required when Zelle). ACH: account type + routing + account number (required when ACH). Routing/account numbers NOT stored for Zelle.
+7. **Contract Details** — Pre-filled job info grid (job title, job type, pay components, pay rate, additional pay rate from admin pre-form), time commitment bucket, other commitments, comments (full-width textarea)
+8. **Acknowledgment & Attestation** — IC agreement version display, checkbox certification (required), typed signature (required), date (required)
 
 ### Sensitive Field Handling
 
@@ -228,7 +253,7 @@ Token-gated public form for workers to submit their own onboarding information. 
 | SSN | `/^\d{3}-\d{2}-\d{4}$/` |
 | EIN | `/^\d{2}-\d{7}$/` |
 | ZIP | 5 digits or 9 digits (with or without dash) |
-| Phone | ≥10 digits when stripped of formatting, ≤15 |
+| Phone | ≥10 digits when stripped of formatting, ≤15. Mobile phone required. |
 | State | 2-char uppercase allowlist (50 states + DC) |
 | Bank routing | 9 digits + ABA checksum: `(3*(d1+d4+d7) + 7*(d2+d5+d8) + (d3+d6+d9)) % 10 === 0` |
 | Bank account | 4–17 digits |
@@ -248,6 +273,7 @@ Token-gated public form for workers to submit their own onboarding information. 
 | POST | `/api/onboarding/:token` | None (token validates) | Submit onboarding data |
 | GET | `/api/admin/employees/:id/onboarding` | Admin password header | Fetch submitted data (masked) |
 | POST | `/api/admin/employees/:id/onboarding-token` | Admin password header | Regenerate token |
+| POST | `/api/admin/employees/:id/send-link` | Admin password header | Send onboarding link via SMS or email |
 
 ### Database Changes
 
@@ -272,11 +298,11 @@ Token-gated public form for workers to submit their own onboarding information. 
 
 ### Validation Library (`lib/onboarding-validation.js`)
 
-Shared module used by both server.js and tests. Exports: `validateSSN`, `validateEIN`, `validateZip`, `validatePhone`, `validateState`, `validateBankRouting`, `validateBankAccount`, `validateDOB`, `validateFutureDate`, `extractLast4SSN`, `extractLast4Routing`, `extractLast4Account`, `validateOnboarding`.
+Shared module used by both server.js and tests. Exports: `validateSSN`, `validateEIN`, `validateZip`, `validatePhone`, `validateState`, `validateBankRouting`, `validateBankAccount`, `validateDOB`, `validateFutureDate`, `extractLast4SSN`, `extractLast4Routing`, `extractLast4Account`, `validateOnboarding`, `JOB_TITLES`, `CLINICAL_TITLES`.
 
 ### Tests
 
-- `test/validation.test.js` — 70 tests covering all validators + full form validation + conditional ACH/Zelle rules + time_commitment_bucket enum. Written red-first.
+- `test/validation.test.js` — 113 tests covering all validators + full form validation + conditional ACH/Zelle rules + time_commitment_bucket enum + mobile phone required + insurance coverage amounts required for clinical titles + conditional license/insurance validation. Written red-first.
 - `test/crypto.test.js` — 23 tests covering AES-256-GCM round-trip, non-determinism (random IV), tampering rejection, wrong-key rejection, empty string, null/undefined passthrough, `isEncrypted` heuristic, `generateKey`, and invalid key detection. Written red-first.
 
 ### Design Decisions
@@ -284,7 +310,7 @@ Shared module used by both server.js and tests. Exports: `validateSSN`, `validat
 - Token security: UUID v4 via `crypto.randomUUID()` (Node built-in, no dependency)
 - Encryption: AES-256-GCM via Node built-in `crypto` module. No new dependencies. Key in env var. Startup fails loudly if key is missing or wrong length.
 - pgsodium not used: application-layer AES-256-GCM chosen over pgsodium for simpler setup and no Supabase extension dependency. Same security guarantees for this use case.
-- No Resend email notifications (explicitly out of scope)
+- Send Link feature: SMS via Twilio (+12134442242) and email via Resend (ops@lemedspa.com, CC lea@lemedspa.com)
 - No 1099 export (out of scope)
 - Never store plaintext SSN/EIN in plain database columns — only in `*_encrypted` columns
 
@@ -344,3 +370,10 @@ Components included depend on employee's `pay_type` setting.
 | 2026-04 | Worker self-onboarding via token link | Replaces manual data collection; UUID token is single-use per employee |
 | 2026-04 | AES-256-GCM for onboarding sensitive fields | Application-layer encryption via Node built-in crypto. Key in Render env var. Startup guard if key missing. |
 | 2026-04 | Admin password stored in sessionStorage | Needed to authenticate `/api/admin/employees/:id/onboarding` from the browser |
+| 2026-04 | Renamed "Employees" → "Team Members" throughout | Warmer, more inclusive terminology aligned with brand voice |
+| 2026-04 | Pre-form overlay replaces inline add form | Full-screen modal matches onboarding form styling; better UX for data entry |
+| 2026-04 | Auto-generated PIN (removed from pre-form) | PIN access is separate concern from onboarding; handled after joining |
+| 2026-04 | Conditional license/insurance sections | Only clinical titles (Esthetician, Aesthetic Nurse, Aesthetic NP, Physician) need professional credentials |
+| 2026-04 | Send Link feature (SMS + Email) | Streamlines onboarding distribution; email uses approved "LeMed Spa family" verbiage |
+| 2026-04 | Resend domain: lemedspa.com (was updates.lemedspa.com) | Free plan 1-domain limit; root domain is more professional |
+| 2026-04 | Standard text inputs for TIN/phone (not digit boxes) | Digit boxes caused sizing/styling issues; auto-formatting text fields are simpler and more accessible |

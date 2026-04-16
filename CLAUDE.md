@@ -115,10 +115,20 @@ Set in Render dashboard:
 
 ## Email
 
-Invoice emails sent via Resend:
-- **From:** `paytrack@updates.lemedspa.com`
+**Invoice emails** sent via Resend:
+- **From:** `paytrack@lemedspa.com`
 - **To:** `lea@lemedspa.com`, `ops@lemedspa.com`
 - **CC:** Employee email (if set)
+
+**Onboarding link emails** sent via Resend:
+- **From:** `ops@lemedspa.com`
+- **To:** Team member email
+- **CC:** `lea@lemedspa.com`
+- **Subject:** "LeMed Spa — New Team Member Onboarding"
+
+**Onboarding link SMS** sent via Twilio:
+- **From:** `+12134442242`
+- **To:** Team member mobile phone
 
 ## Claude Code Automations
 
@@ -156,8 +166,14 @@ Invoice emails sent via Resend:
 
 ## Recent Changes
 
+- **2026-04-16:** Renamed "Employees" → "Team Members" throughout entire app
+- **2026-04-16:** Pre-form overlay for adding team members (replaces inline form), auto-generated PIN
+- **2026-04-16:** Send Link feature: SMS (Twilio) + Email (Resend) for onboarding links
+- **2026-04-16:** Onboarding form Round 2: merged sections, conditional license/insurance for clinical titles, blur validation, phone auto-format, TIN format validation
+- **2026-04-16:** Resend domain swapped: `updates.lemedspa.com` → `lemedspa.com`
+- **2026-04-16:** `SUPABASE_SERVICE_ROLE_KEY` set on Render for file uploads
+- **2026-04-15:** Worker self-onboarding system with AES-256-GCM encryption
 - Migrated from SQLite to Supabase PostgreSQL
 - Admin Review Entries tab with pay period navigation
 - Employee Pay Review tab with delete functionality
 - LA timezone sync for all dates
-- "Patient Name" and "Services" labels in entry details
