@@ -1797,6 +1797,96 @@ app.delete('/api/admin/employee-documents/:docId', async (req, res) => {
   res.json({ success: true });
 });
 
+// ============ Payments API ============
+
+app.get('/api/admin/payments', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  let query = supabaseAdmin
+    .from('payments')
+    .select('*')
+    .order('payment_date', { ascending: false })
+    .order('id', { ascending: false });
+
+  if (req.query.employee_id) query = query.eq('employee_id', parseInt(req.query.employee_id));
+  if (req.query.year) {
+    query = query
+      .gte('payment_date', `${req.query.year}-01-01`)
+      .lte('payment_date', `${req.query.year}-12-31`);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
+});
+
+app.get('/api/admin/payments/:id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { data, error } = await supabaseAdmin
+    .from('payments')
+    .select('*')
+    .eq('id', parseInt(req.params.id))
+    .single();
+
+  if (error) return res.status(404).json({ success: false, message: 'Not found' });
+  res.json(data);
+});
+
+app.post('/api/admin/payments', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { employee_id, teammate_name, payment_date, amount, payment_method, notes } = req.body;
+  if (!teammate_name || !payment_date || !amount) {
+    return res.status(400).json({ success: false, message: 'teammate_name, payment_date, and amount are required' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('payments')
+    .insert({ employee_id: employee_id || null, teammate_name, payment_date, amount: parseFloat(amount), payment_method, notes })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true, payment: data });
+});
+
+app.put('/api/admin/payments/:id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { employee_id, teammate_name, payment_date, amount, payment_method, notes } = req.body;
+  const updates = {};
+  if (employee_id !== undefined) updates.employee_id = employee_id || null;
+  if (teammate_name !== undefined) updates.teammate_name = teammate_name;
+  if (payment_date !== undefined) updates.payment_date = payment_date;
+  if (amount !== undefined) updates.amount = parseFloat(amount);
+  if (payment_method !== undefined) updates.payment_method = payment_method;
+  if (notes !== undefined) updates.notes = notes;
+
+  const { data, error } = await supabaseAdmin
+    .from('payments')
+    .update(updates)
+    .eq('id', parseInt(req.params.id))
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true, payment: data });
+});
+
+app.delete('/api/admin/payments/:id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { error } = await supabaseAdmin.from('payments').delete().eq('id', parseInt(req.params.id));
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
 // Start server
 async function start() {
   await initDatabase();

@@ -156,6 +156,7 @@
       if (tabId === 'review-entries') loadReviewEntries();
       if (tabId === 'employees') loadEmployees();
       if (tabId === 'reports') loadReport();
+      if (tabId === 'payments') { populatePaymentsFilter(); loadPayments(); }
     }
 
     async function loadEmployeesForFilter() {
@@ -396,64 +397,78 @@
         const tbody = document.getElementById('employees-table');
 
         if (sorted.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No team members yet</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No team members yet</td></tr>';
         } else {
           tbody.innerHTML = sorted
             .map((emp) => {
-              // Onboarding cell
+              const inactive = emp.status === 'inactive';
+
+              // Onboarding cell — blank for inactive
               let onboardingCell;
-              if (emp.onboarding_completed_at) {
+              if (inactive) {
+                onboardingCell = '<span style="color:#333;font-size:11px;">—</span>';
+              } else if (emp.onboarding_completed_at) {
                 const completedDate = new Date(emp.onboarding_completed_at).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric',
                 });
                 onboardingCell = `
-                <span style="color: #6bff6b; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;">✓ COMPLETE</span>
-                <br><span style="font-size: 10px; color: #666;">${completedDate}</span>
-                <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="viewOnboardingDetails(${emp.id})">View Details</button>
-              `;
+                  <span style="color:#6bff6b;font-size:11px;font-weight:600;letter-spacing:0.05em;">✓ COMPLETE</span>
+                  <br><span style="font-size:10px;color:#666;">${completedDate}</span>
+                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;" onclick="viewOnboardingDetails(${emp.id})">View Details</button>
+                `;
               } else if (emp.onboarding_token) {
                 onboardingCell = `
-                <span style="color: #c9a84c; font-size: 11px; letter-spacing: 0.05em;">PENDING</span>
-                <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="copyOnboardingLink('${emp.onboarding_token}')">Copy Link</button>
-                <button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px; background:#1a2a1a; border:1px solid #2a4a2a; color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
-              `;
+                  <a href="/onboarding/${emp.onboarding_token}" target="_blank" style="color:#c9a84c;font-size:11px;font-weight:600;letter-spacing:0.05em;text-decoration:none;">PENDING ↗</a>
+                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;" onclick="copyOnboardingLink('${emp.onboarding_token}')">Copy Link</button>
+                  <button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;background:#1a2a1a;border:1px solid #2a4a2a;color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
+                `;
               } else {
-                onboardingCell = `<span style="color: #555; font-size: 11px;">—</span>`;
+                onboardingCell = '<span style="color:#555;font-size:11px;">—</span>';
               }
 
-              // Status cell
-              const statusCell =
-                emp.status === 'inactive'
-                  ? '<span style="font-size:10px;background:#2a1a1a;color:#c9474f;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">INACTIVE</span>'
-                  : '<span style="font-size:10px;background:#0a2a0a;color:#6bff6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">ACTIVE</span>';
+              // Status badge
+              const statusCell = inactive
+                ? '<span style="font-size:10px;background:#2a1a1a;color:#c9474f;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">INACTIVE</span>'
+                : '<span style="font-size:10px;background:#0a2a0a;color:#6bff6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">ACTIVE</span>';
 
-              // Compliance cell
-              const empDocs = docsByEmployee[emp.id] || [];
-              const byType = {};
-              empDocs.forEach((d) => {
-                if (!byType[d.document_type]) byType[d.document_type] = [];
-                byType[d.document_type].push(d);
-              });
-              const required = requiredDocTypes(emp.designation || '');
-              const allCompliant = required.every((t) => isItemCompliant(t, byType));
-              const complianceCell = allCompliant
-                ? '<span style="font-size:10px;background:#003d0f;color:#6bff6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">COMPLIANT</span>'
-                : '<span style="font-size:10px;background:#3d0000;color:#ff6b6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">NOT COMPLIANT</span>';
+              // Job type
+              const jobType = emp.contractor_type === 'employee' ? 'Employee' : 'Contractor';
+
+              // Compliance cell — blank for inactive, icon for active
+              let complianceCell;
+              if (inactive) {
+                complianceCell = '<span style="color:#333;font-size:11px;">—</span>';
+              } else {
+                const empDocs = docsByEmployee[emp.id] || [];
+                const byType = {};
+                empDocs.forEach((d) => {
+                  if (!byType[d.document_type]) byType[d.document_type] = [];
+                  byType[d.document_type].push(d);
+                });
+                const required = requiredDocTypes(emp.designation || '');
+                const allCompliant = required.every((t) => isItemCompliant(t, byType));
+                complianceCell = allCompliant
+                  ? `<span onclick="editEmployee(${emp.id})" title="Compliant — click to review" style="color:#6bff6b;font-size:22px;cursor:pointer;display:block;text-align:center;line-height:1;">✓</span>`
+                  : `<span onclick="editEmployee(${emp.id})" title="Not compliant — click to review" style="color:#ff6b6b;font-size:22px;cursor:pointer;display:block;text-align:center;line-height:1;">✗</span>`;
+              }
 
               return `
-              <tr style="${emp.status === 'inactive' ? 'opacity:0.6;' : ''}">
-                <td><strong>${escapeHtml(emp.name)}</strong></td>
-                <td style="font-size:12px;color:#aaa;">${emp.email ? escapeHtml(emp.email) : '<span style="color:#555;">—</span>'}</td>
-                <td style="font-size:12px;color:#aaa;">${emp.phone ? escapeHtml(emp.phone) : '<span style="color:#555;">—</span>'}</td>
-                <td style="font-size:12px;">${emp.designation ? escapeHtml(emp.designation) : '<span style="color:#555;">—</span>'}</td>
+              <tr style="${inactive ? 'opacity:0.55;' : ''}">
+                <td>
+                  <a href="javascript:void(0)" onclick="editEmployee(${emp.id})" style="color:#c9a84c;font-weight:600;text-decoration:none;cursor:pointer;">${escapeHtml(emp.name)}</a>
+                </td>
+                <td style="font-size:12px;color:#aaa;">${emp.email ? escapeHtml(emp.email) : '<span style="color:#444;">—</span>'}</td>
+                <td style="font-size:13px;color:#aaa;min-width:130px;letter-spacing:0.02em;">${emp.phone ? escapeHtml(emp.phone) : '<span style="color:#444;">—</span>'}</td>
+                <td style="font-size:12px;">${emp.designation ? escapeHtml(emp.designation) : '<span style="color:#444;">—</span>'}</td>
+                <td style="font-size:11px;color:#888;">${jobType}</td>
                 <td>${statusCell}</td>
-                <td style="font-size: 11px; line-height: 1.6;">${onboardingCell}</td>
-                <td>${complianceCell}</td>
-                <td class="actions">
-                  <button class="btn-warning" onclick="editEmployee(${emp.id})">Edit</button>
-                  <button class="btn-danger" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')">Delete</button>
+                <td style="font-size:11px;line-height:1.6;">${onboardingCell}</td>
+                <td style="text-align:center;">${complianceCell}</td>
+                <td class="actions" style="white-space:nowrap;">
+                  <button title="Edit" onclick="editEmployee(${emp.id})" style="background:none;border:none;color:#c9a84c;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Edit ${escapeHtml(emp.name)}">✏</button>
+                  <button title="Delete" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')" style="background:none;border:none;color:#c9474f;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Delete ${escapeHtml(emp.name)}">✕</button>
                 </td>
               </tr>
             `;
@@ -1327,6 +1342,201 @@
 
     function closeOnboardingModal() {
       document.getElementById('onboarding-modal').classList.remove('show');
+    }
+
+    // ============ Payments Tab ============
+
+    function populatePaymentsFilter() {
+      const sel = document.getElementById('payments-filter-employee');
+      if (!sel || sel.options.length > 1) return; // already populated
+      (window._employeesCache || allEmployees || [])
+        .slice()
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .forEach((emp) => {
+          const opt = document.createElement('option');
+          opt.value = emp.id;
+          opt.textContent = emp.name;
+          sel.appendChild(opt);
+        });
+    }
+
+    async function loadPayments() {
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const employeeId = document.getElementById('payments-filter-employee')?.value || '';
+      const year = document.getElementById('payments-filter-year')?.value || '';
+
+      let url = '/api/admin/payments';
+      const params = [];
+      if (employeeId) params.push(`employee_id=${employeeId}`);
+      if (year) params.push(`year=${year}`);
+      if (params.length) url += '?' + params.join('&');
+
+      try {
+        const res = await fetch(url, { headers: { password } });
+        if (!res.ok) return;
+        const payments = await res.json();
+
+        const tbody = document.getElementById('payments-table');
+        const footer = document.getElementById('payments-footer');
+        const totalEl = document.getElementById('payments-total');
+        const summaryDiv = document.getElementById('payments-summary');
+        const summaryContent = document.getElementById('payments-summary-content');
+
+        if (!payments.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No payments found</td></tr>';
+          footer.style.display = 'none';
+          summaryDiv.style.display = 'none';
+          return;
+        }
+
+        let total = 0;
+        tbody.innerHTML = payments
+          .map((p) => {
+            total += parseFloat(p.amount);
+            const date = new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            });
+            const desc = p.description || '';
+            return `
+            <tr>
+              <td style="font-size:12px;white-space:nowrap;">${date}</td>
+              <td><strong>${escapeHtml(p.teammate_name)}</strong></td>
+              <td style="text-align:right;font-size:13px;color:#c9a84c;white-space:nowrap;"><strong>$${parseFloat(p.amount).toFixed(2)}</strong></td>
+              <td style="font-size:11px;color:#888;">${escapeHtml(p.payment_method || '')}</td>
+              <td style="font-size:11px;color:#666;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(desc)}">${escapeHtml(desc) || '<span style="color:#444;">—</span>'}</td>
+              <td style="font-size:11px;color:#777;">${escapeHtml(p.notes || '') || '<span style="color:#444;">—</span>'}</td>
+              <td class="actions" style="white-space:nowrap;">
+                <button title="Edit" onclick="editPayment(${p.id})" style="background:none;border:none;color:#c9a84c;font-size:17px;cursor:pointer;padding:4px 6px;">✏</button>
+                <button title="Delete" onclick="confirmDeletePayment(${p.id}, '${escapeHtml(p.teammate_name)}')" style="background:none;border:none;color:#c9474f;font-size:17px;cursor:pointer;padding:4px 6px;">✕</button>
+              </td>
+            </tr>`;
+          })
+          .join('');
+
+        totalEl.innerHTML = `<strong>$${total.toFixed(2)}</strong>`;
+        footer.style.display = '';
+
+        // Summary by teammate when showing all
+        if (!employeeId) {
+          const byTeammate = {};
+          payments.forEach((p) => {
+            byTeammate[p.teammate_name] = (byTeammate[p.teammate_name] || 0) + parseFloat(p.amount);
+          });
+          summaryContent.innerHTML = Object.entries(byTeammate)
+            .sort((a, b) => b[1] - a[1])
+            .map(
+              ([name, amt]) =>
+                `<div style="text-align:center;padding:8px 16px;"><div style="font-size:11px;color:#888;margin-bottom:2px;">${escapeHtml(name)}</div><div style="font-size:16px;color:#c9a84c;font-weight:600;">$${amt.toFixed(2)}</div></div>`,
+            )
+            .join('');
+          summaryDiv.style.display = '';
+        } else {
+          summaryDiv.style.display = 'none';
+        }
+      } catch (err) {
+        console.error('Error loading payments:', err);
+      }
+    }
+
+    function openPaymentModal(payment) {
+      const overlay = document.getElementById('payment-modal-overlay');
+      const title = document.getElementById('payment-modal-title');
+      const empSel = document.getElementById('payment-employee-select');
+
+      // Populate employee dropdown
+      empSel.innerHTML = '<option value="">— Select team member —</option>';
+      (window._employeesCache || allEmployees || [])
+        .slice()
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .forEach((emp) => {
+          const opt = document.createElement('option');
+          opt.value = emp.id;
+          opt.textContent = emp.name;
+          empSel.appendChild(opt);
+        });
+
+      if (payment) {
+        title.textContent = 'Edit Payment';
+        document.getElementById('payment-editing-id').value = payment.id;
+        empSel.value = payment.employee_id || '';
+        document.getElementById('payment-date-input').value = payment.payment_date;
+        document.getElementById('payment-amount-input').value = parseFloat(payment.amount).toFixed(2);
+        document.getElementById('payment-method-input').value = payment.payment_method || 'Zelle';
+        document.getElementById('payment-notes-input').value = payment.notes || '';
+      } else {
+        title.textContent = 'Add Payment';
+        document.getElementById('payment-editing-id').value = '';
+        empSel.value = '';
+        document.getElementById('payment-date-input').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('payment-amount-input').value = '';
+        document.getElementById('payment-method-input').value = 'Zelle';
+        document.getElementById('payment-notes-input').value = '';
+      }
+
+      overlay.style.display = 'flex';
+    }
+
+    function closePaymentModal() {
+      document.getElementById('payment-modal-overlay').style.display = 'none';
+    }
+
+    async function savePayment() {
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const editingId = document.getElementById('payment-editing-id').value;
+      const empId = document.getElementById('payment-employee-select').value;
+      const date = document.getElementById('payment-date-input').value;
+      const amount = parseFloat(document.getElementById('payment-amount-input').value);
+      const method = document.getElementById('payment-method-input').value;
+      const notes = document.getElementById('payment-notes-input').value.trim();
+
+      if (!empId) return alert('Please select a team member.');
+      if (!date) return alert('Please enter a date.');
+      if (!amount || amount <= 0) return alert('Please enter a valid amount.');
+
+      const emp = (window._employeesCache || allEmployees || []).find((e) => e.id == empId);
+      const teammateName = emp ? emp.name : '';
+
+      const body = { employee_id: parseInt(empId), teammate_name: teammateName, payment_date: date, amount, payment_method: method, notes };
+
+      try {
+        let res;
+        if (editingId) {
+          res = await fetch(`/api/admin/payments/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', password },
+            body: JSON.stringify(body),
+          });
+        } else {
+          res = await fetch('/api/admin/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', password },
+            body: JSON.stringify(body),
+          });
+        }
+        if (!res.ok) throw new Error('Save failed');
+        closePaymentModal();
+        loadPayments();
+      } catch (err) {
+        alert('Failed to save payment. Please try again.');
+      }
+    }
+
+    async function editPayment(id) {
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const res = await fetch(`/api/admin/payments/${id}`, { headers: { password } });
+      if (!res.ok) return alert('Could not load payment.');
+      const payment = await res.json();
+      openPaymentModal(payment);
+    }
+
+    async function confirmDeletePayment(id, name) {
+      if (!confirm(`Delete payment to ${name}? This cannot be undone.`)) return;
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const res = await fetch(`/api/admin/payments/${id}`, { method: 'DELETE', headers: { password } });
+      if (!res.ok) return alert('Delete failed.');
+      loadPayments();
     }
 
     // Check if already logged in
