@@ -727,27 +727,23 @@
       document.getElementById('edit-error').classList.remove('show');
       document.getElementById('edit-doc-status').textContent = '';
       document.getElementById('edit-doc-file').value = '';
-      // Clear onboarding section fields
-      document.getElementById('edit-emp-time-commitment').value = '';
-      document.getElementById('edit-emp-other-commitments').value = '';
-      document.getElementById('edit-emp-attestation-checked').checked = false;
-      document.getElementById('edit-emp-attestation-date').value = '';
+      // Show loading state for teammate responses
+      const respDiv = document.getElementById('edit-emp-teammate-responses');
+      if (respDiv) respDiv.innerHTML = '<span style="color:#555;font-size:11px;">Loading…</span>';
       document.getElementById('edit-modal').classList.add('show');
       loadEmployeeDocs(id);
-      // Load onboarding section 7-8 data async
+      // Load full onboarding submission async
       fetch(`/api/admin/employees/${id}/onboarding`, {
         headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
       })
         .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!data) return;
-          const commitment = data.time_commitment_bucket || '';
-          document.getElementById('edit-emp-time-commitment').value = commitment;
-          document.getElementById('edit-emp-other-commitments').value = data.other_commitments || '';
-          document.getElementById('edit-emp-attestation-checked').checked = !!data.attestation_checked;
-          document.getElementById('edit-emp-attestation-date').value = data.attestation_date || '';
+        .then((resp) => {
+          if (!respDiv) return;
+          respDiv.innerHTML = renderTeammateResponses(resp?.data || null);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (respDiv) respDiv.innerHTML = '<span style="color:#555;font-size:11px;">No submission on file.</span>';
+        });
     }
 
     const CLINICAL_DESIGNATIONS = new Set([
@@ -770,6 +766,11 @@
 
     const MANUAL_COMPLIANCE_ITEMS = [
       {
+        key: 'professional_license_verified',
+        label: 'Active Professional License',
+        clearLabel: 'Mark Verified',
+      },
+      {
         key: 'disciplinary_actions',
         label: 'Disciplinary actions or concerns?',
         clearLabel: 'Mark Reviewed',
@@ -786,9 +787,96 @@
       },
     ];
 
+    function renderTeammateResponses(o) {
+      if (!o) return '<span style="color:#444;font-size:12px;">No onboarding submission on file.</span>';
+
+      function row(label, val) {
+        if (val === null || val === undefined || val === '') return '';
+        return `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #1a1a1a;">
+          <span style="font-size:10px;color:#666;min-width:140px;flex-shrink:0;">${label}</span>
+          <span style="font-size:11px;color:#bbb;">${escapeHtml(String(val))}</span>
+        </div>`;
+      }
+      function section(title) {
+        return `<div style="font-size:9px;color:#c9a84c;letter-spacing:0.12em;text-transform:uppercase;margin:10px 0 4px;padding-bottom:2px;border-bottom:1px solid #222;">${title}</div>`;
+      }
+
+      let profLicensesHtml = '';
+      if (o.professional_licenses && o.professional_licenses.length > 0) {
+        o.professional_licenses.forEach((lic, i) => {
+          const licType = lic.type === 'Other' ? `Other (${lic.type_other || ''})` : lic.type;
+          profLicensesHtml += row(`License ${i + 1} Type`, licType);
+          profLicensesHtml += row(`License ${i + 1} #`, lic.number);
+          profLicensesHtml += row(`License ${i + 1} Status`, lic.status);
+          profLicensesHtml += row(`License ${i + 1} Expires`, lic.expiration);
+        });
+      }
+
+      const completedAt = o.submitted_at
+        ? new Date(o.submitted_at).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : '';
+
+      const commitmentLabels = {
+        under_15: 'Less than 15 hrs / 1-2 days',
+        '15_to_25': '15-25 hrs / 2-3 days',
+        '25_to_35': '25-35 hrs / 3-4 days',
+        over_35: '35+ hrs / 4+ days',
+      };
+
+      return `<div style="max-height:320px;overflow-y:auto;padding-right:4px;">
+        ${section('Identity')}
+        ${row('First Name', o.first_name)}
+        ${row('Last Name', o.last_name)}
+        ${row('Date of Birth', o.date_of_birth)}
+        ${row('Mobile Phone', o.mobile_phone)}
+        ${section('Address')}
+        ${row('Street', o.address_street)}
+        ${row('City', o.address_city)}
+        ${row('State', o.address_state)}
+        ${row('ZIP', o.address_zip)}
+        ${section('Tax / W-9')}
+        ${row('TIN Type', o.tin_type)}
+        ${row('TIN (last 4)', o.tin_last4 ? `***-**-${o.tin_last4}` : '')}
+        ${row('Classification', o.w9_tax_classification)}
+        ${section("Driver's License")}
+        ${row('DL Number', o.driver_license_number)}
+        ${row('DL State', o.driver_license_state)}
+        ${section('Professional Licenses')}
+        ${profLicensesHtml || '<span style="font-size:11px;color:#444;">None provided</span>'}
+        ${o.certifications ? section('Certifications') + row('Certifications', o.certifications) : ''}
+        ${section('Professional Liability Insurance')}
+        ${row('Insurance Co.', o.insurer_name)}
+        ${row('Policy #', o.insurance_policy_number)}
+        ${row('Expires', o.insurance_expiration)}
+        ${row('Per Occurrence', o.prof_liability_per_occurrence)}
+        ${row('Aggregate', o.prof_liability_aggregate)}
+        ${section('Banking')}
+        ${row('Bank Name', o.bank_name)}
+        ${row('Account Owner', o.bank_account_owner_name)}
+        ${row('Account Type', o.bank_account_type)}
+        ${row('Payment Method', o.payment_method)}
+        ${row('Routing (last 4)', o.bank_routing_last4 ? `*****${o.bank_routing_last4}` : '')}
+        ${row('Account (last 4)', o.bank_account_last4 ? `*****${o.bank_account_last4}` : '')}
+        ${row('Zelle Contact', o.zelle_contact)}
+        ${section('Contract & Attestation')}
+        ${row('Time Commitment', commitmentLabels[o.time_commitment_bucket] || o.time_commitment_bucket)}
+        ${row('Other Commitments', o.other_commitments)}
+        ${row('Signature', o.attestation_signature)}
+        ${row('Signed', o.attestation_checked ? 'Yes' : o.attestation_checked === false ? 'No' : '')}
+        ${row('Signature Date', o.attestation_date)}
+        ${row('Submitted', completedAt)}
+      </div>`;
+    }
+
     function requiredDocTypes(designation) {
       const base = ['w9', 'driver_license', 'nda'];
-      return CLINICAL_DESIGNATIONS.has(designation) ? [...base, 'professional_license', 'insurance'] : base;
+      return CLINICAL_DESIGNATIONS.has(designation) ? [...base, 'insurance'] : base;
     }
 
     function expiryBadge(dateStr) {
@@ -1448,22 +1536,34 @@
         });
     }
 
+    function clearPaymentsFilter() {
+      const empSel = document.getElementById('payments-filter-employee');
+      const startIn = document.getElementById('payments-filter-start');
+      const endIn = document.getElementById('payments-filter-end');
+      if (empSel) empSel.value = '';
+      if (startIn) startIn.value = '';
+      if (endIn) endIn.value = '';
+      loadPayments();
+    }
+
     async function loadPayments() {
       const password = sessionStorage.getItem('adminPasswordValue');
       const employeeId = document.getElementById('payments-filter-employee')?.value || '';
-      const year = document.getElementById('payments-filter-year')?.value || '';
+      const startDate = document.getElementById('payments-filter-start')?.value || '';
+      const endDate = document.getElementById('payments-filter-end')?.value || '';
 
       let url = '/api/admin/payments';
       const params = [];
       if (employeeId) params.push(`employee_id=${employeeId}`);
-      if (year) params.push(`year=${year}`);
+      if (startDate) params.push(`start_date=${startDate}`);
+      if (endDate) params.push(`end_date=${endDate}`);
       if (params.length) url += '?' + params.join('&');
 
       try {
         const res = await fetch(url, { headers: { password } });
         if (!res.ok) {
           const tbody = document.getElementById('payments-table');
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:#c9474f;">Error loading payments (${res.status})</td></tr>`;
+          if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:#c9474f;">Error loading payments (${res.status})</td></tr>`;
           return;
         }
         const payments = await res.json();
@@ -1475,7 +1575,7 @@
         const summaryContent = document.getElementById('payments-summary-content');
 
         if (!payments.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No payments found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No payments found</td></tr>';
           footer.style.display = 'none';
           summaryDiv.style.display = 'none';
           return;
@@ -1494,10 +1594,11 @@
             return `
             <tr>
               <td style="font-size:12px;white-space:nowrap;">${date}</td>
-              <td><strong>${escapeHtml(p.teammate_name)}</strong></td>
+              <td style="white-space:nowrap;"><strong>${escapeHtml(p.teammate_name)}</strong></td>
               <td style="text-align:right;font-size:13px;color:#c9a84c;white-space:nowrap;"><strong>$${parseFloat(p.amount).toFixed(2)}</strong></td>
-              <td style="font-size:11px;color:#888;">${escapeHtml(p.payment_method || '')}</td>
-              <td style="font-size:11px;color:#666;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(desc)}">${escapeHtml(desc) || '<span style="color:#444;">—</span>'}</td>
+              <td style="font-size:11px;color:#888;white-space:nowrap;">${escapeHtml(p.payment_method || '')}</td>
+              <td style="font-size:11px;color:#888;white-space:nowrap;">${escapeHtml(p.source || '')}</td>
+              <td style="font-size:11px;color:#666;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(desc)}">${escapeHtml(desc) || '<span style="color:#444;">—</span>'}</td>
               <td style="font-size:11px;color:#777;">${escapeHtml(p.notes || '') || '<span style="color:#444;">—</span>'}</td>
               <td class="actions" style="white-space:nowrap;">
                 <button title="Edit" onclick="editPayment(${p.id})" style="background:none;border:none;color:#c9a84c;font-size:17px;cursor:pointer;padding:4px 6px;">✏</button>
@@ -1556,6 +1657,7 @@
         document.getElementById('payment-date-input').value = payment.payment_date;
         document.getElementById('payment-amount-input').value = parseFloat(payment.amount).toFixed(2);
         document.getElementById('payment-method-input').value = payment.payment_method || 'Zelle';
+        document.getElementById('payment-source-input').value = payment.source || '';
         document.getElementById('payment-notes-input').value = payment.notes || '';
       } else {
         title.textContent = 'Add Payment';
@@ -1564,6 +1666,7 @@
         document.getElementById('payment-date-input').value = new Date().toISOString().slice(0, 10);
         document.getElementById('payment-amount-input').value = '';
         document.getElementById('payment-method-input').value = 'Zelle';
+        document.getElementById('payment-source-input').value = 'Chase 7855';
         document.getElementById('payment-notes-input').value = '';
       }
 
@@ -1581,6 +1684,7 @@
       const date = document.getElementById('payment-date-input').value;
       const amount = parseFloat(document.getElementById('payment-amount-input').value);
       const method = document.getElementById('payment-method-input').value;
+      const source = document.getElementById('payment-source-input').value.trim();
       const notes = document.getElementById('payment-notes-input').value.trim();
 
       if (!empId) return alert('Please select a team member.');
@@ -1590,7 +1694,7 @@
       const emp = (window._employeesCache || allEmployees || []).find((e) => e.id == empId);
       const teammateName = emp ? emp.name : '';
 
-      const body = { employee_id: parseInt(empId), teammate_name: teammateName, payment_date: date, amount, payment_method: method, notes };
+      const body = { employee_id: parseInt(empId), teammate_name: teammateName, payment_date: date, amount, payment_method: method, source: source || null, notes };
 
       try {
         let res;

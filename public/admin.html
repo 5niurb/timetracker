@@ -188,14 +188,14 @@
               </select>
             </div>
             <div class="form-group">
-              <label>Year</label>
-              <select id="payments-filter-year" onchange="loadPayments()">
-                <option value="">All Years</option>
-                <option value="2026">2026</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-              </select>
+              <label>Start Date</label>
+              <input type="date" id="payments-filter-start" onchange="loadPayments()">
             </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="payments-filter-end" onchange="loadPayments()">
+            </div>
+            <button class="btn-secondary" onclick="clearPaymentsFilter()" style="padding:8px 14px;align-self:flex-end;">Clear</button>
           </div>
         </div>
         <div class="card" id="payments-summary" style="display:none;">
@@ -206,13 +206,14 @@
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Team Member</th>
-                  <th style="text-align:right;">Amount</th>
-                  <th>Method</th>
+                  <th style="white-space:nowrap;">Date</th>
+                  <th style="white-space:nowrap;">Team Member</th>
+                  <th style="text-align:right;white-space:nowrap;">Amount</th>
+                  <th style="white-space:nowrap;">Method</th>
+                  <th style="white-space:nowrap;">Source</th>
                   <th>Description</th>
                   <th>Notes</th>
-                  <th>Actions</th>
+                  <th style="white-space:nowrap;">Actions</th>
                 </tr>
               </thead>
               <tbody id="payments-table"></tbody>
@@ -220,7 +221,7 @@
                 <tr style="background:#1a2a1a;">
                   <td colspan="2"><strong>TOTAL</strong></td>
                   <td style="text-align:right;color:#c9a84c;" id="payments-total"><strong>$0.00</strong></td>
-                  <td colspan="4"></td>
+                  <td colspan="5"></td>
                 </tr>
               </tfoot>
             </table>
@@ -255,6 +256,10 @@
             <option value="Cash">Cash</option>
             <option value="Other">Other</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>Source</label>
+          <input type="text" id="payment-source-input" placeholder="e.g. Chase 7855">
         </div>
         <div class="form-group">
           <label>Notes</label>
@@ -508,36 +513,10 @@
         <label>Comments <span style="font-weight: 300; color: #888;">(optional)</span></label>
         <input type="text" id="edit-emp-rate-notes" placeholder="e.g. $X/unit for injectables">
       </div>
-      <!-- Section 7-8: Contract / Attestation (read from onboarding submission) -->
+      <!-- Teammate Responses (all onboarding fields, rendered dynamically) -->
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid #222;">
-        <div style="font-size:11px;color:#c9a84c;letter-spacing:0.1em;margin-bottom:12px;">CONTRACT DETAILS</div>
-        <div class="form-group">
-          <label>Desired Time Commitment</label>
-          <select id="edit-emp-time-commitment" disabled style="background:#0a0a0a;color:#666;border-color:#222;cursor:default;">
-            <option value="">— Not submitted —</option>
-            <option value="under_15">Less than 15 hours / 1-2 days</option>
-            <option value="15_to_25">15-25 hours / 2-3 days</option>
-            <option value="25_to_35">25-35 hours / 3-4 days</option>
-            <option value="over_35">More than 35 hours / 4+ days</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Other Commitments / Disclosures</label>
-          <textarea id="edit-emp-other-commitments" rows="2" disabled placeholder="— Not submitted —" style="background:#0a0a0a;color:#666;border-color:#222;cursor:default;resize:none;"></textarea>
-        </div>
-        <div style="display:flex;gap:24px;">
-          <div class="form-group" style="flex:0 0 auto;">
-            <label>Signed Acknowledgment</label>
-            <div style="padding:6px 0;display:flex;align-items:center;gap:8px;">
-              <input type="checkbox" id="edit-emp-attestation-checked" disabled style="width:16px;height:16px;">
-              <span style="font-size:12px;color:#666;">True / False</span>
-            </div>
-          </div>
-          <div class="form-group" style="flex:1;">
-            <label>Acknowledgment Date</label>
-            <input type="date" id="edit-emp-attestation-date" disabled style="background:#0a0a0a;color:#666;border-color:#222;cursor:default;">
-          </div>
-        </div>
+        <div style="font-size:11px;color:#c9a84c;letter-spacing:0.1em;margin-bottom:12px;">TEAMMATE RESPONSES</div>
+        <div id="edit-emp-teammate-responses" style="font-size:12px;color:#555;">Loading…</div>
       </div>
 
       <div class="alert error" id="edit-error"></div>

@@ -1843,11 +1843,8 @@ app.get('/api/admin/payments', async (req, res) => {
     .order('id', { ascending: false });
 
   if (req.query.employee_id) query = query.eq('employee_id', parseInt(req.query.employee_id));
-  if (req.query.year) {
-    query = query
-      .gte('payment_date', `${req.query.year}-01-01`)
-      .lte('payment_date', `${req.query.year}-12-31`);
-  }
+  if (req.query.start_date) query = query.gte('payment_date', req.query.start_date);
+  if (req.query.end_date) query = query.lte('payment_date', req.query.end_date);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ success: false, message: error.message });
@@ -1872,14 +1869,14 @@ app.post('/api/admin/payments', async (req, res) => {
   const { password } = req.headers;
   if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  const { employee_id, teammate_name, payment_date, amount, payment_method, notes } = req.body;
+  const { employee_id, teammate_name, payment_date, amount, payment_method, source, notes } = req.body;
   if (!teammate_name || !payment_date || !amount) {
     return res.status(400).json({ success: false, message: 'teammate_name, payment_date, and amount are required' });
   }
 
   const { data, error } = await supabaseAdmin
     .from('payments')
-    .insert({ employee_id: employee_id || null, teammate_name, payment_date, amount: parseFloat(amount), payment_method, notes })
+    .insert({ employee_id: employee_id || null, teammate_name, payment_date, amount: parseFloat(amount), payment_method, source: source || null, notes })
     .select()
     .single();
 
@@ -1891,13 +1888,14 @@ app.put('/api/admin/payments/:id', async (req, res) => {
   const { password } = req.headers;
   if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  const { employee_id, teammate_name, payment_date, amount, payment_method, notes } = req.body;
+  const { employee_id, teammate_name, payment_date, amount, payment_method, source, notes } = req.body;
   const updates = {};
   if (employee_id !== undefined) updates.employee_id = employee_id || null;
   if (teammate_name !== undefined) updates.teammate_name = teammate_name;
   if (payment_date !== undefined) updates.payment_date = payment_date;
   if (amount !== undefined) updates.amount = parseFloat(amount);
   if (payment_method !== undefined) updates.payment_method = payment_method;
+  if (source !== undefined) updates.source = source || null;
   if (notes !== undefined) updates.notes = notes;
 
   const { data, error } = await supabaseAdmin
