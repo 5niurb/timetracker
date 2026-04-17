@@ -368,59 +368,97 @@
 
     async function loadEmployees() {
       try {
-        const response = await fetch('/api/admin/employees');
-        const employees = await response.json();
+        const password = sessionStorage.getItem('adminPasswordValue');
+        const [empRes, docsRes] = await Promise.all([
+          fetch('/api/admin/employees'),
+          fetch('/api/admin/employee-documents/all', { headers: { password } }),
+        ]);
+        const employees = await empRes.json();
+        const allDocs = docsRes.ok ? await docsRes.json() : [];
 
         window._employeesCache = employees;
 
+        // Group docs by employee_id for O(1) lookup
+        const docsByEmployee = {};
+        allDocs.forEach((d) => {
+          if (!docsByEmployee[d.employee_id]) docsByEmployee[d.employee_id] = [];
+          docsByEmployee[d.employee_id].push(d);
+        });
+
+        // Sort: active first (alpha), inactive at bottom (alpha)
+        const sorted = [...employees].sort((a, b) => {
+          const aInactive = a.status === 'inactive' ? 1 : 0;
+          const bInactive = b.status === 'inactive' ? 1 : 0;
+          if (aInactive !== bInactive) return aInactive - bInactive;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+
         const tbody = document.getElementById('employees-table');
 
-        if (employees.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No team members yet</td></tr>';
+        if (sorted.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No team members yet</td></tr>';
         } else {
-          tbody.innerHTML = employees.map(emp => {
-            const jobTypeLabel = emp.contractor_type === 'contract' ? 'Contract' : emp.contractor_type === 'employee' ? 'Full-time' : '—';
-
-            // Build onboarding cell
-            let onboardingCell;
-            if (emp.onboarding_completed_at) {
-              const completedDate = new Date(emp.onboarding_completed_at).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric'
-              });
-              onboardingCell = `
+          tbody.innerHTML = sorted
+            .map((emp) => {
+              // Onboarding cell
+              let onboardingCell;
+              if (emp.onboarding_completed_at) {
+                const completedDate = new Date(emp.onboarding_completed_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+                onboardingCell = `
                 <span style="color: #6bff6b; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;">✓ COMPLETE</span>
                 <br><span style="font-size: 10px; color: #666;">${completedDate}</span>
                 <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="viewOnboardingDetails(${emp.id})">View Details</button>
               `;
-            } else if (emp.onboarding_token) {
-              onboardingCell = `
+              } else if (emp.onboarding_token) {
+                onboardingCell = `
                 <span style="color: #c9a84c; font-size: 11px; letter-spacing: 0.05em;">PENDING</span>
                 <br><button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px;" onclick="copyOnboardingLink('${emp.onboarding_token}')">Copy Link</button>
                 <button class="btn-secondary" style="font-size: 10px; padding: 2px 8px; margin-top: 4px; background:#1a2a1a; border:1px solid #2a4a2a; color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
               `;
-            } else {
-              onboardingCell = `<span style="color: #555; font-size: 11px;">—</span>`;
-            }
+              } else {
+                onboardingCell = `<span style="color: #555; font-size: 11px;">—</span>`;
+              }
 
-            const statusBadge = emp.status === 'inactive'
-              ? '<span style="font-size:10px;background:#2a1a1a;color:#c9474f;padding:1px 6px;border-radius:2px;margin-left:6px;">INACTIVE</span>'
-              : '';
+              // Status cell
+              const statusCell =
+                emp.status === 'inactive'
+                  ? '<span style="font-size:10px;background:#2a1a1a;color:#c9474f;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">INACTIVE</span>'
+                  : '<span style="font-size:10px;background:#0a2a0a;color:#6bff6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">ACTIVE</span>';
 
-            return `
+              // Compliance cell
+              const empDocs = docsByEmployee[emp.id] || [];
+              const byType = {};
+              empDocs.forEach((d) => {
+                if (!byType[d.document_type]) byType[d.document_type] = [];
+                byType[d.document_type].push(d);
+              });
+              const required = requiredDocTypes(emp.designation || '');
+              const allCompliant = required.every((t) => isItemCompliant(t, byType));
+              const complianceCell = allCompliant
+                ? '<span style="font-size:10px;background:#003d0f;color:#6bff6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">COMPLIANT</span>'
+                : '<span style="font-size:10px;background:#3d0000;color:#ff6b6b;padding:2px 7px;border-radius:2px;letter-spacing:0.04em;">NOT COMPLIANT</span>';
+
+              return `
               <tr style="${emp.status === 'inactive' ? 'opacity:0.6;' : ''}">
-                <td><strong>${escapeHtml(emp.name)}</strong>${statusBadge}<br><span style="font-size:11px;color:#888;">${emp.email || ''}</span></td>
-                <td><code style="background: #1a1a1a; padding: 4px 8px; font-size: 12px; color: #888; border: 1px solid #333;">${emp.pin}</code></td>
-                <td style="font-size: 12px;">${escapeHtml(emp.designation) || '<span style="color:#555;">—</span>'}</td>
-                <td style="font-size: 12px;">${jobTypeLabel}</td>
-                <td>${emp.hourly_wage > 0 ? `$${parseFloat(emp.hourly_wage).toFixed(2)}` : '-'}</td>
+                <td><strong>${escapeHtml(emp.name)}</strong></td>
+                <td style="font-size:12px;color:#aaa;">${emp.email ? escapeHtml(emp.email) : '<span style="color:#555;">—</span>'}</td>
+                <td style="font-size:12px;color:#aaa;">${emp.phone ? escapeHtml(emp.phone) : '<span style="color:#555;">—</span>'}</td>
+                <td style="font-size:12px;">${emp.designation ? escapeHtml(emp.designation) : '<span style="color:#555;">—</span>'}</td>
+                <td>${statusCell}</td>
                 <td style="font-size: 11px; line-height: 1.6;">${onboardingCell}</td>
+                <td>${complianceCell}</td>
                 <td class="actions">
                   <button class="btn-warning" onclick="editEmployee(${emp.id})">Edit</button>
                   <button class="btn-danger" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')">Delete</button>
                 </td>
               </tr>
             `;
-          }).join('');
+            })
+            .join('');
         }
       } catch (error) {
         console.error('Error loading employees:', error);

@@ -1665,6 +1665,19 @@ app.get('/api/admin/tax-filings/export/:year', async (req, res) => {
 // ============ EMPLOYEE DOCUMENTS ROUTES ============
 
 // GET /api/admin/employees/:id/documents — list docs with signed download URLs
+// Bulk compliance check — returns all docs (no signed URLs) for list view
+app.get('/api/admin/employee-documents/all', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { data, error } = await supabaseAdmin
+    .from('employee_documents')
+    .select('employee_id, document_type, expiration_date');
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
+});
+
 app.get('/api/admin/employees/:id/documents', async (req, res) => {
   const { password } = req.headers;
   if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
