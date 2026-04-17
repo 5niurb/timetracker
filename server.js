@@ -1797,6 +1797,39 @@ app.delete('/api/admin/employee-documents/:docId', async (req, res) => {
   res.json({ success: true });
 });
 
+// ============ Compliance Items API ============
+
+app.get('/api/admin/employees/:id/compliance-items', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  const { data, error } = await supabaseAdmin
+    .from('employee_compliance_items')
+    .select('*')
+    .eq('employee_id', parseInt(req.params.id));
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
+});
+
+app.put('/api/admin/employees/:id/compliance-items/:key', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  const { comment, is_cleared } = req.body;
+  const employeeId = parseInt(req.params.id);
+  const itemKey = req.params.key;
+  const record = {
+    employee_id: employeeId,
+    item_key: itemKey,
+    comment: comment || null,
+    is_cleared: !!is_cleared,
+    cleared_at: is_cleared ? new Date().toISOString() : null,
+  };
+  const { error } = await supabaseAdmin
+    .from('employee_compliance_items')
+    .upsert(record, { onConflict: 'employee_id,item_key' });
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
 // ============ Payments API ============
 
 app.get('/api/admin/payments', async (req, res) => {

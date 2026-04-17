@@ -421,8 +421,7 @@
               } else if (emp.onboarding_token) {
                 onboardingCell = `
                   <a href="/onboarding/${emp.onboarding_token}" target="_blank" style="color:#c9a84c;font-size:11px;font-weight:600;letter-spacing:0.05em;text-decoration:none;">PENDING ↗</a>
-                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;" onclick="copyOnboardingLink('${emp.onboarding_token}')">Copy Link</button>
-                  <button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;background:#1a2a1a;border:1px solid #2a4a2a;color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
+                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;background:#1a2a1a;border:1px solid #2a4a2a;color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
                 `;
               } else {
                 onboardingCell = '<span style="color:#555;font-size:11px;">—</span>';
@@ -450,8 +449,8 @@
                 const required = requiredDocTypes(emp.designation || '');
                 const allCompliant = required.every((t) => isItemCompliant(t, byType));
                 complianceCell = allCompliant
-                  ? `<span onclick="editEmployee(${emp.id})" title="Compliant — click to review" style="color:#6bff6b;font-size:22px;cursor:pointer;display:block;text-align:center;line-height:1;">✓</span>`
-                  : `<span onclick="editEmployee(${emp.id})" title="Not compliant — click to review" style="color:#ff6b6b;font-size:22px;cursor:pointer;display:block;text-align:center;line-height:1;">✗</span>`;
+                  ? `<span onclick="editEmployee(${emp.id})" title="Compliant — click to review" style="color:#6bff6b;font-size:12px;font-weight:700;cursor:pointer;display:block;text-align:center;">Yes</span>`
+                  : `<span onclick="editEmployee(${emp.id})" title="Not compliant — click to review" style="color:#ff6b6b;font-size:12px;font-weight:700;cursor:pointer;display:block;text-align:center;">No</span>`;
               }
 
               return `
@@ -467,7 +466,7 @@
                 <td style="font-size:11px;line-height:1.6;">${onboardingCell}</td>
                 <td style="text-align:center;">${complianceCell}</td>
                 <td class="actions" style="white-space:nowrap;">
-                  <button title="Edit" onclick="editEmployee(${emp.id})" style="background:none;border:none;color:#c9a84c;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Edit ${escapeHtml(emp.name)}">✏</button>
+                  <button title="Edit" onclick="editEmployee(${emp.id})" style="background:none;border:none;color:#c9a84c;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Edit ${escapeHtml(emp.name)}"><span style="display:inline-block;transform:rotate(-45deg);">✏</span></button>
                   <button title="Delete" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')" style="background:none;border:none;color:#c9474f;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Delete ${escapeHtml(emp.name)}">✕</button>
                 </td>
               </tr>
@@ -728,8 +727,27 @@
       document.getElementById('edit-error').classList.remove('show');
       document.getElementById('edit-doc-status').textContent = '';
       document.getElementById('edit-doc-file').value = '';
+      // Clear onboarding section fields
+      document.getElementById('edit-emp-time-commitment').value = '';
+      document.getElementById('edit-emp-other-commitments').value = '';
+      document.getElementById('edit-emp-attestation-checked').checked = false;
+      document.getElementById('edit-emp-attestation-date').value = '';
       document.getElementById('edit-modal').classList.add('show');
       loadEmployeeDocs(id);
+      // Load onboarding section 7-8 data async
+      fetch(`/api/admin/employees/${id}/onboarding`, {
+        headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          const commitment = data.time_commitment_bucket || '';
+          document.getElementById('edit-emp-time-commitment').value = commitment;
+          document.getElementById('edit-emp-other-commitments').value = data.other_commitments || '';
+          document.getElementById('edit-emp-attestation-checked').checked = !!data.attestation_checked;
+          document.getElementById('edit-emp-attestation-date').value = data.attestation_date || '';
+        })
+        .catch(() => {});
     }
 
     const CLINICAL_DESIGNATIONS = new Set([
@@ -741,14 +759,32 @@
     ]);
 
     const DOC_TYPE_META = {
-      w9: { label: 'W-9', hasExpiry: false, hasLicenseNo: false },
+      w9: { label: 'Tax Info / W-9', hasExpiry: false, hasLicenseNo: false },
       driver_license: { label: "Driver's License / Gov ID", hasExpiry: false, hasLicenseNo: false },
       nda: { label: 'Non-Disclosure Agreement', hasExpiry: false, hasLicenseNo: false },
-      professional_license: { label: 'Professional License', hasExpiry: true, hasLicenseNo: true },
+      professional_license: { label: 'Active Professional License', hasExpiry: true, hasLicenseNo: true },
       insurance: { label: 'Insurance Certificate', hasExpiry: true, hasLicenseNo: false },
       contract: { label: 'Contractor Agreement', hasExpiry: false, hasLicenseNo: false },
       other: { label: 'Other', hasExpiry: false, hasLicenseNo: false },
     };
+
+    const MANUAL_COMPLIANCE_ITEMS = [
+      {
+        key: 'disciplinary_actions',
+        label: 'Disciplinary actions or concerns?',
+        clearLabel: 'Mark Reviewed',
+      },
+      {
+        key: 'liability_current',
+        label: 'Current professional liability coverage',
+        clearLabel: 'Mark Verified',
+      },
+      {
+        key: 'liability_adequate',
+        label: 'Adequate professional liability coverage (250K+ occurrence, 1M+ aggregate)',
+        clearLabel: 'Mark Verified',
+      },
+    ];
 
     function requiredDocTypes(designation) {
       const base = ['w9', 'driver_license', 'nda'];
@@ -780,12 +816,17 @@
       return docs.some((d) => !d.expiration_date || new Date(d.expiration_date) >= new Date());
     }
 
-    function renderComplianceDocs(designation, docs, employeeId) {
+    function renderComplianceDocs(designation, docs, employeeId, complianceItems) {
       const required = requiredDocTypes(designation);
       const byType = {};
       docs.forEach((d) => {
         if (!byType[d.document_type]) byType[d.document_type] = [];
         byType[d.document_type].push(d);
+      });
+
+      const compByKey = {};
+      (complianceItems || []).forEach((c) => {
+        compByKey[c.item_key] = c;
       });
 
       const consumedTypes = new Set(required);
@@ -808,7 +849,7 @@
         if (isNda) consumedTypes.add('contract');
 
         const meta = isNda
-          ? { label: 'NDA / Contractor Agreement', hasExpiry: false, hasLicenseNo: false }
+          ? { label: 'Signed NDA / Contract', hasExpiry: false, hasLicenseNo: false }
           : DOC_TYPE_META[type] || { label: type };
 
         const compliant = isItemCompliant(type, byType);
@@ -859,7 +900,51 @@
         });
       }
 
+      // Manual compliance items
+      if (MANUAL_COMPLIANCE_ITEMS.length) {
+        html +=
+          '<div style="font-size:10px;color:#666;letter-spacing:0.08em;margin-top:14px;margin-bottom:8px;">MANUAL REVIEW ITEMS</div>';
+        MANUAL_COMPLIANCE_ITEMS.forEach((item) => {
+          const saved = compByKey[item.key];
+          const isCleared = saved?.is_cleared;
+          const comment = saved?.comment || '';
+          const clearedAt = saved?.cleared_at
+            ? new Date(saved.cleared_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : null;
+          const borderColor = isCleared ? '#2d6a2d' : '#6a2d2d';
+          const checkColor = isCleared ? '#6bff6b' : '#c9474f';
+          const symbol = isCleared ? '✓' : '✗';
+          html += `<div style="padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
+              <span style="font-size:12px;color:#aaa;flex:1;">${escapeHtml(item.label)}</span>
+              ${isCleared ? `<span style="font-size:10px;color:#555;flex-shrink:0;">Cleared ${clearedAt}</span>` : ''}
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="text" id="ci-comment-${item.key}-${employeeId}" placeholder="Add comment…" value="${escapeHtml(comment)}"
+                style="flex:1;font-size:11px;padding:4px 7px;background:#111;border:1px solid #333;color:#ccc;outline:none;">
+              <button onclick="saveComplianceItem(${employeeId},'${item.key}',false)"
+                style="font-size:10px;padding:4px 10px;background:none;border:1px solid #444;color:#888;cursor:pointer;white-space:nowrap;">Save Note</button>
+              <button onclick="saveComplianceItem(${employeeId},'${item.key}',true)"
+                style="font-size:10px;padding:4px 10px;background:#0a2a0a;border:1px solid #2a5a2a;color:#6bff6b;cursor:pointer;white-space:nowrap;">${item.clearLabel}</button>
+            </div>
+          </div>`;
+        });
+      }
+
       return html;
+    }
+
+    async function saveComplianceItem(employeeId, key, isCleared) {
+      const commentEl = document.getElementById(`ci-comment-${key}-${employeeId}`);
+      const comment = commentEl?.value || '';
+      const password = sessionStorage.getItem('adminPasswordValue') || '';
+      const res = await fetch(`/api/admin/employees/${employeeId}/compliance-items/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', password },
+        body: JSON.stringify({ comment, is_cleared: isCleared }),
+      });
+      if (res.ok) loadEmployeeDocs(employeeId);
     }
 
     function onDocTypeChange() {
@@ -881,12 +966,15 @@
       const listEl = document.getElementById('edit-docs-list');
       listEl.innerHTML = '<span style="color:#555;font-size:12px;">Loading…</span>';
       try {
-        const res = await fetch(`/api/admin/employees/${employeeId}/documents`, {
-          headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
-        });
-        const docs = await res.json();
+        const password = sessionStorage.getItem('adminPasswordValue') || '';
+        const [docsRes, compRes] = await Promise.all([
+          fetch(`/api/admin/employees/${employeeId}/documents`, { headers: { password } }),
+          fetch(`/api/admin/employees/${employeeId}/compliance-items`, { headers: { password } }),
+        ]);
+        const docs = await docsRes.json();
+        const complianceItems = compRes.ok ? await compRes.json() : [];
         const designation = document.getElementById('edit-emp-designation').value;
-        listEl.innerHTML = renderComplianceDocs(designation, docs, employeeId);
+        listEl.innerHTML = renderComplianceDocs(designation, docs, employeeId, complianceItems);
       } catch (e) {
         listEl.innerHTML = '<span style="color:#c9474f;font-size:12px;">Failed to load documents.</span>';
       }
@@ -1373,7 +1461,11 @@
 
       try {
         const res = await fetch(url, { headers: { password } });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const tbody = document.getElementById('payments-table');
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:#c9474f;">Error loading payments (${res.status})</td></tr>`;
+          return;
+        }
         const payments = await res.json();
 
         const tbody = document.getElementById('payments-table');
