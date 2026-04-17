@@ -719,13 +719,13 @@ app.get('/api/admin/employees', async (req, res) => {
   const { data: employees, error } = await supabaseAdmin
     .from('employees')
     .select(
-      'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, status, created_at, onboarding_token, onboarding_completed_at',
+      'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, status, created_at, review_token, review_completed_at',
     );
 
   res.json(employees || []);
 });
 
-// Add new employee — auto-generates onboarding_token
+// Add new employee — auto-generates review_token
 app.post('/api/admin/employees', async (req, res) => {
   const {
     name,
@@ -766,7 +766,7 @@ app.post('/api/admin/employees', async (req, res) => {
       designation: designation?.trim() || null,
       contractor_type: contractorType || null,
       start_date: startDate || null,
-      onboarding_token: onboardingToken,
+      review_token: onboardingToken,
     })
     .select()
     .single();
@@ -831,6 +831,46 @@ app.put('/api/admin/employees/:id', async (req, res) => {
   } else {
     res.json({ success: true });
   }
+});
+
+// Admin direct PII edit — no review token required
+app.put('/api/admin/employees/:id/pii', async (req, res) => {
+  const { id } = req.params;
+  const allowed = [
+    'first_name', 'last_name', 'middle_name', 'preferred_name', 'mobile_phone',
+    'date_of_birth', 'address_street', 'address_city', 'address_state', 'address_zip',
+    'tin_type', 'tin_last4', 'w9_entity_name', 'w9_tax_classification', 'w9_collected_at',
+    'driver_license_number', 'driver_license_state', 'professional_licenses',
+    'insurer_name', 'insurance_policy_number', 'insurance_expiration',
+    'prof_liability_per_occurrence', 'prof_liability_aggregate',
+    'bank_name', 'bank_account_owner_name', 'bank_account_type',
+    'bank_routing_last4', 'bank_account_last4', 'payment_method', 'zelle_contact',
+    'time_commitment_bucket', 'other_commitments',
+    'attestation_checked', 'attestation_signature', 'attestation_date',
+  ];
+  const payload = {};
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) payload[key] = req.body[key];
+  }
+  if (req.body.tin_raw) {
+    payload.tin_encrypted = encryptValue(req.body.tin_raw);
+    payload.tin_last4 = req.body.tin_raw.replace(/\D/g, '').slice(-4);
+  }
+  if (req.body.bank_routing_raw) {
+    payload.bank_routing_encrypted = encryptValue(req.body.bank_routing_raw);
+    payload.bank_routing_last4 = req.body.bank_routing_raw.replace(/\D/g, '').slice(-4);
+  }
+  if (req.body.bank_account_raw) {
+    payload.bank_account_encrypted = encryptValue(req.body.bank_account_raw);
+    payload.bank_account_last4 = req.body.bank_account_raw.replace(/\D/g, '').slice(-4);
+  }
+  if (Object.keys(payload).length === 0) {
+    return res.status(400).json({ success: false, message: 'No valid fields provided' });
+  }
+  payload.data_updated_at = new Date().toISOString();
+  const { error } = await supabaseAdmin.from('employees').update(payload).eq('id', parseInt(id));
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
 });
 
 // Delete employee
@@ -970,7 +1010,7 @@ app.get('/admin', (req, res) => {
 
 // ============ ONBOARDING ROUTES ============
 
-// Admin: get onboarding details for an employee (masked — no *_encrypted columns)
+// Admin: get PII/compliance details for an employee (masked — no *_encrypted columns)
 app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
   const { password } = req.headers;
   if (password !== ADMIN_PASSWORD) {
@@ -979,37 +1019,50 @@ app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
 
   const { id } = req.params;
 
-  const { data: record, error } = await supabaseAdmin
-    .from('employee_onboarding')
+  const { data, error } = await supabaseAdmin
+    .from('employees')
     .select(
-      `id, employee_id, first_name, last_name, middle_name, preferred_name,
-       mobile_phone, date_of_birth,
-       address_street, address_city, address_state, address_zip,
-       tin_last4, tin_type, w9_entity_name, w9_tax_classification, w9_collected_at,
+      `first_name, last_name, middle_name, preferred_name, mobile_phone,
+       date_of_birth, address_street, address_city, address_state, address_zip,
+       tin_type, tin_last4, tin_encrypted,
+       w9_entity_name, w9_tax_classification, w9_collected_at,
        driver_license_number, driver_license_state, driver_license_upload_path,
        professional_licenses,
        insurer_name, insurance_policy_number, insurance_expiration, insurance_upload_path,
        prof_liability_per_occurrence, prof_liability_aggregate,
        bank_name, bank_account_owner_name, bank_account_type,
-       bank_routing_last4, bank_account_last4,
+       bank_routing_last4, bank_account_last4, bank_routing_encrypted, bank_account_encrypted,
        payment_method, zelle_contact,
        time_commitment_bucket, other_commitments,
        attestation_checked, attestation_signature, attestation_date,
-       submitted_at`,
+       review_submitted_at, review_completed_at`,
     )
-    .eq('employee_id', parseInt(id))
-    .order('submitted_at', { ascending: false })
-    .limit(1)
+    .eq('id', parseInt(id))
     .single();
 
   if (error) {
-    return res.status(404).json({ success: false, message: 'No onboarding data found' });
+    return res.status(404).json({ success: false, message: 'Employee not found' });
   }
 
-  res.json({ success: true, data: record });
+  // Mask encrypted values — return hint strings, not ciphertext
+  const masked = { ...data };
+  if (masked.tin_encrypted) {
+    masked.tin_masked = masked.tin_last4 ? `***-**-${masked.tin_last4}` : 'on file';
+  }
+  delete masked.tin_encrypted;
+  if (masked.bank_routing_encrypted) {
+    masked.bank_routing_masked = masked.bank_routing_last4 ? `*****${masked.bank_routing_last4}` : 'on file';
+  }
+  delete masked.bank_routing_encrypted;
+  if (masked.bank_account_encrypted) {
+    masked.bank_account_masked = masked.bank_account_last4 ? `****${masked.bank_account_last4}` : 'on file';
+  }
+  delete masked.bank_account_encrypted;
+
+  res.json({ success: true, data: masked });
 });
 
-// Admin: generate a new onboarding token for an existing employee
+// Admin: generate a new review token for an existing employee
 app.post('/api/admin/employees/:id/onboarding-token', async (req, res) => {
   const { password } = req.headers;
   if (password !== ADMIN_PASSWORD) {
@@ -1021,7 +1074,7 @@ app.post('/api/admin/employees/:id/onboarding-token', async (req, res) => {
 
   const { error } = await supabaseAdmin
     .from('employees')
-    .update({ onboarding_token: newToken, onboarding_completed_at: null })
+    .update({ review_token: newToken })
     .eq('id', parseInt(id));
 
   if (error) {
@@ -1047,7 +1100,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
 
   const { data: employee, error } = await supabaseAdmin
     .from('employees')
-    .select('id, name, email, phone, onboarding_token, onboarding_completed_at')
+    .select('id, name, email, phone, review_token')
     .eq('id', parseInt(id))
     .single();
 
@@ -1055,16 +1108,12 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
     return res.status(404).json({ success: false, message: 'Employee not found' });
   }
 
-  if (!employee.onboarding_token) {
-    return res.status(400).json({ success: false, message: 'No onboarding token — generate one first' });
-  }
-
-  if (employee.onboarding_completed_at) {
-    return res.status(400).json({ success: false, message: 'Onboarding already completed' });
+  if (!employee.review_token) {
+    return res.status(400).json({ success: false, message: 'No review token — generate one first' });
   }
 
   const firstName = (employee.name || '').split(' ')[0];
-  const onboardingUrl = `${req.protocol}://${req.get('host')}/onboarding/${employee.onboarding_token}`;
+  const onboardingUrl = `${req.protocol}://${req.get('host')}/onboarding/${employee.review_token}`;
 
   if (type === 'sms') {
     if (!employee.phone) {
@@ -1077,7 +1126,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Twilio not configured' });
     }
 
-    const smsBody = `Hi ${firstName}, this is LeMed Spa. Please complete your onboarding form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${onboardingUrl}\n\nQuestions? Reply to this text or call 818-463-3772.`;
+    const smsBody = `Hi ${firstName}, this is LeMed Spa. Please review and confirm your info on file at the link below. It takes about 5-10 minutes.\n\n${onboardingUrl}\n\nQuestions? Reply to this text or call 818-463-3772.`;
 
     // Normalize phone to E.164
     let toPhone = employee.phone.replace(/\D/g, '');
@@ -1131,15 +1180,12 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
         <div style="border-bottom: 2px solid #c9a84c; padding-bottom: 16px; margin-bottom: 24px;">
           <h1 style="font-size: 20px; color: #222; margin: 0;">LeMed Spa</h1>
         </div>
-        <p>Hi ${firstName} — Welcome to the LeMed Spa family!</p>
-        <p>Please visit our onboarding workflow which automatically collects your contact info, insurance coverage, payment preferences, and other info needed to get you properly setup in our systems. It also requires you to upload your government ID and license/insurance info.</p>
-        <p>Access it via this link:</p>
+        <p>Hi ${firstName},</p>
+        <p>Please take a moment to review and confirm your information on file with LeMed Spa — contact info, tax details, insurance, and payment preferences. The link below is reusable and can be used anytime to make updates.</p>
         <p style="margin: 20px 0;">
-          <a href="${onboardingUrl}" style="color: #c9a84c; font-weight: 600;">LM &ndash; New Team Member Onboarding</a>
+          <a href="${onboardingUrl}" style="color: #c9a84c; font-weight: 600;">Review My Team Member Info</a>
         </p>
-        <p>Will also use the responses to pre-populate a W9 form and send to you for electronic signature.</p>
         <p>If you have any questions, please let Lea know or just reply here.</p>
-        <p>We look forward to working with you!</p>
         <p style="margin-top: 28px; margin-bottom: 4px;"><em>Regards,</em></p>
         <p style="margin: 0;">
           <strong>Accounts</strong> | <strong>Operations</strong><br>
@@ -1156,10 +1202,10 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'LeMed Spa Onboarding <ops@lemedspa.com>',
+          from: 'LeMed Spa <ops@lemedspa.com>',
           to: [employee.email],
           cc: ['lea@lemedspa.com'],
-          subject: `LeMed Spa — New Team Member Onboarding`,
+          subject: `LeMed Spa — Please Review Your Team Info`,
           html: emailHtml,
         }),
       });
@@ -1180,46 +1226,46 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
   }
 });
 
-// Public: prefill data for onboarding form (returns employee job info for pre-population)
+// Public: prefill data for review form (returns all available employee data for pre-population)
 app.get('/api/onboarding/:token/prefill', async (req, res) => {
   const { token } = req.params;
 
   const { data: employee, error } = await supabaseAdmin
     .from('employees')
     .select(
-      'id, name, email, phone, designation, contractor_type, pay_type, hourly_wage, additional_pay_rate, rate_notes, onboarding_completed_at',
+      `id, name, email, phone, designation, contractor_type, pay_type,
+       hourly_wage, additional_pay_rate, rate_notes, start_date,
+       first_name, last_name, middle_name, preferred_name, mobile_phone,
+       date_of_birth, address_street, address_city, address_state, address_zip,
+       tin_type, tin_last4,
+       w9_entity_name, w9_tax_classification,
+       driver_license_number, driver_license_state, driver_license_upload_path,
+       professional_licenses,
+       insurer_name, insurance_policy_number, insurance_expiration, insurance_upload_path,
+       prof_liability_per_occurrence, prof_liability_aggregate,
+       bank_name, bank_account_owner_name, bank_account_type,
+       bank_routing_last4, bank_account_last4,
+       payment_method, zelle_contact,
+       time_commitment_bucket, other_commitments,
+       attestation_checked, attestation_signature, attestation_date,
+       review_completed_at`,
     )
-    .eq('onboarding_token', token)
+    .eq('review_token', token)
     .single();
 
   if (error || !employee) {
-    return res.status(404).json({ success: false, message: 'Invalid onboarding link' });
+    return res.status(404).json({ success: false, message: 'Invalid link' });
   }
 
-  if (employee.onboarding_completed_at) {
-    return res.status(409).json({ success: false, message: 'Onboarding already completed' });
-  }
-
-  // Split name into first/last for pre-fill (best effort)
+  // Split name into first/last for pre-fill if not already stored
   const nameParts = (employee.name || '').trim().split(/\s+/);
-  const first_name = nameParts[0] || '';
-  const last_name = nameParts.slice(1).join(' ') || '';
+  const prefill = {
+    ...employee,
+    first_name: employee.first_name || nameParts[0] || '',
+    last_name: employee.last_name || nameParts.slice(1).join(' ') || '',
+  };
 
-  res.json({
-    success: true,
-    prefill: {
-      first_name,
-      last_name,
-      email: employee.email || '',
-      phone: employee.phone || '',
-      designation: employee.designation || '',
-      contractor_type: employee.contractor_type || '',
-      pay_type: employee.pay_type || '',
-      hourly_wage: employee.hourly_wage || '',
-      additional_pay_rate: employee.additional_pay_rate || '',
-      rate_notes: employee.rate_notes || '',
-    },
-  });
+  res.json({ success: true, prefill });
 });
 
 // Public: upload a file during onboarding (driver license or insurance certificate)
@@ -1233,16 +1279,12 @@ app.post(
     // Validate token
     const { data: employee, error: empError } = await supabaseAdmin
       .from('employees')
-      .select('id, onboarding_completed_at')
-      .eq('onboarding_token', token)
+      .select('id')
+      .eq('review_token', token)
       .single();
 
     if (empError || !employee) {
-      return res.status(404).json({ success: false, message: 'Invalid onboarding link' });
-    }
-
-    if (employee.onboarding_completed_at) {
-      return res.status(409).json({ success: false, message: 'Onboarding already completed' });
+      return res.status(404).json({ success: false, message: 'Invalid link' });
     }
 
     if (!req.file) {
@@ -1280,14 +1322,14 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// Public: serve onboarding page (validates token)
+// Public: serve review page (validates token — link is always reusable)
 app.get('/onboarding/:token', async (req, res) => {
   const { token } = req.params;
 
   const { data: employee, error } = await supabaseAdmin
     .from('employees')
-    .select('id, name, onboarding_completed_at')
-    .eq('onboarding_token', token)
+    .select('id')
+    .eq('review_token', token)
     .single();
 
   if (error || !employee) {
@@ -1296,53 +1338,30 @@ app.get('/onboarding/:token', async (req, res) => {
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <style>body{font-family:sans-serif;text-align:center;padding:60px 20px;background:#0a0a0a;color:#ccc;}
       h2{color:#c9a84c;}</style></head>
-      <body><h2>Invalid Onboarding Link</h2>
-      <p>This link is invalid or has expired. Please contact your administrator.</p></body></html>
+      <body><h2>Invalid Link</h2>
+      <p>This link is invalid. Please contact your administrator.</p></body></html>
     `);
   }
 
-  if (employee.onboarding_completed_at) {
-    return res.status(200).send(`
-      <!DOCTYPE html><html><head><title>Already Complete</title>
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <style>body{font-family:sans-serif;text-align:center;padding:60px 20px;background:#0a0a0a;color:#ccc;}
-      h2{color:#6bff6b;}</style></head>
-      <body><h2>Onboarding Complete</h2>
-      <p>Your onboarding was already submitted. Thank you!</p></body></html>
-    `);
-  }
-
-  // Serve the onboarding HTML page
   res.sendFile(path.join(__dirname, 'public', 'onboarding.html'));
 });
 
-// Public: submit onboarding form
+// Public: submit review form (updates employees table directly)
 app.post('/api/onboarding/:token', async (req, res) => {
   const { token } = req.params;
 
-  // Verify token
+  // Verify token and get designation for validation
   const { data: employee, error: empError } = await supabaseAdmin
     .from('employees')
-    .select('id, name, onboarding_completed_at')
-    .eq('onboarding_token', token)
+    .select('id, name, designation')
+    .eq('review_token', token)
     .single();
 
   if (empError || !employee) {
-    return res.status(404).json({ success: false, message: 'Invalid or expired onboarding link' });
+    return res.status(404).json({ success: false, message: 'Invalid or expired link' });
   }
 
-  if (employee.onboarding_completed_at) {
-    return res.status(409).json({ success: false, message: 'Onboarding already completed' });
-  }
-
-  // Look up employee designation to determine conditional validation
-  const { data: empDetail } = await supabaseAdmin
-    .from('employees')
-    .select('designation')
-    .eq('id', employee.id)
-    .single();
-  const designation = empDetail?.designation || '';
-  const requireLicenseInsurance = CLINICAL_TITLES.has(designation);
+  const requireLicenseInsurance = CLINICAL_TITLES.has(employee.designation || '');
 
   // Validate all fields
   const form = req.body;
@@ -1354,14 +1373,10 @@ app.post('/api/onboarding/:token', async (req, res) => {
 
   // Extract masked values
   const tin_last4 = form.tin_raw ? extractLast4SSN(form.tin_raw) : null;
-  const bank_routing_last4 = form.bank_routing_raw
-    ? extractLast4Routing(form.bank_routing_raw)
-    : null;
-  const bank_account_last4 = form.bank_account_raw
-    ? extractLast4Account(form.bank_account_raw)
-    : null;
+  const bank_routing_last4 = form.bank_routing_raw ? extractLast4Routing(form.bank_routing_raw) : null;
+  const bank_account_last4 = form.bank_account_raw ? extractLast4Account(form.bank_account_raw) : null;
 
-  // Encrypt sensitive fields with AES-256-GCM before storing
+  // Encrypt sensitive fields
   const [tin_encrypted, bank_routing_encrypted, bank_account_encrypted] = await Promise.all([
     encryptValue(form.tin_raw || null),
     form.payment_method === 'ach' ? encryptValue(form.bank_routing_raw || null) : Promise.resolve(null),
@@ -1378,8 +1393,9 @@ app.post('/api/onboarding/:token', async (req, res) => {
     }
   }
 
-  const onboardingRecord = {
-    employee_id: employee.id,
+  const now = new Date().toISOString();
+
+  const updatePayload = {
     first_name: form.first_name.trim(),
     last_name: form.last_name.trim(),
     middle_name: form.middle_name?.trim() || null,
@@ -1395,6 +1411,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
     tin_encrypted,
     w9_entity_name: form.w9_entity_name?.trim() || null,
     w9_tax_classification: form.w9_tax_classification || null,
+    w9_collected_at: now,
     driver_license_number: form.driver_license_number?.trim() || null,
     driver_license_state: form.driver_license_state || null,
     driver_license_upload_path: form.driver_license_upload_path || null,
@@ -1414,7 +1431,6 @@ app.post('/api/onboarding/:token', async (req, res) => {
     bank_account_type: form.payment_method === 'ach' ? (form.bank_account_type || null) : null,
     bank_routing_last4: form.payment_method === 'ach' ? bank_routing_last4 : null,
     bank_account_last4: form.payment_method === 'ach' ? bank_account_last4 : null,
-    // Encrypted ACH fields — null for Zelle path (no stale plaintext left behind)
     bank_routing_encrypted,
     bank_account_encrypted,
     payment_method: form.payment_method || null,
@@ -1424,30 +1440,26 @@ app.post('/api/onboarding/:token', async (req, res) => {
     attestation_checked: true,
     attestation_signature: form.attestation_signature.trim(),
     attestation_date: form.attestation_date,
+    ic_agreement_signed: true,
+    ic_agreement_signed_at: now,
+    review_completed_at: now,
+    review_submitted_at: now,
+    data_updated_at: now,
   };
 
-  // Insert onboarding record
-  const { error: insertError } = await supabaseAdmin.from('employee_onboarding').insert(onboardingRecord);
-
-  if (insertError) {
-    console.error('[Onboarding] Insert error:', insertError);
-    return res.status(500).json({ success: false, message: 'Failed to save onboarding data. Please try again.' });
-  }
-
-  // Mark employee as onboarded
-  const now = new Date().toISOString();
-  await supabaseAdmin
+  const { error: updateError } = await supabaseAdmin
     .from('employees')
-    .update({
-      ic_agreement_signed: true,
-      ic_agreement_signed_at: now,
-      onboarding_completed_at: now,
-    })
+    .update(updatePayload)
     .eq('id', employee.id);
 
-  console.log(`[Onboarding] Completed for employee ${employee.id} (${employee.name})`);
+  if (updateError) {
+    console.error('[Review] Update error:', updateError);
+    return res.status(500).json({ success: false, message: 'Failed to save. Please try again.' });
+  }
 
-  res.json({ success: true, message: 'Onboarding submitted successfully' });
+  console.log(`[Review] Submitted for employee ${employee.id} (${employee.name})`);
+
+  res.json({ success: true, message: 'Info confirmed. Thank you!' });
 });
 
 // ============ TAX FILINGS ROUTES ============
