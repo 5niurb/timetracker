@@ -1343,7 +1343,7 @@ app.get('/onboarding/:token', async (req, res) => {
     `);
   }
 
-  res.sendFile(path.join(__dirname, 'public', 'onboarding.html'));
+  res.sendFile(path.join(__dirname, 'public', 'review.html'));
 });
 
 // Public: submit review form (updates employees table directly)
