@@ -39,6 +39,16 @@ for (const emp of employees) {
   const buffer = Buffer.from(await fileData.arrayBuffer());
   const base64 = buffer.toString('base64');
 
+  const ext = emp.insurance_upload_path.split('.').pop().toLowerCase();
+  const isImage = ['jpeg', 'jpg', 'png', 'webp', 'gif'].includes(ext);
+  const mediaType = isImage
+    ? `image/${ext === 'jpg' ? 'jpeg' : ext}`
+    : 'application/pdf';
+
+  const contentBlock = isImage
+    ? { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } }
+    : { type: 'document', source: { type: 'base64', media_type: mediaType, data: base64 } };
+
   let msg;
   try {
     msg = await anthropic.messages.create({
@@ -47,10 +57,7 @@ for (const emp of employees) {
       messages: [{
         role: 'user',
         content: [
-          {
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-          },
+          contentBlock,
           {
             type: 'text',
             text: `Extract these fields from this Certificate of Insurance. Return JSON only, no explanation:
@@ -73,7 +80,8 @@ If a field is not visible, use null.`,
 
   let extracted;
   try {
-    extracted = JSON.parse(msg.content[0].text);
+    const raw = msg.content[0].text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+    extracted = JSON.parse(raw);
   } catch {
     console.error(`SKIP ${emp.name}: could not parse Haiku response — "${msg.content[0].text}"`);
     continue;

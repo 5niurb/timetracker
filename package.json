@@ -1,5 +1,5 @@
 {
-  "name": "timetracker",
+  "name": "paytrack",
   "version": "1.0.0",
   "description": "Employee time tracking PWA",
   "main": "server.js",
@@ -13,5 +13,9 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "multer": "^2.1.1"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "xlsx": "^0.18.5"
   }
 }
