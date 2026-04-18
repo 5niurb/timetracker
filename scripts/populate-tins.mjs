@@ -14,10 +14,10 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 // Format: { name: 'As in employees.name', ssn: '###-##-####' }
 const TIN_DATA = [
   // { name: 'Jade Gonzales',   ssn: 'xxx-xx-xxxx' },
-  // { name: 'Leena Osman',     ssn: 'xxx-xx-xxxx' },
   // { name: 'Jodi Kay',        ssn: 'xxx-xx-xxxx' },
-  // { name: 'Salakjit Hanna',  ssn: 'xxx-xx-xxxx' },
+  // { name: 'Lucine Keseyan',  ssn: 'xxx-xx-xxxx' },
   // { name: 'Vayda Kasbah',    ssn: 'xxx-xx-xxxx' },
+  // { name: 'Salakjit Hanna',  ssn: 'xxx-xx-xxxx' },
 ];
 
 if (TIN_DATA.length === 0) {
@@ -33,7 +33,7 @@ for (const { name, ssn } of TIN_DATA) {
   }
 
   const tin_last4 = digits.slice(-4);
-  const tin_encrypted = encryptValue(ssn);
+  const tin_encrypted = await encryptValue(ssn);
   const pin = digits.slice(0, 4);
 
   const { error } = await supabase

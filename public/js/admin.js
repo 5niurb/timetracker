@@ -403,25 +403,20 @@
             .map((emp) => {
               const inactive = emp.status === 'inactive';
 
-              // Onboarding cell — blank for inactive
+              // Response Form cell — blank for inactive
               let onboardingCell;
               if (inactive) {
                 onboardingCell = '<span style="color:#333;font-size:11px;">—</span>';
-              } else if (emp.onboarding_completed_at) {
-                const completedDate = new Date(emp.onboarding_completed_at).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                });
+              } else if (emp.review_completed_at) {
                 onboardingCell = `
-                  <span style="color:#6bff6b;font-size:11px;font-weight:600;letter-spacing:0.05em;">✓ COMPLETE</span>
-                  <br><span style="font-size:10px;color:#666;">${completedDate}</span>
-                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;" onclick="viewOnboardingDetails(${emp.id})">View Details</button>
+                  <span style="display:inline-block;background:#0a2a0a;color:#6bff6b;font-size:10px;font-weight:600;padding:3px 10px;border-radius:3px;letter-spacing:0.06em;">ACKNOWLEDGED</span>
+                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;" onclick="copyResponseFormLink('${emp.review_token}')">Copy Link</button>
                 `;
-              } else if (emp.onboarding_token) {
+              } else if (emp.review_token) {
                 onboardingCell = `
-                  <a href="/onboarding/${emp.onboarding_token}" target="_blank" style="color:#c9a84c;font-size:11px;font-weight:600;letter-spacing:0.05em;text-decoration:none;">PENDING ↗</a>
-                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;background:#1a2a1a;border:1px solid #2a4a2a;color:#6bff6b;" onclick="openSendLink(${emp.id})">Send Link</button>
+                  <span style="display:inline-block;background:#2a1f00;color:#c9a84c;font-size:10px;font-weight:600;padding:3px 10px;border-radius:3px;letter-spacing:0.06em;">PENDING</span>
+                  <br><button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;" onclick="openSendLink(${emp.id})">Send Link</button>
+                  <button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-top:4px;margin-left:4px;" onclick="copyResponseFormLink('${emp.review_token}')">Copy</button>
                 `;
               } else {
                 onboardingCell = '<span style="color:#555;font-size:11px;">—</span>';
@@ -592,7 +587,7 @@
         if (data.success) {
           // Show success state
           const link = `${window.location.origin}/onboarding/${data.onboardingToken}`;
-          document.getElementById('preform-success-name').textContent = `${name} has been added. Share the onboarding link below.`;
+          document.getElementById('preform-success-name').textContent = `${name} has been added. Share the response form link below.`;
           document.getElementById('preform-onboarding-url').value = link;
           window._preformEmployeeId = data.id;
           window._preformEmployeeName = firstName;
@@ -622,7 +617,7 @@
       // Find employee from cache
       const emp = (window._employeesCache || []).find(e => e.id === empId);
       const name = emp ? emp.name : (window._preformEmployeeName || 'team member');
-      document.getElementById('send-link-subtitle').textContent = `Send onboarding link to ${name}`;
+      document.getElementById('send-link-subtitle').textContent = `Send response form link to ${name}`;
       document.getElementById('send-link-options').style.display = 'block';
       document.getElementById('send-link-preview-wrap').style.display = 'none';
       document.getElementById('send-link-sent').style.display = 'none';
@@ -639,8 +634,8 @@
       _sendLinkType = type;
       const emp = (window._employeesCache || []).find(e => e.id === _sendLinkEmployeeId);
       const firstName = emp ? (emp.name || '').split(' ')[0] : (window._preformEmployeeName || '');
-      const link = emp && emp.onboarding_token
-        ? `${window.location.origin}/onboarding/${emp.onboarding_token}`
+      const link = emp && emp.review_token
+        ? `${window.location.origin}/onboarding/${emp.review_token}`
         : (window._preformOnboardingLink || '');
 
       let preview = '';
@@ -648,10 +643,10 @@
 
       if (type === 'sms') {
         label = 'Text Message Preview (from 213-444-2242)';
-        preview = `Hi ${firstName}, this is LeMed Spa. Please complete your onboarding form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${link}\n\nQuestions? Reply to this text or call 818-463-3772.`;
+        preview = `Hi ${firstName}, this is LeMed Spa. Please complete your response form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${link}\n\nQuestions? Reply to this text or call 818-463-3772.`;
       } else {
         label = 'Email Preview (from ops@lemedspa.com)';
-        preview = `Subject: LeMed Spa — New Team Member Onboarding\nTo: ${emp?.email || window._preformEmployeeEmail || '(no email on file)'}\nCC: lea@lemedspa.com\n\n---\n\nHi ${firstName} — Welcome to the LeMed Spa family!\n\nPlease visit our onboarding workflow which automatically collects your contact info, insurance coverage, payment preferences, and other info needed to get you properly setup in our systems. It also requires you to upload your government ID and license/insurance info.\n\nAccess it via this link:\n${link}\n\nWill also use the responses to pre-populate a W9 form and send to you for electronic signature.\n\nIf you have any questions, please let Lea know or just reply here.\n\nWe look forward to working with you!\n\nRegards,\n\nAccounts | Operations\naccounts@lemedspa.com | ops@lemedspa.com`;
+        preview = `Subject: LeMed Spa — Response Form\nTo: ${emp?.email || window._preformEmployeeEmail || '(no email on file)'}\nCC: lea@lemedspa.com\n\n---\n\nHi ${firstName} — Welcome to the LeMed Spa family!\n\nPlease complete our response form, which collects your contact info, insurance coverage, payment preferences, and other info needed to get you properly set up in our systems. It also requires you to upload your government ID and license/insurance info.\n\nAccess it via this link:\n${link}\n\nIf you have any questions, please let Lea know or just reply here.\n\nWe look forward to working with you!\n\nRegards,\n\nAccounts | Operations\naccounts@lemedspa.com | ops@lemedspa.com`;
       }
 
       document.getElementById('send-preview-label').textContent = label;
@@ -1495,7 +1490,7 @@
       return div.innerHTML;
     }
 
-    function copyOnboardingLink(token) {
+    function copyResponseFormLink(token) {
       const link = `${window.location.origin}/onboarding/${token}`;
       navigator.clipboard.writeText(link).then(() => {
         // Flash feedback

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LM PayTrack — Worker Onboarding</title>
+  <title>LM PayTrack — Response Form</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -459,14 +459,14 @@
 <div class="page-header">
   <div>
     <h1>LM PayTrack</h1>
-    <div class="subtitle">Independent Contractor Onboarding</div>
+    <div class="subtitle">Response Form</div>
   </div>
 </div>
 
 <!-- Success screen (shown after submit) -->
 <div id="success-screen">
   <div class="icon">&#10003;</div>
-  <h2>Onboarding Complete</h2>
+  <h2>Form Complete</h2>
   <p>Thank you — your information has been received.<br>
   LeMed will be in touch with next steps.</p>
 </div>
@@ -907,7 +907,7 @@
 
   <div class="submit-zone">
     <button type="button" class="btn-submit" id="submit-btn" onclick="submitForm()">
-      Submit Onboarding
+      Submit Response Form
     </button>
     <p style="color:var(--text-dim);font-size:11px;text-align:center;margin-top:12px;">
       This form can only be submitted once. You will not be able to edit after submission.
@@ -1454,7 +1454,7 @@
       banner.textContent = 'Please correct the highlighted fields below.';
       banner.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = 'Submit Onboarding';
+      btn.textContent = 'Submit Response Form';
       return;
     }
 
@@ -1546,7 +1546,7 @@
     }
 
     btn.disabled = false;
-    btn.textContent = 'Submit Onboarding';
+    btn.textContent = 'Submit Response Form';
   }
 </script>
 </body>
