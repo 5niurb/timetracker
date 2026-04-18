@@ -1,3 +1,160 @@
+## Session — 2026-04-17 (Flatten employee schema — full data architecture redesign)
+
+**Focus:** Execute 6-task plan: collapse `employee_onboarding` into flat `employees` table; reusable review flow; admin PII edit tabs; Haiku insurance extraction script.
+
+**Accomplished:**
+- **Task 1:** Migration 006 — 41 new columns added to `employees`, `employee_onboarding` dropped, `onboarding_token` → `review_token`
+- **Task 2:** server.js — all routes updated to use `employees` directly; added `PUT /api/admin/employees/:id/pii`; reusable review links (no one-shot redirect)
+- **Task 3:** `public/review.html` — copy of onboarding form with "Review & Confirm" framing; served at `/onboarding/:token`
+- **Task 4:** admin.html/admin.js/admin.css — edit modal now has 4-tab PII editor (Identity, Tax/W-9, Insurance, Banking); admin can edit any field directly without employee token
+- **Task 5:** `scripts/populate-tins.mjs` — one-off script to set TIN + PIN from 1099 PDF extract
+- **Task 6:** `scripts/extract-insurance.mjs` — Claude Haiku reads COI PDFs from Supabase Storage; extracts insurer, policy, expiration, coverage amounts
+
+**Diagram:**
+```
+Admin panel (edit modal)        Employee review link
+  ├─ Basic info (top)             /onboarding/:token → review.html
+  ├─ Save Changes (name/pin/etc)    ↓ POST /api/onboarding/:token
+  └─ TEAMMATE DETAILS tabs           → UPDATE employees (single row)
+      Identity | Tax | Insurance | Banking
+      [Save Details] → PUT /api/admin/employees/:id/pii
+
+employees table (single source of truth)
+  id, name, pin, ... , first_name, last_name, tin_encrypted,
+  bank_routing_encrypted, review_token, review_completed_at, ...
+  (employee_onboarding table DROPPED)
+```
+
+**Current State:**
+- All 6 tasks complete and pushed to GitHub (eb8fc38..0495455)
+- Render auto-deploy triggered — should be live in ~3 min
+- 23/23 tests pass
+- `populate-tins.mjs` needs TIN_DATA filled in from 1099 PDF before running
+- `extract-insurance.mjs` needs `@anthropic-ai/sdk` installed + `ANTHROPIC_API_KEY` in env
+
+**Issues:**
+- None known
+
+**Next Steps:**
+- Verify production deploy at paytrack.lemedspa.app
+- Fill TIN_DATA in populate-tins.mjs (ask Lea for SSNs from 1099 PDF)
+- Run extract-insurance.mjs once employees upload their COI PDFs
+- SPECS.md update for new schema + routes
+
+---
+
+## Session — 2026-04-17 (Team Table modal + compliance overhaul + payments fix)
+
+**Focus:** Redesign edit modal as "Team Table", overhaul compliance checklist with manual review items, fix Payments tab, Team Member list tweaks.
+
+**Accomplished:**
+- Edit modal renamed "Team Table", widened to 720px
+- Pay Rate → "Hourly Rate: Service Revenue ($)"
+- Additional Pay Rate → "Hourly Rate-Training & Development ($)"
+- Contract Details section (read-only, pulled from `employee_onboarding`): time commitment, other commitments, signed acknowledgment, acknowledgment date
+- Compliance checklist labels: W-9 → "Tax Info / W-9", NDA slot → "Signed NDA / Contract", Professional License → "Active Professional License"
+- 3 new manual review items with comment + Save Note / Mark Verified buttons:
+  - "Disciplinary actions or concerns?"
+  - "Current professional liability coverage"
+  - "Adequate professional liability coverage (250K+ occurrence, 1M+ aggregate)"
+- Migration 009: `employee_compliance_items` table (employee_id, item_key, is_cleared, comment, cleared_at)
+- New API endpoints: `GET /api/admin/employees/:id/compliance-items`, `PUT /api/admin/employees/:id/compliance-items/:key`
+- Team list: "Compliance" → "Compliant?", Yes/No text (was ✓/✗ icons), Copy Link button removed, pencil rotated 45°, columns narrowed
+- Payments: error message shown on non-OK response (was silently blank)
+- Deployed: commit aca9338
+
+**Diagram:**
+```
+Team Members list                    Team Table modal
+  Name (link) | ... | Compliant? | Actions     Title: "Team Table" (720px wide)
+              Yes/No ←→ editEmployee()          ├─ Basic info (1-6 unchanged)
+              rotated pencil ✏ button           ├─ Pay: "Hourly Rate: Service Revenue"
+                                                ├─ "Hourly Rate-Training & Development"
+employee_compliance_items            ├─ CONTRACT DETAILS (read-only from onboarding)
+  employee_id, item_key, is_cleared  └─ COMPLIANCE CHECKLIST
+  comment, cleared_at                    required docs + 3 manual review items
+  ↑ PUT /api/admin/.../compliance-items/:key   [Save Note] [Mark Verified]
+```
+
+**Current State:**
+- All previous functionality intact
+- Payments tab: 78 historical payments in DB, tab should display correctly now
+- New compliance items table empty (populated as admin reviews each employee)
+
+**Issues:**
+- Payments tab was blank for user — likely Render hadn't deployed when tested; now has visible error message if it fails again
+- Chase bank integration (weekly auto-pull of transactions) — deferred, needs research
+
+**Next Steps:**
+- Verify Payments tab working at paytrack.lemedspa.app
+- Chase bank integration research (Plaid vs direct Chase API vs manual xlsx upload workflow)
+- SPECS.md update
+
+---
+
+## Session — 2026-04-16 (compliance checklist + expiry tracking)
+
+**Focus:** Structured compliance doc checklist in edit modal; expiry/license metadata; DB enrichment.
+
+**Accomplished:**
+- Migration 007: Added `expiration_date DATE` + `license_number TEXT` to `employee_documents`
+- Enrichment SQL: Backfilled existing rows from Talent Vendor Database.xlsx
+  - Jodi (id=13) professional_license: #171374, exp 2027-04-30
+  - Lucine (id=14) professional_license: #95350547, exp 2026-12-31
+  - Lucine (id=14) insurance: exp 2026-09-01
+  - Jade (id=11) insurance: exp 2025-06-29 (EXPIRED)
+- Fixed designations for imported employees: Salakjit→Esthetician, Kirti→Aesthetic Nurse Practitioner, Sheila→Esthetician
+- Compliance checklist UI in edit modal:
+  - Required docs derived from designation (all: W-9, Gov ID, NDA; clinical: + license + insurance)
+  - Missing docs show `○` placeholder with `+ Upload` shortcut button
+  - Uploaded required docs show `✓` green border + expiry badge (green/yellow/orange/red)
+  - Additional (non-required) docs shown in separate section
+- Upload form: conditional expiry date + license# inputs (shown only for applicable types)
+- New PATCH `/api/admin/employee-documents/:docId` for metadata-only edits (expiry/license/notes)
+- GET docs route now returns `expiration_date`, `license_number`
+- POST docs route now saves `expiration_date`, `license_number`
+- Deployed to Render (commit e6deaf4)
+
+**Diagram:**
+```
+Edit Modal → COMPLIANCE DOCUMENTS section
+  REQUIRED (per designation):
+    ✓ W-9            [green border, ✓]
+    ○ Gov ID         [gray, + Upload →]  sets type select + scrolls
+    ✓ Prof License   [green, #171374, EXP Apr 30 2027]
+    ✓ Insurance      [red,   EXPIRED Jun 29 2025]
+  ADDITIONAL:
+    [contract, other docs not in required list]
+Upload form: type select → show/hide expiry + license# inputs
+```
+
+**Current State:**
+- 9 employees: 7 active + 2 inactive (Kirti, Sheila)
+- All designations now set correctly
+- 18 docs in `employee_documents`; 4 rows enriched with expiry/license data
+- Compliance checklist live on Render
+
+**Issues:**
+- Jade's insurance is EXPIRED (2025-06-29) — needs renewal → shows as ✗ NOT COMPLIANT
+- Sheila's professional license EXPIRED (2026-02-28) → shows as ✗ NOT COMPLIANT
+- Jade has no professional_license doc uploaded (license #753411 known from xlsx, but no file)
+- Lea Culver: no employee record (no email source)
+- Kirti has no professional_license doc uploaded yet (license# 95007091 known)
+- NDA: no standalone NDA docs uploaded for anyone, but contractor agreements satisfy requirement for those who have them (Jade, Lucine, Sheila)
+
+**Updated (later in session):**
+- NDA slot: contractor agreement satisfies it (contract docs consumed by NDA slot, not shown in ADDITIONAL)
+- Compliance checklist redesigned: COMPLIANT / NOT COMPLIANT status badge derived from all requirements; expired docs count as ✗
+- Heading renamed to "COMPLIANCE CHECKLIST"
+- Deployed: commit 6ea0331
+
+**Next Steps:**
+- W9 pre-population feature (deferred)
+- SPECS.md update for compliance checklist feature
+- Consider showing compliance status column in Team Members list view
+
+---
+
 ## Session — 2026-04-16 (status field + employee_documents + doc uploads)
 
 **Focus:** Employee status field, inactive contractors, compliance doc uploads.
