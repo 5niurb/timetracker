@@ -30,13 +30,22 @@ employees table (single source of truth)
 - Render auto-deploy triggered — should be live in ~3 min
 - 23/23 tests pass
 - `populate-tins.mjs` needs TIN_DATA filled in from 1099 PDF before running
-- `extract-insurance.mjs` needs `@anthropic-ai/sdk` installed + `ANTHROPIC_API_KEY` in env
+- `extract-insurance.mjs` working — Jade Gonzales extracted, committed 64bf799
+- `ANTHROPIC_API_KEY` set in Windows env (setx) and documented in reference_credentials.md
+
+**Insurance extraction results (2026-04-17):**
+- **Jade Gonzales (id:11):** American Casualty Co of Reading PA, policy 0665857179, expires 2025-06-29, $1M/$6M ← WRITTEN TO DB
+- **Kirti Patel (id:17):** `Insurance.jpeg` in iCloudDrive is not a COI — Haiku returned all nulls. Need actual COI PDF.
 
 **Issues:**
-- None known
+- Kirti Patel insurance JPEG is not a COI — need the actual certificate document
+- Jade's insurance is expired (2025-06-29) — Lea may need to request a renewed COI
 
 **Next Steps:**
 - Verify production deploy at paytrack.lemedspa.app
+- Get Kirti Patel's actual COI PDF, upload to Supabase Storage, re-run extract-insurance.mjs
+- Fill `TIN_DATA` in `populate-tins.mjs` from 1099 PDF (needs Lea to confirm SSNs)
+- Consider flagging Jade's expired insurance in admin UI
 - Fill TIN_DATA in populate-tins.mjs (ask Lea for SSNs from 1099 PDF)
 - Run extract-insurance.mjs once employees upload their COI PDFs
 - SPECS.md update for new schema + routes
