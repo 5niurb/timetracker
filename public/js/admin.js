@@ -727,23 +727,124 @@
       document.getElementById('edit-error').classList.remove('show');
       document.getElementById('edit-doc-status').textContent = '';
       document.getElementById('edit-doc-file').value = '';
-      // Show loading state for teammate responses
-      const respDiv = document.getElementById('edit-emp-teammate-responses');
-      if (respDiv) respDiv.innerHTML = '<span style="color:#555;font-size:11px;">Loading…</span>';
+      document.getElementById('pii-save-status').textContent = '';
+      // Clear raw-value fields so previous data doesn't leak
+      ['pii-tin_raw', 'pii-bank_routing_raw', 'pii-bank_account_raw'].forEach(
+        (id) => (document.getElementById(id).value = ''),
+      );
+      showPiiTab('identity');
       document.getElementById('edit-modal').classList.add('show');
       loadEmployeeDocs(id);
-      // Load full onboarding submission async
+      // Load full profile data async and populate PII tabs
       fetch(`/api/admin/employees/${id}/onboarding`, {
         headers: { password: sessionStorage.getItem('adminPasswordValue') || '' },
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((resp) => {
-          if (!respDiv) return;
-          respDiv.innerHTML = renderTeammateResponses(resp?.data || null);
+          const d = resp?.data || {};
+          const set = (elId, val) => {
+            const el = document.getElementById(elId);
+            if (el) el.value = val ?? '';
+          };
+          // Identity
+          set('pii-first_name', d.first_name);
+          set('pii-last_name', d.last_name);
+          set('pii-middle_name', d.middle_name);
+          set('pii-preferred_name', d.preferred_name);
+          set('pii-mobile_phone', d.mobile_phone);
+          set('pii-date_of_birth', d.date_of_birth);
+          set('pii-address_street', d.address_street);
+          set('pii-address_city', d.address_city);
+          set('pii-address_state', d.address_state);
+          set('pii-address_zip', d.address_zip);
+          set('pii-driver_license_number', d.driver_license_number);
+          set('pii-driver_license_state', d.driver_license_state);
+          // Tax
+          set('pii-tin_type', d.tin_type);
+          set('pii-tin_last4_display', d.tin_last4 ? `***-**-${d.tin_last4}` : '');
+          set('pii-w9_entity_name', d.w9_entity_name);
+          set('pii-w9_tax_classification', d.w9_tax_classification);
+          // Insurance
+          set('pii-insurer_name', d.insurer_name);
+          set('pii-insurance_policy_number', d.insurance_policy_number);
+          set('pii-insurance_expiration', d.insurance_expiration);
+          set('pii-prof_liability_per_occurrence', d.prof_liability_per_occurrence);
+          set('pii-prof_liability_aggregate', d.prof_liability_aggregate);
+          // Banking
+          set('pii-bank_name', d.bank_name);
+          set('pii-bank_account_owner_name', d.bank_account_owner_name);
+          set('pii-bank_account_type', d.bank_account_type);
+          set('pii-payment_method', d.payment_method);
+          set('pii-zelle_contact', d.zelle_contact);
+          set('pii-routing_display', d.bank_routing_last4 ? `*****${d.bank_routing_last4}` : '');
+          set('pii-account_display', d.bank_account_last4 ? `*****${d.bank_account_last4}` : '');
         })
-        .catch(() => {
-          if (respDiv) respDiv.innerHTML = '<span style="color:#555;font-size:11px;">No submission on file.</span>';
+        .catch(() => {});
+    }
+
+    function showPiiTab(name) {
+      ['identity', 'tax', 'insurance', 'banking'].forEach((t) => {
+        document.getElementById(`pii-panel-${t}`).style.display = t === name ? '' : 'none';
+        const btn = document.getElementById(`pii-tab-${t}`);
+        btn.classList.toggle('pii-tab-active', t === name);
+      });
+    }
+
+    async function savePiiData() {
+      const id = document.getElementById('edit-emp-id').value;
+      const statusEl = document.getElementById('pii-save-status');
+      statusEl.style.color = '#888';
+      statusEl.textContent = 'Saving…';
+
+      const val = (elId) => document.getElementById(elId)?.value?.trim() ?? '';
+
+      const payload = {};
+      const fields = [
+        'first_name', 'last_name', 'middle_name', 'preferred_name', 'mobile_phone',
+        'date_of_birth', 'address_street', 'address_city', 'address_state', 'address_zip',
+        'driver_license_number', 'driver_license_state',
+        'tin_type', 'w9_entity_name', 'w9_tax_classification',
+        'insurer_name', 'insurance_policy_number', 'insurance_expiration',
+        'prof_liability_per_occurrence', 'prof_liability_aggregate',
+        'bank_name', 'bank_account_owner_name', 'bank_account_type',
+        'payment_method', 'zelle_contact',
+      ];
+      fields.forEach((f) => {
+        const v = val(`pii-${f}`);
+        if (v !== '') payload[f] = v;
+      });
+      const tinRaw = val('pii-tin_raw');
+      if (tinRaw) payload.tin_raw = tinRaw;
+      const routingRaw = val('pii-bank_routing_raw');
+      if (routingRaw) payload.bank_routing_raw = routingRaw;
+      const accountRaw = val('pii-bank_account_raw');
+      if (accountRaw) payload.bank_account_raw = accountRaw;
+
+      try {
+        const res = await fetch(`/api/admin/employees/${id}/pii`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            password: sessionStorage.getItem('adminPasswordValue') || '',
+          },
+          body: JSON.stringify(payload),
         });
+        const data = await res.json();
+        if (data.success) {
+          statusEl.style.color = '#6bff6b';
+          statusEl.textContent = 'Saved ✓';
+          // Clear raw fields after save
+          document.getElementById('pii-tin_raw').value = '';
+          document.getElementById('pii-bank_routing_raw').value = '';
+          document.getElementById('pii-bank_account_raw').value = '';
+        } else {
+          statusEl.style.color = '#ff6b6b';
+          statusEl.textContent = data.message || 'Save failed';
+        }
+      } catch {
+        statusEl.style.color = '#ff6b6b';
+        statusEl.textContent = 'Network error';
+      }
     }
 
     const CLINICAL_DESIGNATIONS = new Set([

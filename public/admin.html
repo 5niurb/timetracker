@@ -513,16 +513,112 @@
         <label>Comments <span style="font-weight: 300; color: #888;">(optional)</span></label>
         <input type="text" id="edit-emp-rate-notes" placeholder="e.g. $X/unit for injectables">
       </div>
-      <!-- Teammate Responses (all onboarding fields, rendered dynamically) -->
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #222;">
-        <div style="font-size:11px;color:#c9a84c;letter-spacing:0.1em;margin-bottom:12px;">TEAMMATE RESPONSES</div>
-        <div id="edit-emp-teammate-responses" style="font-size:12px;color:#555;">Loading…</div>
-      </div>
-
       <div class="alert error" id="edit-error"></div>
       <div class="modal-actions">
         <button class="btn-secondary" onclick="closeEditModal()">Cancel</button>
         <button class="btn-primary" onclick="saveEmployee()">Save Changes</button>
+      </div>
+
+      <!-- PII / Profile Details (tabbed, editable by admin) -->
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid #333;">
+        <div style="font-size:11px;color:#c9a84c;letter-spacing:0.1em;margin-bottom:14px;">TEAMMATE DETAILS</div>
+
+        <!-- Tab bar -->
+        <div id="pii-tabs" style="display:flex;gap:0;border-bottom:1px solid #333;margin-bottom:16px;">
+          <button onclick="showPiiTab('identity')" id="pii-tab-identity" class="pii-tab pii-tab-active">Identity</button>
+          <button onclick="showPiiTab('tax')" id="pii-tab-tax" class="pii-tab">Tax / W-9</button>
+          <button onclick="showPiiTab('insurance')" id="pii-tab-insurance" class="pii-tab">Insurance</button>
+          <button onclick="showPiiTab('banking')" id="pii-tab-banking" class="pii-tab">Banking</button>
+        </div>
+
+        <!-- Identity tab -->
+        <div id="pii-panel-identity" class="pii-panel">
+          <div class="pii-grid">
+            <div class="pii-field"><label>First Name</label><input type="text" id="pii-first_name"></div>
+            <div class="pii-field"><label>Last Name</label><input type="text" id="pii-last_name"></div>
+            <div class="pii-field"><label>Middle Name</label><input type="text" id="pii-middle_name"></div>
+            <div class="pii-field"><label>Preferred Name</label><input type="text" id="pii-preferred_name"></div>
+            <div class="pii-field"><label>Mobile Phone</label><input type="tel" id="pii-mobile_phone"></div>
+            <div class="pii-field"><label>Date of Birth</label><input type="date" id="pii-date_of_birth"></div>
+            <div class="pii-field span-2"><label>Street Address</label><input type="text" id="pii-address_street"></div>
+            <div class="pii-field"><label>City</label><input type="text" id="pii-address_city"></div>
+            <div class="pii-field"><label>State</label><input type="text" id="pii-address_state" maxlength="2" placeholder="CA"></div>
+            <div class="pii-field"><label>ZIP</label><input type="text" id="pii-address_zip" maxlength="10"></div>
+            <div class="pii-field"><label>DL / ID Number</label><input type="text" id="pii-driver_license_number"></div>
+            <div class="pii-field"><label>DL / ID State</label><input type="text" id="pii-driver_license_state" maxlength="2" placeholder="CA"></div>
+          </div>
+        </div>
+
+        <!-- Tax tab -->
+        <div id="pii-panel-tax" class="pii-panel" style="display:none;">
+          <div class="pii-grid">
+            <div class="pii-field"><label>TIN Type</label>
+              <select id="pii-tin_type">
+                <option value="">— Select —</option>
+                <option value="SSN">SSN</option>
+                <option value="EIN">EIN</option>
+              </select>
+            </div>
+            <div class="pii-field"><label>TIN (last 4 on file)</label><input type="text" id="pii-tin_last4_display" disabled placeholder="—"></div>
+            <div class="pii-field span-2"><label>New TIN (leave blank to keep existing)</label><input type="text" id="pii-tin_raw" placeholder="123-45-6789 or 12-3456789" autocomplete="off"></div>
+            <div class="pii-field"><label>W-9 Entity Name</label><input type="text" id="pii-w9_entity_name" placeholder="Leave blank if sole prop"></div>
+            <div class="pii-field"><label>Tax Classification</label>
+              <select id="pii-w9_tax_classification">
+                <option value="">— Select —</option>
+                <option value="individual">Individual / sole proprietor</option>
+                <option value="c_corp">C Corporation</option>
+                <option value="s_corp">S Corporation</option>
+                <option value="partnership">Partnership</option>
+                <option value="llc_single">LLC – single member</option>
+                <option value="llc_multi">LLC – multi-member</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insurance tab -->
+        <div id="pii-panel-insurance" class="pii-panel" style="display:none;">
+          <div class="pii-grid">
+            <div class="pii-field"><label>Insurer Name</label><input type="text" id="pii-insurer_name"></div>
+            <div class="pii-field"><label>Policy Number</label><input type="text" id="pii-insurance_policy_number"></div>
+            <div class="pii-field"><label>Expiration Date</label><input type="date" id="pii-insurance_expiration"></div>
+            <div class="pii-field"><label>Per Occurrence ($)</label><input type="number" id="pii-prof_liability_per_occurrence" step="0.01" min="0"></div>
+            <div class="pii-field"><label>Aggregate ($)</label><input type="number" id="pii-prof_liability_aggregate" step="0.01" min="0"></div>
+          </div>
+        </div>
+
+        <!-- Banking tab -->
+        <div id="pii-panel-banking" class="pii-panel" style="display:none;">
+          <div class="pii-grid">
+            <div class="pii-field"><label>Bank Name</label><input type="text" id="pii-bank_name"></div>
+            <div class="pii-field"><label>Account Owner Name</label><input type="text" id="pii-bank_account_owner_name"></div>
+            <div class="pii-field"><label>Account Type</label>
+              <select id="pii-bank_account_type">
+                <option value="">— Select —</option>
+                <option value="checking">Checking</option>
+                <option value="savings">Savings</option>
+              </select>
+            </div>
+            <div class="pii-field"><label>Payment Method</label>
+              <select id="pii-payment_method">
+                <option value="">— Select —</option>
+                <option value="ach">ACH</option>
+                <option value="zelle">Zelle</option>
+              </select>
+            </div>
+            <div class="pii-field"><label>Zelle Contact</label><input type="text" id="pii-zelle_contact" placeholder="Phone or email"></div>
+            <div class="pii-field"><label>Routing (last 4 on file)</label><input type="text" id="pii-routing_display" disabled placeholder="—"></div>
+            <div class="pii-field"><label>Account (last 4 on file)</label><input type="text" id="pii-account_display" disabled placeholder="—"></div>
+            <div class="pii-field"><label>New Routing # (leave blank to keep)</label><input type="text" id="pii-bank_routing_raw" placeholder="9 digits" autocomplete="off" maxlength="9"></div>
+            <div class="pii-field"><label>New Account # (leave blank to keep)</label><input type="text" id="pii-bank_account_raw" placeholder="4-17 digits" autocomplete="off" maxlength="17"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+          <button class="btn-primary" style="font-size:12px;padding:7px 18px;" onclick="savePiiData()">Save Details</button>
+          <span id="pii-save-status" style="font-size:11px;"></span>
+        </div>
       </div>
 
       <!-- Documents Section -->

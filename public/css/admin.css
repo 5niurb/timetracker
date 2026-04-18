@@ -812,3 +812,41 @@
         width: 100%;
       }
     }
+
+    /* PII tab section in edit modal */
+    .pii-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #666;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 14px 8px;
+      cursor: pointer;
+    }
+    .pii-tab:hover { color: #aaa; }
+    .pii-tab-active {
+      color: #c9a84c;
+      border-bottom-color: #c9a84c;
+    }
+    .pii-panel { display: block; }
+    .pii-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+    }
+    .pii-field { display: flex; flex-direction: column; gap: 4px; }
+    .pii-field label { font-size: 10px; color: #666; letter-spacing: 0.05em; text-transform: uppercase; }
+    .pii-field input, .pii-field select {
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      color: #ccc;
+      font-size: 12px;
+      padding: 5px 8px;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .pii-field input:focus, .pii-field select:focus { outline: none; border-color: #c9a84c; }
+    .pii-field input:disabled { color: #444; cursor: default; }
+    .pii-field.span-2 { grid-column: span 2; }
