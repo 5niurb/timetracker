@@ -1,3 +1,54 @@
+## Session — 2026-04-17 (Response Form rebrand + employee data population)
+
+**Focus:** Rebrand "Onboarding" → "Response Form" throughout app; populate employee DB from CSV/XLSX; encrypt TINs.
+
+**Accomplished:**
+- **Response Form rebrand:** admin.html, admin.js, onboarding.html, review.html — all "Onboarding" → "Response Form"
+- **Team member list:** "Response Form" column with Acknowledged (green) / Pending (gold) badges + Copy/Send Link buttons
+- **Bug fix:** `copyOnboardingLink` renamed to `copyResponseFormLink` (was broken — cell HTML called wrong name)
+- **Bug fix:** admin.js now uses `review_token`/`review_completed_at` (schema was renamed, JS still used old names)
+- **Bug fix:** `populate-tins.mjs` — added `await` before `encryptValue()` (was storing Promise object, not ciphertext)
+- **Label fixes:** "Training & Development (if applicable)", removed "(optional)" from Comments, removed placeholder text
+- **Employee DB populated** (via Supabase MCP): first/last names, phones, professional licenses for all active employees; Lucine's CNA NSO insurance
+- **TINs encrypted:** Jade, Jodi, Lucine, Vayda, Salakjit — SSNs encrypted + stored, never committed to git
+- **Pushed:** commit 1eb2a44
+
+**Diagram:**
+```
+Team Members list (admin.html)
+  Response Form column:
+    ┌─────────────────┐  ┌──────────────────┐
+    │  ACKNOWLEDGED   │  │    PENDING       │
+    │  (green badge)  │  │  (gold badge)    │
+    │  [Copy Link]    │  │  [Send][Copy]    │
+    └─────────────────┘  └──────────────────┘
+
+employees table (populated fields):
+  first_name, last_name — ALL employees ✓
+  mobile_phone — Jade, Leena, Jodi ✓
+  professional_licenses (JSONB) — Jade(RN), Leena(NP), Jodi(Est), Lucine(RN), Salakjit(Est) ✓
+  insurer_name, insurance_expiration, coverage — Lucine (CNA NSO) ✓
+  address_street — Vayda ✓
+  tin_encrypted, tin_last4, pin — Jade, Jodi, Lucine, Vayda, Salakjit ✓
+```
+
+**Current State:**
+- Render auto-deploy triggered from push — live in ~3 min at paytrack.lemedspa.app
+- Admin Response Form column showing correct status for all employees
+- TINs stored encrypted; populate-tins.mjs TIN_DATA cleared (no SSNs in git)
+
+**Issues:**
+- Jade's insurance still expired (2025-06-29) — Lea needs to provide updated COI
+- Vayda's address missing city/state/zip (only street set)
+- Leena, April: no mobile_phone in source data
+
+**Next Steps:**
+- SPECS.md update for Response Form rebrand
+- Flag Jade's expired insurance in admin compliance checklist
+- Collect updated COI from Jade
+
+---
+
 ## Session — 2026-04-17 (Flatten employee schema — full data architecture redesign)
 
 **Focus:** Execute 6-task plan: collapse `employee_onboarding` into flat `employees` table; reusable review flow; admin PII edit tabs; Haiku insurance extraction script.
@@ -35,15 +86,13 @@ employees table (single source of truth)
 
 **Insurance extraction results (2026-04-17):**
 - **Jade Gonzales (id:11):** American Casualty Co of Reading PA, policy 0665857179, expires 2025-06-29, $1M/$6M ← WRITTEN TO DB
-- **Kirti Patel (id:17):** `Insurance.jpeg` in iCloudDrive is not a COI — Haiku returned all nulls. Need actual COI PDF.
+- **Kirti Patel (id:17):** inactive — no action needed
 
 **Issues:**
-- Kirti Patel insurance JPEG is not a COI — need the actual certificate document
 - Jade's insurance is expired (2025-06-29) — Lea may need to request a renewed COI
 
 **Next Steps:**
 - Verify production deploy at paytrack.lemedspa.app
-- Get Kirti Patel's actual COI PDF, upload to Supabase Storage, re-run extract-insurance.mjs
 - Fill `TIN_DATA` in `populate-tins.mjs` from 1099 PDF (needs Lea to confirm SSNs)
 - Consider flagging Jade's expired insurance in admin UI
 - Fill TIN_DATA in populate-tins.mjs (ask Lea for SSNs from 1099 PDF)
