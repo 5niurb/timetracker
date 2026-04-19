@@ -121,7 +121,7 @@
 **Purpose:** Staff management — add, edit, delete team members.
 
 **Components:**
-- Team member table: Name (with email below), PIN, Job Title, Job Type, Pay Rate, Onboarding status, Actions
+- Team member table: Name (with email below), PIN, Job Title, Job Type, Pay Rate, Response Form status, Actions
 - "Add New Team Member" button → full-screen pre-form overlay
 - Edit/delete actions per row
 - Row spacing: 18px padding, 1.5 line-height
@@ -141,7 +141,7 @@ Full-screen overlay (onboarding-form styled) with:
 **Send Link Modal (post-creation):**
 
 After creating team member, shows:
-- Onboarding link (copyable)
+- Response Form link (copyable)
 - "Send via SMS" button → preview → confirm (sends via Twilio from +12134442242)
 - "Send via Email" button → preview → confirm (sends via Resend from ops@lemedspa.com, CC lea@lemedspa.com)
 - "Done" button → refreshes team members list
@@ -187,18 +187,18 @@ After creating team member, shows:
 
 ---
 
-## Worker Self-Onboarding (`/onboarding/:token`)
+## Worker Response Form (`/onboarding/:token`)
 
 ### Overview
 
-Token-gated public form for workers to submit their own onboarding information. Replaces manual data collection. Admin generates a unique per-employee link; worker fills in and submits the form; admin reviews via the Employees tab.
+Token-gated public form for workers to submit their own information. Replaces manual data collection. Admin generates a unique per-employee link; worker fills in and submits the form; admin reviews via the Team Members tab.
 
 ### User Flows
 
 **Admin flow:**
-1. Creates employee via Employees tab → server auto-generates `onboarding_token` (UUID v4)
-2. Onboarding link displayed in success banner after adding employee
-3. Employees tab shows per-employee status: Pending (token exists, not submitted) / Complete (with date + "View Details" button) / — (no token)
+1. Creates team member via Team Members tab → server auto-generates `review_token` (UUID v4)
+2. Response Form link displayed in success banner after adding team member
+3. Team Members tab shows per-employee status: Pending (token exists, not submitted) / Complete (with date + "View Details" button) / — (no token)
 4. Admin can view submitted data via "View Details" → modal with all fields (sensitive fields show last 4 only)
 
 **Worker flow:**
@@ -287,8 +287,8 @@ Token-gated public form for workers to submit their own onboarding information. 
 | `start_date` | DATE | Employment start |
 | `ic_agreement_signed` | BOOLEAN | IC agreement accepted |
 | `ic_agreement_signed_at` | TIMESTAMPTZ | When signed |
-| `onboarding_token` | TEXT UNIQUE | UUID for form link |
-| `onboarding_completed_at` | TIMESTAMPTZ | When form was submitted |
+| `review_token` | TEXT UNIQUE | UUID for Response Form link |
+| `review_completed_at` | TIMESTAMPTZ | When form was submitted |
 
 **New `employee_onboarding` table (~35 columns):** Full form submission, one row per employee. Identity, address, tax, license, insurance, banking fields. `tin_encrypted`, `bank_routing_encrypted`, `bank_account_encrypted` stored as AES-256-GCM ciphertext. `*_last4` columns always populated. `submitted_at`, `ip_address`, `ic_agreement_version` for audit trail.
 
@@ -320,12 +320,13 @@ Shared module used by both server.js and tests. Exports: `validateSSN`, `validat
 
 | Table | Purpose | Key fields |
 |-------|---------|-----------|
-| `employees` | Staff profiles | name, pin, email, hourly_wage, commission_rate, pay_type, onboarding_token, onboarding_completed_at |
+| `employees` | Staff profiles | name, pin, email, hourly_wage, commission_rate, pay_type, review_token, review_completed_at |
 | `employee_onboarding` | Worker onboarding submissions | employee_id, personal info, address, tax (W-9), license, banking, attestation |
 | `time_entries` | Daily hours | employee_id, date, start_time, end_time, break_minutes, hours |
 | `client_entries` | Service work | time_entry_id, client_name, procedure_name, amount_earned, tip_amount, tip_received_cash |
 | `product_sales` | Sales commissions | time_entry_id, product_name, sale_amount, commission_amount |
 | `invoices` | Submitted summaries | employee_id, pay_period_start/end, totals, submitted_at, email_sent |
+| `filings_1099` | 1099-NEC filing records | tax_year, form, irs_submit_date, tin_encrypted, tin_last4, recipient_name, address, compensation boxes, state income |
 
 ---
 
@@ -377,3 +378,5 @@ Components included depend on employee's `pay_type` setting.
 | 2026-04 | Send Link feature (SMS + Email) | Streamlines onboarding distribution; email uses approved "LeMed Spa family" verbiage |
 | 2026-04 | Resend domain: lemedspa.com (was updates.lemedspa.com) | Free plan 1-domain limit; root domain is more professional |
 | 2026-04 | Standard text inputs for TIN/phone (not digit boxes) | Digit boxes caused sizing/styling issues; auto-formatting text fields are simpler and more accessible |
+| 2026-04 | Renamed "Onboarding" → "Response Form" throughout UI | Rebranded for clarity — this is a response/confirmation form, not just initial onboarding. Route URL `/onboarding/:token` and schema column names (`review_token`, `review_completed_at`) unchanged. |
+| 2026-04 | `filings_1099` table for 1099-NEC tracking | IRS filing history per contractor. SSNs encrypted (AES-256-GCM, same key as employees.tin_encrypted). Leena Osman SSN was masked on source form — only tin_last4 stored. |

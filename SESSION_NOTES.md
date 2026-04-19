@@ -39,13 +39,39 @@ employees table (populated fields):
 
 **Issues:**
 - Jade's insurance still expired (2025-06-29) — Lea needs to provide updated COI
-- Vayda's address missing city/state/zip (only street set)
+- Vayda's address missing city/state/zip (only street set: "200 N. Vermont Ave, Unit 527")
 - Leena, April: no mobile_phone in source data
 
 **Next Steps:**
 - SPECS.md update for Response Form rebrand
 - Flag Jade's expired insurance in admin compliance checklist
 - Collect updated COI from Jade
+
+---
+
+## Session — 2026-04-18 (Employee data lookup: April & Vayda)
+
+**Focus:** Confirm April Fabro's mobile, get Vayda's address, check April's TextMagic chat history.
+
+**Accomplished:**
+- **April Fabro mobile confirmed:** `818-618-7987` (lm-app contacts "April Mundy" = same person). Updated `employees` id:8 `mobile_phone = '818-618-7987'`
+- **April TextMagic history:** Only 2 outbound messages — no inbound replies from her
+  - 2026-04-06: Referral-only auto-response (before she'd identified herself)
+  - 2026-04-13: "Hi April, we received your email with your contact info. Please let us know what questions you have about **Sofwave**."
+  - April is interested in Sofwave
+- **Vayda address status:** Street `200 N. Vermont Ave, Unit 527` already in employees DB; city/state/zip still null. AR patient record exists but is invoice-derived only — full profile not synced. TextMagic contact 316953205 deleted (404). Response form not yet completed.
+
+**Current State:**
+- April Fabro: mobile phone now populated ✓
+- Vayda: needs city/state/zip — not obtainable from AR ETL; requires AR web UI scrape or direct from Vayda
+
+**Issues:**
+- Vayda's address still incomplete (no city/state/zip in any system)
+- AR ETL only captures invoice-level data — patient address/phone/email requires AR profile sync
+
+**Next Steps:**
+- Vayda's city/state/zip: get from Lea or scrape AR web UI for her patient profile
+- SPECS.md update for Response Form rebrand still pending
 
 ---
 
