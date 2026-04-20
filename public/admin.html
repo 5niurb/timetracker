@@ -37,9 +37,11 @@
     <div class="container">
       <div class="tabs">
         <button class="tab active" onclick="showTab('review-entries')">Review Entries</button>
-        <button class="tab" onclick="showTab('employees')">Team Members</button>
-        <button class="tab" onclick="showTab('reports')">Reports</button>
+        <button class="tab" onclick="showTab('employees')">Team</button>
+        <button class="tab" onclick="showTab('reports')">Report Entries</button>
         <button class="tab" onclick="showTab('payments')">Payments</button>
+        <button class="tab" onclick="showTab('tax')">Tax</button>
+        <button class="tab" onclick="showTab('compliance')">Compliance</button>
       </div>
 
       <!-- Review Entries Tab -->
@@ -224,6 +226,78 @@
                   <td colspan="5"></td>
                 </tr>
               </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tax Tab -->
+      <div id="tab-tax" class="tab-content" style="display: none;">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <h3 style="margin-bottom:0;">1099 Filings</h3>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <label style="font-size:11px;color:#888;margin:0;">Tax Year</label>
+              <select id="tax-year-filter" onchange="loadTaxFilings()" style="font-size:12px;padding:6px 10px;background:#111;border:1px solid #333;color:#e0d8c8;">
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="card" id="tax-summary-cards" style="display:none;">
+          <div id="tax-summary-content" style="display:flex;gap:32px;flex-wrap:wrap;"></div>
+        </div>
+        <div class="card">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Recipient</th>
+                  <th>Form</th>
+                  <th>Year</th>
+                  <th>TIN (last 4)</th>
+                  <th style="text-align:right;">Box 1 NEC</th>
+                  <th>TIN Match</th>
+                  <th>IRS Filed</th>
+                  <th>Recipient Sent</th>
+                  <th>City / State</th>
+                </tr>
+              </thead>
+              <tbody id="tax-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compliance Tab -->
+      <div id="tab-compliance" class="tab-content" style="display: none;">
+        <div class="card">
+          <h3 style="margin-bottom:8px;">Compliance Dashboard</h3>
+          <p style="font-size:12px;color:#666;margin:0;">Active team members only. Insurance, Response Form, and document requirements.</p>
+        </div>
+        <div class="card" id="compliance-summary-cards">
+          <div id="compliance-summary-content" style="display:flex;gap:24px;flex-wrap:wrap;"></div>
+        </div>
+        <div class="card">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Team Member</th>
+                  <th>Title</th>
+                  <th>Response Form</th>
+                  <th>W-9 / Tax</th>
+                  <th>Gov ID</th>
+                  <th>NDA / Contract</th>
+                  <th>Insurance</th>
+                  <th>Ins. Expires</th>
+                  <th>Overall</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="compliance-table"></tbody>
             </table>
           </div>
         </div>

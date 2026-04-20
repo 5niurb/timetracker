@@ -157,6 +157,8 @@
       if (tabId === 'employees') loadEmployees();
       if (tabId === 'reports') loadReport();
       if (tabId === 'payments') { populatePaymentsFilter(); loadPayments(); }
+      if (tabId === 'tax') loadTaxFilings();
+      if (tabId === 'compliance') loadComplianceDashboard();
     }
 
     async function loadEmployeesForFilter() {
@@ -1829,6 +1831,218 @@
       const res = await fetch(`/api/admin/payments/${id}`, { method: 'DELETE', headers: { password } });
       if (!res.ok) return alert('Delete failed.');
       loadPayments();
+    }
+
+    async function loadTaxFilings() {
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const year = document.getElementById('tax-year-filter')?.value || '2025';
+      const tbody = document.getElementById('tax-table');
+      tbody.innerHTML = '<tr><td colspan="9" style="color:#555;text-align:center;padding:20px;">Loading…</td></tr>';
+
+      try {
+        const res = await fetch(`/api/admin/filings-1099?year=${year}`, { headers: { password } });
+        if (!res.ok) throw new Error('Failed to load tax filings');
+        const filings = await res.json();
+
+        if (!filings.length) {
+          tbody.innerHTML = `<tr><td colspan="9" class="empty-state">No 1099 filings for ${year}</td></tr>`;
+          document.getElementById('tax-summary-cards').style.display = 'none';
+          return;
+        }
+
+        // Summary cards
+        const totalComp = filings.reduce((s, f) => s + parseFloat(f.box1_nonemployee_comp || 0), 0);
+        const tinFailed = filings.filter(f => f.tin_match === 'Failed').length;
+        document.getElementById('tax-summary-content').innerHTML = `
+          <div><div style="font-size:22px;font-weight:700;color:#c9a84c;">$${totalComp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div><div style="font-size:11px;color:#666;margin-top:2px;">Total NEC Compensation</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:#e0d8c8;">${filings.length}</div><div style="font-size:11px;color:#666;margin-top:2px;">Contractors</div></div>
+          ${tinFailed ? `<div><div style="font-size:22px;font-weight:700;color:#ff6b6b;">${tinFailed}</div><div style="font-size:11px;color:#666;margin-top:2px;">TIN Match Failed</div></div>` : ''}
+        `;
+        document.getElementById('tax-summary-cards').style.display = 'block';
+
+        // Table rows
+        tbody.innerHTML = filings
+          .map(f => {
+            const tinMatchCell =
+              f.tin_match === 'Failed'
+                ? '<span style="color:#ff6b6b;font-size:11px;font-weight:600;">FAILED</span>'
+                : '<span style="color:#6bff6b;font-size:11px;">Passed</span>';
+            const tinCell = f.tin_last4
+              ? `<span style="color:#888;font-size:12px;">···${escapeHtml(f.tin_last4)}</span>`
+              : '<span style="color:#444;font-size:11px;">—</span>';
+            const comp = parseFloat(f.box1_nonemployee_comp || 0).toLocaleString('en-US', {
+              style: 'currency',
+              currency: 'USD',
+            });
+            const irsDate = f.irs_submit_date
+              ? new Date(f.irs_submit_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : '—';
+            const recipDate = f.email_recipient_date
+              ? new Date(f.email_recipient_date).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : '—';
+            const location = [f.city, f.state].filter(Boolean).join(', ') || '—';
+            return `<tr>
+            <td style="font-weight:600;">${escapeHtml(f.recipient_name || '—')}</td>
+            <td style="font-size:11px;color:#888;">${escapeHtml(f.form || '—')}</td>
+            <td style="font-size:12px;">${f.tax_year || '—'}</td>
+            <td>${tinCell}</td>
+            <td style="text-align:right;font-family:monospace;">${comp}</td>
+            <td>${tinMatchCell}</td>
+            <td style="font-size:11px;color:#888;">${irsDate}</td>
+            <td style="font-size:11px;color:#888;">${recipDate}</td>
+            <td style="font-size:11px;color:#666;">${escapeHtml(location)}</td>
+          </tr>`;
+          })
+          .join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" style="color:#ff6b6b;text-align:center;padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    async function loadComplianceDashboard() {
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const tbody = document.getElementById('compliance-table');
+      const summaryEl = document.getElementById('compliance-summary-content');
+      tbody.innerHTML =
+        '<tr><td colspan="10" style="color:#555;text-align:center;padding:20px;">Loading…</td></tr>';
+
+      try {
+        const [empRes, docRes] = await Promise.all([
+          fetch('/api/admin/employees', { headers: { password } }),
+          fetch('/api/admin/employee-documents/all', { headers: { password } }),
+        ]);
+        const employees = await empRes.json();
+        const allDocs = await docRes.json();
+
+        // Index docs by employee id
+        const docsByEmployee = {};
+        allDocs.forEach(d => {
+          if (!docsByEmployee[d.employee_id]) docsByEmployee[d.employee_id] = [];
+          docsByEmployee[d.employee_id].push(d);
+        });
+
+        // Active employees only
+        const active = employees.filter(e => e.status !== 'inactive');
+
+        // Compute per-employee compliance
+        const rows = active.map(emp => {
+          const docs = docsByEmployee[emp.id] || [];
+          const byType = {};
+          docs.forEach(d => {
+            if (!byType[d.document_type]) byType[d.document_type] = [];
+            byType[d.document_type].push(d);
+          });
+
+          const needsInsurance = CLINICAL_DESIGNATIONS.has(emp.designation || '');
+
+          const hasW9 = isItemCompliant('w9', byType);
+          const hasId = isItemCompliant('driver_license', byType);
+          const hasNda = isItemCompliant('nda', byType);
+          const hasInsurance = needsInsurance ? isItemCompliant('insurance', byType) : null;
+
+          // Insurance expiry — prefer doc expiration_date, fall back to emp field
+          const insDoc = (byType['insurance'] || []).find(d => d.expiration_date);
+          const insExpiry = insDoc?.expiration_date || emp.insurance_expiration || null;
+
+          const responseForm = emp.review_completed_at ? 'done' : emp.review_token ? 'pending' : 'none';
+
+          const allOk =
+            hasW9 && hasId && hasNda && (needsInsurance ? hasInsurance : true) && responseForm === 'done';
+
+          return { emp, hasW9, hasId, hasNda, hasInsurance, needsInsurance, insExpiry, responseForm, allOk };
+        });
+
+        // Summary counts
+        const pending = rows.filter(r => !r.allOk).length;
+        const rfPending = rows.filter(r => r.responseForm !== 'done').length;
+        const insExpired = rows.filter(r => {
+          if (!r.insExpiry) return false;
+          return new Date(r.insExpiry) < new Date();
+        }).length;
+        const insExpiring = rows.filter(r => {
+          if (!r.insExpiry) return false;
+          const days = Math.floor((new Date(r.insExpiry) - new Date()) / 86400000);
+          return days >= 0 && days <= 90;
+        }).length;
+
+        summaryEl.innerHTML = `
+          <div><div style="font-size:22px;font-weight:700;color:${pending ? '#ff6b6b' : '#6bff6b'};">${pending}</div><div style="font-size:11px;color:#666;margin-top:2px;">Non-Compliant</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:#e0d8c8;">${active.length}</div><div style="font-size:11px;color:#666;margin-top:2px;">Active Members</div></div>
+          ${rfPending ? `<div><div style="font-size:22px;font-weight:700;color:#c9a84c;">${rfPending}</div><div style="font-size:11px;color:#666;margin-top:2px;">Response Form Pending</div></div>` : ''}
+          ${insExpired ? `<div><div style="font-size:22px;font-weight:700;color:#ff6b6b;">${insExpired}</div><div style="font-size:11px;color:#666;margin-top:2px;">Insurance Expired</div></div>` : ''}
+          ${insExpiring ? `<div><div style="font-size:22px;font-weight:700;color:#ff9f43;">${insExpiring}</div><div style="font-size:11px;color:#666;margin-top:2px;">Ins. Expiring ≤90 days</div></div>` : ''}
+        `;
+
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No active team members</td></tr>';
+          return;
+        }
+
+        // Sort: non-compliant first, then alpha
+        rows.sort((a, b) => {
+          if (a.allOk !== b.allOk) return a.allOk ? 1 : -1;
+          return (a.emp.name || '').localeCompare(b.emp.name || '');
+        });
+
+        function checkCell(ok) {
+          return ok
+            ? '<span style="color:#6bff6b;font-size:14px;">✓</span>'
+            : '<span style="color:#ff6b6b;font-size:14px;">✗</span>';
+        }
+
+        tbody.innerHTML = rows
+          .map(({ emp, hasW9, hasId, hasNda, hasInsurance, needsInsurance, insExpiry, responseForm, allOk }) => {
+            const rfCell =
+              responseForm === 'done'
+                ? '<span style="color:#6bff6b;font-size:11px;font-weight:600;">Done</span>'
+                : responseForm === 'pending'
+                  ? '<span style="color:#c9a84c;font-size:11px;font-weight:600;">Pending</span>'
+                  : '<span style="color:#555;font-size:11px;">Not sent</span>';
+
+            const insCell = needsInsurance
+              ? checkCell(hasInsurance)
+              : '<span style="color:#333;font-size:11px;">—</span>';
+
+            const insExpiryCell = insExpiry
+              ? expiryBadge(insExpiry)
+              : needsInsurance
+                ? '<span style="color:#ff6b6b;font-size:11px;">Missing</span>'
+                : '<span style="color:#333;">—</span>';
+
+            const overallCell = allOk
+              ? '<span style="color:#6bff6b;font-size:11px;font-weight:700;">Compliant</span>'
+              : '<span style="color:#ff6b6b;font-size:11px;font-weight:700;">Action Needed</span>';
+
+            const canSendReminder = (emp.phone || emp.email) && responseForm !== 'done';
+            const actionCell = canSendReminder
+              ? `<button class="btn-secondary" style="font-size:10px;padding:3px 10px;white-space:nowrap;" onclick="openSendLink(${emp.id})">Send Reminder</button>`
+              : `<button class="btn-secondary" style="font-size:10px;padding:3px 10px;white-space:nowrap;" onclick="editEmployee(${emp.id})">Review</button>`;
+
+            return `<tr style="${allOk ? '' : 'background:rgba(255,50,50,0.03);'}">
+            <td><a href="javascript:void(0)" onclick="editEmployee(${emp.id})" style="color:#c9a84c;font-weight:600;text-decoration:none;">${escapeHtml(emp.name || '')}</a></td>
+            <td style="font-size:11px;color:#888;">${escapeHtml(emp.designation || '—')}</td>
+            <td>${rfCell}</td>
+            <td style="text-align:center;">${checkCell(hasW9)}</td>
+            <td style="text-align:center;">${checkCell(hasId)}</td>
+            <td style="text-align:center;">${checkCell(hasNda)}</td>
+            <td style="text-align:center;">${insCell}</td>
+            <td>${insExpiryCell}</td>
+            <td>${overallCell}</td>
+            <td>${actionCell}</td>
+          </tr>`;
+          })
+          .join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="10" style="color:#ff6b6b;text-align:center;padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+      }
     }
 
     // Check if already logged in

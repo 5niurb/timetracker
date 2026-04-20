@@ -1492,6 +1492,28 @@ app.get('/api/admin/tax-filings', async (req, res) => {
   res.json(data || []);
 });
 
+// 1099-NEC contractor filings (from filings_1099 table — populated by populate-1099.mjs)
+app.get('/api/admin/filings-1099', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { year } = req.query;
+
+  let query = supabaseAdmin
+    .from('filings_1099')
+    .select(
+      'id, tax_year, form, irs_submit_date, email_recipient_date, tin_type, tin_match, recipient_name, tin_last4, box1_nonemployee_comp, city, state, zip, email, created_at',
+    )
+    .order('tax_year', { ascending: false })
+    .order('recipient_name', { ascending: true });
+
+  if (year) query = query.eq('tax_year', parseInt(year));
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
+});
+
 // Get a single tax filing by id
 app.get('/api/admin/tax-filings/:id', async (req, res) => {
   const { password } = req.headers;
