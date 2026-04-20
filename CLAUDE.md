@@ -1,6 +1,6 @@
 @../CLAUDE.md
 
-# CLAUDE.md — timetracker (LM PayTrack)
+# CLAUDE.md — paytrack (LM PayTrack)
 
 ## Session Management
 
@@ -28,7 +28,7 @@
 
 Employee time & payroll tracking PWA for Le Med Spa staff.
 - **App name:** LM PayTrack
-- **Repo:** github.com/5niurb/timetracker
+- **Repo:** github.com/5niurb/paytrack
 - **Tech:** Node.js, Express, Supabase (PostgreSQL), vanilla JS frontend
 - **Deployment:** Render.com (auto-deploys on push to main)
 - **Production URL:** https://paytrack.lemedspa.app
@@ -42,8 +42,10 @@ npm run dev    # Starts server on port 3000 with --watch
 Requires `.env` file with:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `PAYTRACK_ENCRYPTION_KEY` — **required** — AES-256-GCM key for onboarding sensitive fields; server exits on startup if missing. Generate once: `node scripts/generate-encryption-key.mjs`
 - `RESEND_API_KEY` (optional — for invoice emails)
 - `ADMIN_PASSWORD` (optional — defaults to hardcoded value)
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (optional — for onboarding SMS links)
 
 ## Key Files
 
