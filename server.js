@@ -1457,6 +1457,43 @@ app.post('/api/onboarding/:token', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to save. Please try again.' });
   }
 
+  // Mirror uploaded files into employee_documents so the admin Documents tab can find them
+  const docRecords = [];
+  if (form.driver_license_upload_path) {
+    docRecords.push({
+      employee_id: employee.id,
+      document_type: 'driver_license',
+      file_path: form.driver_license_upload_path,
+      file_name: form.driver_license_upload_path.split('/').pop(),
+      uploaded_at: now,
+    });
+  }
+  if (form.insurance_upload_path) {
+    docRecords.push({
+      employee_id: employee.id,
+      document_type: 'insurance',
+      file_path: form.insurance_upload_path,
+      file_name: form.insurance_upload_path.split('/').pop(),
+      uploaded_at: now,
+      expiration_date: form.insurance_expiration || null,
+    });
+  }
+  if (docRecords.length) {
+    // Check which paths already exist to avoid duplicates on resubmit
+    const paths = docRecords.map((d) => d.file_path);
+    const { data: existing } = await supabaseAdmin
+      .from('employee_documents')
+      .select('file_path')
+      .eq('employee_id', employee.id)
+      .in('file_path', paths);
+    const existingPaths = new Set((existing || []).map((r) => r.file_path));
+    const toInsert = docRecords.filter((d) => !existingPaths.has(d.file_path));
+    if (toInsert.length) {
+      const { error: docError } = await supabaseAdmin.from('employee_documents').insert(toInsert);
+      if (docError) console.error('[Review] employee_documents insert error:', docError);
+    }
+  }
+
   console.log(`[Review] Submitted for employee ${employee.id} (${employee.name})`);
 
   res.json({ success: true, message: 'Info confirmed. Thank you!' });
@@ -1697,6 +1734,26 @@ app.get('/api/admin/tax-filings/export/:year', async (req, res) => {
 });
 
 // ============ EMPLOYEE DOCUMENTS ROUTES ============
+
+// GET /api/admin/storage/signed-url?path=... — generate a 1-hour signed URL for any storage path
+app.get('/api/admin/storage/signed-url', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+  const { path: filePath } = req.query;
+  if (!filePath) return res.status(400).json({ success: false, message: 'path is required' });
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('onboarding-documents')
+    .createSignedUrl(filePath, 3600);
+
+  if (error || !data?.signedUrl) {
+    console.error('[Storage] signed URL error:', error);
+    return res.status(500).json({ success: false, message: 'Could not generate link' });
+  }
+
+  res.json({ success: true, url: data.signedUrl });
+});
 
 // GET /api/admin/employees/:id/documents — list docs with signed download URLs
 // Bulk compliance check — returns all docs (no signed URLs) for list view

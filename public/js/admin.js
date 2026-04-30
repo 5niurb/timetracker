@@ -1213,6 +1213,24 @@
       }
     }
 
+    async function openSignedDoc(event, filePath) {
+      event.preventDefault();
+      const password = sessionStorage.getItem('adminPasswordValue') || '';
+      try {
+        const res = await fetch(`/api/admin/storage/signed-url?path=${encodeURIComponent(filePath)}`, {
+          headers: { password },
+        });
+        const data = await res.json();
+        if (data.url) {
+          window.open(data.url, '_blank');
+        } else {
+          alert('Could not generate download link.');
+        }
+      } catch (e) {
+        alert('Error fetching file.');
+      }
+    }
+
     async function deleteEmployeeDoc(docId, employeeId) {
       if (!confirm('Remove this document?')) return;
       const res = await fetch(`/api/admin/employee-documents/${docId}`, {
@@ -1580,7 +1598,7 @@
             ${section("Driver's License")}
             ${row("DL Number", o.driver_license_number)}
             ${row("DL State", o.driver_license_state)}
-            ${o.driver_license_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">DL Upload</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="${escapeHtml(o.driver_license_upload_path)}" target="_blank" style="color:#c9a84c;">View file</a></td></tr>` : ''}
+            ${o.driver_license_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">DL Upload</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="#" onclick="openSignedDoc(event,'${escapeHtml(o.driver_license_upload_path)}')" style="color:#c9a84c;">View file</a></td></tr>` : ''}
             ${section('Professional Licenses')}
             ${profLicensesHtml || '<tr><td colspan="2" style="color:#555;font-size:12px;padding:6px 0;">None provided</td></tr>'}
             ${o.certifications ? `${section('Certifications')}${row('Certifications', o.certifications)}` : ''}
@@ -1588,7 +1606,7 @@
             ${row('Insurance Co.', o.insurance_company)}
             ${row('Policy #', o.insurance_policy_number)}
             ${row('Insurance Expires', o.insurance_expiration)}
-            ${o.insurance_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">Insurance Cert</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="${escapeHtml(o.insurance_upload_path)}" target="_blank" style="color:#c9a84c;">View file</a></td></tr>` : ''}
+            ${o.insurance_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">Insurance Cert</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="#" onclick="openSignedDoc(event,'${escapeHtml(o.insurance_upload_path)}')" style="color:#c9a84c;">View file</a></td></tr>` : ''}
             ${section('Banking')}
             ${row('Bank Name', o.bank_name)}
             ${row('Account Owner', o.bank_account_owner_name)}
