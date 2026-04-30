@@ -1126,7 +1126,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Twilio not configured' });
     }
 
-    const smsBody = `Hi ${firstName}, this is LeMed Spa. Please review and confirm your info on file at the link below. It takes about 5-10 minutes.\n\n${onboardingUrl}\n\nQuestions? Reply to this text or call 818-463-3772.`;
+    const smsBody = `Hi ${firstName}, this is LeMed Spa. At initial onboarding and periodically thereafter, we may need you to provide or confirm certain tax, license, insurance, and payment information, by completing the form linked here: ${onboardingUrl} Questions? Reply to this email/text or text Mike at 310.621.8356 - Thanks!`;
 
     // Normalize phone to E.164
     let toPhone = employee.phone.replace(/\D/g, '');

@@ -806,23 +806,23 @@
             </div>
             <div class="form-group">
               <label>Routing Number (9 digits) <span class="req">*</span></label>
-              <div class="sensitive-field-wrap">
-                <input type="password" id="bank_routing_raw" maxlength="9" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
-                  autocomplete="off" oninput="updateRoutingMask()" onblur="validateRoutingField()">
-                <button type="button" class="reveal-btn" onclick="toggleReveal('bank_routing_raw', this)" aria-label="Show/hide routing">&#128065;</button>
-              </div>
+              <input type="text" id="bank_routing_raw" maxlength="9" placeholder="123456789"
+                autocomplete="off" inputmode="numeric" oninput="updateRoutingMask()" onblur="validateRoutingField()">
               <div class="masked-preview" id="routing_mask_preview"></div>
               <span class="field-error" id="err-bank_routing_raw"></span>
             </div>
             <div class="form-group">
               <label>Account Number <span class="req">*</span></label>
-              <div class="sensitive-field-wrap">
-                <input type="password" id="bank_account_raw" maxlength="17" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"
-                  autocomplete="off" oninput="updateAccountMask()" onblur="validateAccountField()">
-                <button type="button" class="reveal-btn" onclick="toggleReveal('bank_account_raw', this)" aria-label="Show/hide account">&#128065;</button>
-              </div>
+              <input type="text" id="bank_account_raw" maxlength="17" placeholder="Your account number"
+                autocomplete="off" inputmode="numeric" oninput="updateAccountMask()" onblur="validateAccountField()">
               <div class="masked-preview" id="account_mask_preview"></div>
               <span class="field-error" id="err-bank_account_raw"></span>
+            </div>
+            <div class="form-group">
+              <label>Confirm Account Number <span class="req">*</span></label>
+              <input type="text" id="bank_account_confirm" maxlength="17" placeholder="Re-enter account number"
+                autocomplete="off" inputmode="numeric" onblur="validateAccountConfirmField()">
+              <span class="field-error" id="err-bank_account_confirm"></span>
             </div>
           </div>
         </div>
@@ -1418,6 +1418,14 @@
     clearError('bank_account_raw'); return true;
   }
 
+  function validateAccountConfirmField() {
+    const val = document.getElementById('bank_account_raw').value;
+    const confirm = document.getElementById('bank_account_confirm').value;
+    if (!confirm) { setError('bank_account_confirm', 'Please re-enter account number'); return false; }
+    if (val !== confirm) { setError('bank_account_confirm', 'Account numbers do not match'); return false; }
+    clearError('bank_account_confirm'); return true;
+  }
+
   function validateAttestation() {
     const checked = document.getElementById('attestation_checked').checked;
     if (!checked) { setError('attestation_checked', 'You must check this box to continue'); return false; }
@@ -1459,6 +1467,20 @@
     }
 
     const method = document.querySelector('input[name="payment_method"]:checked')?.value || '';
+
+    if (method === 'ach') {
+      const routingOk = validateRoutingField();
+      const accountOk = validateAccountField();
+      const confirmOk = validateAccountConfirmField();
+      if (!routingOk || !accountOk || !confirmOk) {
+        const banner = document.getElementById('form-error-banner');
+        banner.textContent = 'Please correct the highlighted fields below.';
+        banner.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Submit Response Form';
+        return;
+      }
+    }
 
     const formData = {
       first_name: document.getElementById('first_name').value.trim(),
