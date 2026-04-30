@@ -607,6 +607,7 @@
         endTime: document.getElementById('end-time').value,
         breakMinutes: parseInt(document.getElementById('break-minutes').value) || 0,
         hours,
+        description: document.getElementById('entry-notes').value.trim(),
         clients,
         productSales
       };
@@ -667,6 +668,7 @@
       document.getElementById('start-time').value = '';
       document.getElementById('end-time').value = '';
       document.getElementById('break-minutes').value = '0';
+      document.getElementById('entry-notes').value = '';
       document.getElementById('calculated-hours').textContent = '0.00';
       document.getElementById('service-entries-container').innerHTML = '';
       document.getElementById('sales-entries-container').innerHTML = '';

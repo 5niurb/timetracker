@@ -69,7 +69,7 @@
           </div>
 
           <!-- Time Inputs -->
-          <div class="time-row">
+          <div class="time-row three-col">
             <div class="form-group">
               <label>Start Time</label>
               <input type="time" id="start-time" onchange="calculateHours()">
@@ -78,16 +78,21 @@
               <label>End Time</label>
               <input type="time" id="end-time" onchange="calculateHours()">
             </div>
-          </div>
-
-          <div class="form-group">
-            <label>Break Time (minutes)</label>
-            <input type="number" id="break-minutes" value="0" min="0" step="5" onchange="calculateHours()">
+            <div class="form-group">
+              <label>Break (min)</label>
+              <input type="number" id="break-minutes" value="0" min="0" step="5" onchange="calculateHours()">
+            </div>
           </div>
 
           <div class="calculated-hours">
             <div class="label">Hours Worked</div>
             <div class="value" id="calculated-hours">0.00</div>
+          </div>
+
+          <!-- Day Notes -->
+          <div class="form-group">
+            <label>Notes (optional)</label>
+            <textarea id="entry-notes" rows="3" placeholder="Any notes about today..."></textarea>
           </div>
 
           <!-- Service Entries (for service commission workers) -->
