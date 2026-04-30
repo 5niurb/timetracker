@@ -775,12 +775,69 @@
           set('pii-zelle_contact', d.zelle_contact);
           set('pii-routing_display', d.bank_routing_last4 ? `*****${d.bank_routing_last4}` : '');
           set('pii-account_display', d.bank_account_last4 ? `*****${d.bank_account_last4}` : '');
+
+          // Licenses tab (read-only)
+          const licEl = document.getElementById('pii-licenses-content');
+          if (licEl) {
+            const lics = d.professional_licenses || [];
+            if (lics.length) {
+              licEl.innerHTML = lics
+                .map(
+                  (lic, i) =>
+                    `<div style="padding:8px;background:#0d0d0d;border:1px solid #222;margin-bottom:6px;">` +
+                    `<div style="font-size:10px;color:#c9a84c;margin-bottom:4px;">LICENSE ${i + 1}</div>` +
+                    `<div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#ccc;">` +
+                    `<span><span style="color:#666;">Type:</span> ${escapeHtml(lic.type || '—')}${lic.type === 'Other' && lic.type_other ? ` (${escapeHtml(lic.type_other)})` : ''}</span>` +
+                    `<span><span style="color:#666;">Number:</span> ${escapeHtml(lic.number || '—')}</span>` +
+                    `<span><span style="color:#666;">Status:</span> ${escapeHtml(lic.status || '—')}</span>` +
+                    `<span><span style="color:#666;">Expires:</span> ${escapeHtml(lic.expiration || '—')}</span>` +
+                    (lic.license_url
+                      ? `<a href="${escapeHtml(lic.license_url)}" target="_blank" style="color:#c9a84c;">Verify ↗</a>`
+                      : '') +
+                    `</div></div>`,
+                )
+                .join('');
+            } else {
+              licEl.innerHTML = '<span style="color:#555;font-size:12px;">No professional licenses on file.</span>';
+            }
+          }
+
+          // Contract tab (read-only)
+          const contractEl = document.getElementById('pii-contract-content');
+          if (contractEl) {
+            const commitmentLabels = {
+              under_15: 'Less than 15 hrs / 1-2 days',
+              '15_to_25': '15–25 hrs / 2–3 days',
+              '25_to_35': '25–35 hrs / 3–4 days',
+              over_35: '35+ hrs / 4+ days',
+            };
+            const field = (label, val) =>
+              val
+                ? `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #111;">
+                    <span style="font-size:11px;color:#666;min-width:150px;flex-shrink:0;">${label}</span>
+                    <span style="font-size:12px;color:#ccc;">${escapeHtml(String(val))}</span>
+                  </div>`
+                : '';
+            const hasContract =
+              d.ic_agreement_signed || d.attestation_signature || d.time_commitment_bucket;
+            if (hasContract) {
+              contractEl.innerHTML =
+                field('IC Agreement Signed', d.ic_agreement_signed ? 'Yes' : null) +
+                field('Signature', d.attestation_signature) +
+                field('Signature Date', d.attestation_date) +
+                field('Time Commitment', commitmentLabels[d.time_commitment_bucket] || d.time_commitment_bucket) +
+                field('Other Commitments', d.other_commitments) +
+                field('Submitted', d.review_submitted_at ? new Date(d.review_submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : null);
+            } else {
+              contractEl.innerHTML = '<span style="color:#555;font-size:12px;">No contract submission on file.</span>';
+            }
+          }
         })
         .catch(() => {});
     }
 
     function showPiiTab(name) {
-      ['identity', 'tax', 'insurance', 'banking'].forEach((t) => {
+      ['identity', 'tax', 'insurance', 'banking', 'licenses', 'contract'].forEach((t) => {
         document.getElementById(`pii-panel-${t}`).style.display = t === name ? '' : 'none';
         const btn = document.getElementById(`pii-tab-${t}`);
         btn.classList.toggle('pii-tab-active', t === name);
@@ -1002,7 +1059,7 @@
       return docs.some((d) => !d.expiration_date || new Date(d.expiration_date) >= new Date());
     }
 
-    function renderComplianceDocs(designation, docs, employeeId, complianceItems) {
+    function renderComplianceDocs(designation, docs, employeeId, complianceItems, professionalLicenses) {
       const required = requiredDocTypes(designation);
       const byType = {};
       docs.forEach((d) => {
@@ -1043,26 +1100,51 @@
         const borderColor = compliant ? '#2d6a2d' : '#6a2d2d';
         const symbol = compliant ? '✓' : '✗';
 
+        // Inline submitted license info from onboarding form (professional_license slot only)
+        const profLicInfo =
+          type === 'professional_license' && professionalLicenses && professionalLicenses.length
+            ? professionalLicenses
+                .map(
+                  (lic) =>
+                    `<div style="margin-top:4px;padding:6px 8px;background:#111;border:1px solid #1e2a1e;font-size:11px;color:#aaa;display:flex;flex-wrap:wrap;gap:8px;">` +
+                    `<span><span style="color:#555;">Type:</span> ${escapeHtml(lic.type || '—')}</span>` +
+                    `<span><span style="color:#555;">#:</span> ${escapeHtml(lic.number || '—')}</span>` +
+                    `<span><span style="color:#555;">Status:</span> ${escapeHtml(lic.status || '—')}</span>` +
+                    `<span><span style="color:#555;">Expires:</span> ${escapeHtml(lic.expiration || '—')}</span>` +
+                    (lic.license_url
+                      ? `<a href="${escapeHtml(lic.license_url)}" target="_blank" style="color:#c9a84c;text-decoration:none;">Verify ↗</a>`
+                      : '') +
+                    `</div>`,
+                )
+                .join('')
+            : '';
+
         if (!docsForSlot.length) {
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
-            <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
-            <span style="font-size:12px;color:#aaa;flex:1;">${escapeHtml(meta.label)}</span>
-            <span style="font-size:10px;color:#555;flex-shrink:0;">No document on file</span>
-            <button onclick="focusUploadForType('${isNda ? 'nda' : type}')" style="font-size:10px;color:#c9a84c;background:none;border:1px solid #333;padding:2px 8px;cursor:pointer;flex-shrink:0;">+ Upload</button>
+          html += `<div style="padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
+              <span style="font-size:12px;color:#aaa;flex:1;">${escapeHtml(meta.label)}</span>
+              <span style="font-size:10px;color:#555;flex-shrink:0;">No document on file</span>
+              <button onclick="focusUploadForType('${isNda ? 'nda' : type}')" style="font-size:10px;color:#c9a84c;background:none;border:1px solid #333;padding:2px 8px;cursor:pointer;flex-shrink:0;">+ Upload</button>
+            </div>
+            ${profLicInfo}
           </div>`;
         } else {
-          docsForSlot.forEach((d) => {
+          docsForSlot.forEach((d, idx) => {
             const licLine =
               meta.hasLicenseNo && d.license_number
                 ? `<span style="font-size:10px;color:#888;white-space:nowrap;flex-shrink:0;">#${escapeHtml(d.license_number)}</span>`
                 : '';
-            html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
-              <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
-              <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(meta.label)}</span>
-              ${licLine}
-              ${expiryBadge(d.expiration_date)}
-              ${d.url ? `<a href="${d.url}" target="_blank" style="font-size:11px;color:#c9a84c;text-decoration:none;flex-shrink:0;">View</a>` : ''}
-              <button onclick="deleteEmployeeDoc(${d.id}, ${employeeId})" style="background:none;border:none;color:#c9474f;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Delete">×</button>
+            html += `<div style="padding:8px 10px;background:#0d0d0d;border:1px solid #2a2a2a;border-left:3px solid ${borderColor};margin-bottom:4px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:13px;color:${checkColor};flex-shrink:0;">${symbol}</span>
+                <span style="font-size:12px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(d.file_name || d.file_path)}">${escapeHtml(meta.label)}</span>
+                ${licLine}
+                ${expiryBadge(d.expiration_date)}
+                ${d.url ? `<a href="${d.url}" target="_blank" style="font-size:11px;color:#c9a84c;text-decoration:none;flex-shrink:0;">View</a>` : ''}
+                <button onclick="deleteEmployeeDoc(${d.id}, ${employeeId})" style="background:none;border:none;color:#c9474f;font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0;" title="Delete">×</button>
+              </div>
+              ${idx === 0 ? profLicInfo : ''}
             </div>`;
           });
         }
@@ -1153,14 +1235,17 @@
       listEl.innerHTML = '<span style="color:#555;font-size:12px;">Loading…</span>';
       try {
         const password = sessionStorage.getItem('adminPasswordValue') || '';
-        const [docsRes, compRes] = await Promise.all([
+        const [docsRes, compRes, onbRes] = await Promise.all([
           fetch(`/api/admin/employees/${employeeId}/documents`, { headers: { password } }),
           fetch(`/api/admin/employees/${employeeId}/compliance-items`, { headers: { password } }),
+          fetch(`/api/admin/employees/${employeeId}/onboarding`, { headers: { password } }),
         ]);
         const docs = await docsRes.json();
         const complianceItems = compRes.ok ? await compRes.json() : [];
+        const onbData = onbRes.ok ? await onbRes.json() : null;
+        const professionalLicenses = onbData?.data?.professional_licenses || [];
         const designation = document.getElementById('edit-emp-designation').value;
-        listEl.innerHTML = renderComplianceDocs(designation, docs, employeeId, complianceItems);
+        listEl.innerHTML = renderComplianceDocs(designation, docs, employeeId, complianceItems, professionalLicenses);
       } catch (e) {
         listEl.innerHTML = '<span style="color:#c9474f;font-size:12px;">Failed to load documents.</span>';
       }

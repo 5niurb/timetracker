@@ -603,6 +603,8 @@
           <button onclick="showPiiTab('tax')" id="pii-tab-tax" class="pii-tab">Tax / W-9</button>
           <button onclick="showPiiTab('insurance')" id="pii-tab-insurance" class="pii-tab">Insurance</button>
           <button onclick="showPiiTab('banking')" id="pii-tab-banking" class="pii-tab">Banking</button>
+          <button onclick="showPiiTab('licenses')" id="pii-tab-licenses" class="pii-tab">Licenses</button>
+          <button onclick="showPiiTab('contract')" id="pii-tab-contract" class="pii-tab">Contract</button>
         </div>
 
         <!-- Identity tab -->
@@ -687,6 +689,16 @@
             <div class="pii-field"><label>New Routing # (leave blank to keep)</label><input type="text" id="pii-bank_routing_raw" placeholder="9 digits" autocomplete="off" maxlength="9"></div>
             <div class="pii-field"><label>New Account # (leave blank to keep)</label><input type="text" id="pii-bank_account_raw" placeholder="4-17 digits" autocomplete="off" maxlength="17"></div>
           </div>
+        </div>
+
+        <!-- Licenses tab (read-only) -->
+        <div id="pii-panel-licenses" class="pii-panel" style="display:none;">
+          <div id="pii-licenses-content" style="font-size:12px;color:#888;padding:8px 0;">No license info on file.</div>
+        </div>
+
+        <!-- Contract tab (read-only) -->
+        <div id="pii-panel-contract" class="pii-panel" style="display:none;">
+          <div id="pii-contract-content" style="font-size:12px;color:#888;padding:8px 0;">No contract info on file.</div>
         </div>
 
         <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
