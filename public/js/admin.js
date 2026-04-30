@@ -704,6 +704,8 @@
       document.getElementById('send-sent-msg').style.color = '';
     }
 
+    let _currentOnboardingData = null;
+
     function editEmployee(id) {
       const emp = (window._employeesCache || []).find((e) => e.id === id);
       if (!emp) return;
@@ -729,6 +731,7 @@
       ['pii-tin_raw', 'pii-bank_routing_raw', 'pii-bank_account_raw'].forEach(
         (id) => (document.getElementById(id).value = ''),
       );
+      _currentOnboardingData = null;
       showPiiTab('identity');
       document.getElementById('edit-modal').classList.add('show');
       loadEmployeeDocs(id);
@@ -739,6 +742,7 @@
         .then((r) => (r.ok ? r.json() : null))
         .then((resp) => {
           const d = resp?.data || {};
+          _currentOnboardingData = d;
           const set = (elId, val) => {
             const el = document.getElementById(elId);
             if (el) el.value = val ?? '';
@@ -775,65 +779,73 @@
           set('pii-zelle_contact', d.zelle_contact);
           set('pii-routing_display', d.bank_routing_last4 ? `*****${d.bank_routing_last4}` : '');
           set('pii-account_display', d.bank_account_last4 ? `*****${d.bank_account_last4}` : '');
-
-          // Licenses tab (read-only)
-          const licEl = document.getElementById('pii-licenses-content');
-          if (licEl) {
-            const lics = d.professional_licenses || [];
-            if (lics.length) {
-              licEl.innerHTML = lics
-                .map(
-                  (lic, i) =>
-                    `<div style="padding:8px;background:#0d0d0d;border:1px solid #222;margin-bottom:6px;">` +
-                    `<div style="font-size:10px;color:#c9a84c;margin-bottom:4px;">LICENSE ${i + 1}</div>` +
-                    `<div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#ccc;">` +
-                    `<span><span style="color:#666;">Type:</span> ${escapeHtml(lic.type || '—')}${lic.type === 'Other' && lic.type_other ? ` (${escapeHtml(lic.type_other)})` : ''}</span>` +
-                    `<span><span style="color:#666;">Number:</span> ${escapeHtml(lic.number || '—')}</span>` +
-                    `<span><span style="color:#666;">Status:</span> ${escapeHtml(lic.status || '—')}</span>` +
-                    `<span><span style="color:#666;">Expires:</span> ${escapeHtml(lic.expiration || '—')}</span>` +
-                    (lic.license_url
-                      ? `<a href="${escapeHtml(lic.license_url)}" target="_blank" style="color:#c9a84c;">Verify ↗</a>`
-                      : '') +
-                    `</div></div>`,
-                )
-                .join('');
-            } else {
-              licEl.innerHTML = '<span style="color:#555;font-size:12px;">No professional licenses on file.</span>';
-            }
-          }
-
-          // Contract tab (read-only)
-          const contractEl = document.getElementById('pii-contract-content');
-          if (contractEl) {
-            const commitmentLabels = {
-              under_15: 'Less than 15 hrs / 1-2 days',
-              '15_to_25': '15–25 hrs / 2–3 days',
-              '25_to_35': '25–35 hrs / 3–4 days',
-              over_35: '35+ hrs / 4+ days',
-            };
-            const field = (label, val) =>
-              val
-                ? `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #111;">
-                    <span style="font-size:11px;color:#666;min-width:150px;flex-shrink:0;">${label}</span>
-                    <span style="font-size:12px;color:#ccc;">${escapeHtml(String(val))}</span>
-                  </div>`
-                : '';
-            const hasContract =
-              d.ic_agreement_signed || d.attestation_signature || d.time_commitment_bucket;
-            if (hasContract) {
-              contractEl.innerHTML =
-                field('IC Agreement Signed', d.ic_agreement_signed ? 'Yes' : null) +
-                field('Signature', d.attestation_signature) +
-                field('Signature Date', d.attestation_date) +
-                field('Time Commitment', commitmentLabels[d.time_commitment_bucket] || d.time_commitment_bucket) +
-                field('Other Commitments', d.other_commitments) +
-                field('Submitted', d.review_submitted_at ? new Date(d.review_submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : null);
-            } else {
-              contractEl.innerHTML = '<span style="color:#555;font-size:12px;">No contract submission on file.</span>';
-            }
-          }
+          renderReadonlyPiiTabs(d);
         })
         .catch(() => {});
+    }
+
+    function renderReadonlyPiiTabs(d) {
+      if (!d) return;
+
+      // Licenses tab
+      const licEl = document.getElementById('pii-licenses-content');
+      if (licEl) {
+        const lics = Array.isArray(d.professional_licenses) ? d.professional_licenses : [];
+        if (lics.length) {
+          licEl.innerHTML = lics
+            .map(
+              (lic, i) =>
+                '<div style="padding:8px;background:#0d0d0d;border:1px solid #222;margin-bottom:6px;">' +
+                '<div style="font-size:10px;color:#c9a84c;margin-bottom:4px;">LICENSE ' +
+                (i + 1) +
+                '</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#ccc;">' +
+                '<span><span style="color:#666;">Type:</span> ' +
+                escapeHtml((lic.type || '') + (lic.type === 'Other' && lic.type_other ? ' (' + lic.type_other + ')' : '')) +
+                '</span>' +
+                '<span><span style="color:#666;">Number:</span> ' + escapeHtml(lic.number || '—') + '</span>' +
+                '<span><span style="color:#666;">Status:</span> ' + escapeHtml(lic.status || '—') + '</span>' +
+                '<span><span style="color:#666;">Expires:</span> ' + escapeHtml(lic.expiration || '—') + '</span>' +
+                (lic.license_url
+                  ? ' <a href="' + escapeHtml(lic.license_url) + '" target="_blank" style="color:#c9a84c;">Verify ↗</a>'
+                  : '') +
+                '</div></div>',
+            )
+            .join('');
+        } else {
+          licEl.innerHTML = '<span style="color:#555;font-size:12px;">No professional licenses on file.</span>';
+        }
+      }
+
+      // Contract tab
+      const contractEl = document.getElementById('pii-contract-content');
+      if (contractEl) {
+        const commitmentLabels = {
+          under_15: 'Less than 15 hrs / 1-2 days',
+          '15_to_25': '15–25 hrs / 2–3 days',
+          '25_to_35': '25–35 hrs / 3–4 days',
+          over_35: '35+ hrs / 4+ days',
+        };
+        const row = (label, val) =>
+          val != null && val !== ''
+            ? '<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #111;">' +
+              '<span style="font-size:11px;color:#666;min-width:150px;flex-shrink:0;">' + label + '</span>' +
+              '<span style="font-size:12px;color:#ccc;">' + escapeHtml(String(val)) + '</span>' +
+              '</div>'
+            : '';
+        const submittedAt = d.review_submitted_at
+          ? new Date(d.review_submitted_at).toLocaleString('en-US', {
+              month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+            })
+          : null;
+        const html =
+          row('Signature', d.attestation_signature) +
+          row('Signature Date', d.attestation_date) +
+          row('Time Commitment', commitmentLabels[d.time_commitment_bucket] || d.time_commitment_bucket) +
+          row('Other Commitments', d.other_commitments) +
+          row('Submitted', submittedAt);
+        contractEl.innerHTML = html || '<span style="color:#555;font-size:12px;">No contract submission on file.</span>';
+      }
     }
 
     function showPiiTab(name) {
@@ -842,6 +854,10 @@
         const btn = document.getElementById(`pii-tab-${t}`);
         btn.classList.toggle('pii-tab-active', t === name);
       });
+      // Re-render read-only tabs in case data arrived after last render
+      if ((name === 'licenses' || name === 'contract') && _currentOnboardingData) {
+        renderReadonlyPiiTabs(_currentOnboardingData);
+      }
     }
 
     async function savePiiData() {

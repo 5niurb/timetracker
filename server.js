@@ -1035,6 +1035,7 @@ app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
        payment_method, zelle_contact,
        time_commitment_bucket, other_commitments,
        attestation_checked, attestation_signature, attestation_date,
+       ic_agreement_signed, ic_agreement_signed_at,
        review_submitted_at, review_completed_at`,
     )
     .eq('id', parseInt(id))
