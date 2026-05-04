@@ -841,7 +841,7 @@
         const html =
           row('Signature', d.attestation_signature) +
           row('Signature Date', d.attestation_date) +
-          row('Time Commitment', commitmentLabels[d.time_commitment_bucket] || d.time_commitment_bucket) +
+          row('Desired Time Commitment', commitmentLabels[d.time_commitment_bucket] || d.time_commitment_bucket) +
           row('Other Commitments', d.other_commitments) +
           row('Submitted', submittedAt);
         contractEl.innerHTML = html || '<span style="color:#555;font-size:12px;">No contract submission on file.</span>';
