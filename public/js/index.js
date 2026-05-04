@@ -318,10 +318,15 @@
         const diffHours = (diffMs / (1000 * 60 * 60)) - (breakMinutes / 60);
         const hours = Math.max(0, diffHours);
 
+        const totalMinutes = Math.round(hours * 60);
+        const hh = Math.floor(totalMinutes / 60);
+        const mm = String(totalMinutes % 60).padStart(2, '0');
+        document.getElementById('calculated-time').textContent = `${hh}:${mm}`;
         document.getElementById('calculated-hours').textContent = hours.toFixed(2);
         return hours;
       }
 
+      document.getElementById('calculated-time').textContent = '0:00';
       document.getElementById('calculated-hours').textContent = '0.00';
       return 0;
     }
@@ -669,6 +674,7 @@
       document.getElementById('end-time').value = '';
       document.getElementById('break-minutes').value = '0';
       document.getElementById('entry-notes').value = '';
+      document.getElementById('calculated-time').textContent = '0:00';
       document.getElementById('calculated-hours').textContent = '0.00';
       document.getElementById('service-entries-container').innerHTML = '';
       document.getElementById('sales-entries-container').innerHTML = '';
