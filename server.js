@@ -49,7 +49,7 @@ if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-initCompliance(supabase);
+initCompliance(supabase, process.env.ADMIN_PASSWORD || 'LM$PayTrack#Admin2026!');
 app.use('/api/compliance', complianceRouter);
 
 // Service-role client for storage uploads (bypasses RLS on storage bucket)

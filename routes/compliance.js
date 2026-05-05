@@ -4,17 +4,18 @@ const express = require('express');
 const router = express.Router();
 const { generateToken, isTokenExpired } = require('../lib/compliance-tokens');
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LM$PayTrack#Admin2026!';
 const COI_FIELDS = ['insurer_name', 'policy_number', 'expiration_date', 'per_occurrence', 'aggregate'];
 
-// Supabase client is passed in via module.exports factory
-// (avoids circular dependency with server.js)
+// Supabase client and admin password are passed in via module.exports factory
+// (avoids circular dependency with server.js and keeps secrets out of this file)
 let supabase;
+let adminPassword;
 let notifier;
 let extractor;
 
-function init(supabaseClient) {
+function init(supabaseClient, adminPwd) {
   supabase = supabaseClient;
+  adminPassword = adminPwd;
   // Lazy-load ESM modules
   notifier = null; // loaded on first use
   extractor = null;
@@ -152,8 +153,7 @@ router.get('/confirm/:token', async (req, res) => {
     .eq('document_type', 'coi')
     .in('status', ['extracted', 'pending'])
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .maybeSingle();
 
   if (docErr) {
     console.error('confirm GET doc error:', docErr.message);
@@ -221,7 +221,8 @@ router.post('/confirm/:token', async (req, res) => {
     await supabase
       .from('compliance_requests')
       .update({ used_at: new Date().toISOString() })
-      .eq('token', req.params.token);
+      .eq('token', req.params.token)
+      .eq('employee_id', request.employee_id);
 
     res.json({ success: true });
   } catch (err) {
@@ -236,7 +237,7 @@ router.post('/confirm/:token', async (req, res) => {
 // ─────────────────────────────────────────────
 router.get('/review', async (req, res) => {
   const { password } = req.headers;
-  if (password !== ADMIN_PASSWORD) {
+  if (password !== adminPassword) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -255,7 +256,7 @@ router.get('/review', async (req, res) => {
 // ─────────────────────────────────────────────
 router.post('/review/:id/approve', async (req, res) => {
   const { password } = req.headers;
-  if (password !== ADMIN_PASSWORD) {
+  if (password !== adminPassword) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -307,7 +308,7 @@ router.post('/review/:id/approve', async (req, res) => {
 // ─────────────────────────────────────────────
 router.post('/review/:id/reject', async (req, res) => {
   const { password } = req.headers;
-  if (password !== ADMIN_PASSWORD) {
+  if (password !== adminPassword) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
