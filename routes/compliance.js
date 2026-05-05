@@ -4,6 +4,9 @@ const express = require('express');
 const router = express.Router();
 const { generateToken, isTokenExpired } = require('../lib/compliance-tokens');
 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LM$PayTrack#Admin2026!';
+const COI_FIELDS = ['insurer_name', 'policy_number', 'expiration_date', 'per_occurrence', 'aggregate'];
+
 // Supabase client is passed in via module.exports factory
 // (avoids circular dependency with server.js)
 let supabase;
@@ -53,6 +56,11 @@ async function findValidRequest(res, token) {
   return req;
 }
 
+// Helper: build an allowlisted field object from COI_FIELDS
+function pickCOIFields(source) {
+  return Object.fromEntries(COI_FIELDS.filter((k) => source[k] !== undefined).map((k) => [k, source[k]]));
+}
+
 // ─────────────────────────────────────────────
 // POST /api/compliance/coi-received
 // Called by Cloudflare Email Worker after PDF extracted
@@ -63,29 +71,31 @@ router.post('/coi-received', async (req, res) => {
     return res.status(400).json({ error: 'employee_id and storage_path required' });
   }
 
-  try {
-    // 1. Create a compliance_documents row (status: pending)
-    const { data: doc, error: docErr } = await supabase
-      .from('compliance_documents')
-      .insert({ employee_id, document_type: 'coi', storage_path, status: 'pending' })
-      .select()
-      .single();
+  // 1. Create a compliance_documents row (status: pending)
+  const { data: doc, error: docErr } = await supabase
+    .from('compliance_documents')
+    .insert({ employee_id, document_type: 'coi', storage_path, status: 'pending' })
+    .select()
+    .single();
 
-    if (docErr) throw docErr;
+  if (docErr) {
+    console.error('coi-received error:', docErr.message);
+    return res.status(500).json({ error: 'Internal error processing document' });
+  }
 
-    // 2. Run extraction async (don't block the response)
-    res.json({ success: true, document_id: doc.id });
+  // 2. Respond immediately — all subsequent work is fire-and-forget
+  res.json({ success: true, document_id: doc.id });
 
-    // 3. Extract and update
+  // 3. Extract and notify — isolated from res to prevent double-send
+  setImmediate(async () => {
     try {
       const { extractCOI } = await getExtractor();
       const fields = await extractCOI(storage_path);
 
-      await supabase.from('compliance_documents').update({
-        ...fields,
-        ai_extracted: fields,
-        status: 'extracted',
-      }).eq('id', doc.id);
+      await supabase
+        .from('compliance_documents')
+        .update({ ...fields, ai_extracted: fields, status: 'extracted' })
+        .eq('id', doc.id);
 
       // 4. Create a confirm token and send Step 2 notification
       const { token, expires_at } = generateToken();
@@ -103,6 +113,11 @@ router.post('/coi-received', async (req, res) => {
         .eq('id', employee_id)
         .single();
 
+      if (!emp) {
+        console.error('coi-received: employee not found for id:', employee_id);
+        return;
+      }
+
       const n = await getNotifier();
       await n.sendCOIConfirmRequest({
         to_email: emp.email,
@@ -110,14 +125,15 @@ router.post('/coi-received', async (req, res) => {
         worker_name: emp.name,
         confirm_url: `${BASE_URL}/compliance.html?token=${token}`,
       });
-    } catch (extractErr) {
-      console.error('COI extraction failed:', extractErr.message);
-      await supabase.from('compliance_documents').update({ status: 'pending' }).eq('id', doc.id);
+    } catch (err) {
+      console.error('COI extraction failed:', err.message);
+      await supabase
+        .from('compliance_documents')
+        .update({ status: 'pending' })
+        .eq('id', doc.id)
+        .catch((e) => console.error('status reset failed:', e.message));
     }
-  } catch (err) {
-    console.error('coi-received error:', err.message);
-    res.status(500).json({ error: 'Internal error processing document' });
-  }
+  });
 });
 
 // ─────────────────────────────────────────────
@@ -129,7 +145,7 @@ router.get('/confirm/:token', async (req, res) => {
   if (!request) return;
 
   // Find the most recent extracted compliance_documents for this employee
-  const { data: doc } = await supabase
+  const { data: doc, error: docErr } = await supabase
     .from('compliance_documents')
     .select('id, insurer_name, policy_number, expiration_date, per_occurrence, aggregate, storage_path')
     .eq('employee_id', request.employee_id)
@@ -138,6 +154,11 @@ router.get('/confirm/:token', async (req, res) => {
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
+
+  if (docErr) {
+    console.error('confirm GET doc error:', docErr.message);
+    return res.status(500).json({ error: 'Error loading document data' });
+  }
 
   res.json({
     worker_name: request.employees.name,
@@ -172,25 +193,34 @@ router.post('/confirm/:token', async (req, res) => {
       .from('compliance_documents')
       .select('ai_extracted')
       .eq('id', document_id)
+      .eq('employee_id', request.employee_id) // cross-employee guard
       .single();
 
     const ai = doc?.ai_extracted || {};
     const edits = {};
-    for (const key of ['insurer_name', 'policy_number', 'expiration_date', 'per_occurrence', 'aggregate']) {
+    for (const key of COI_FIELDS) {
       if (fields[key] !== undefined && String(fields[key]) !== String(ai[key])) {
         edits[key] = { original: ai[key], corrected: fields[key] };
       }
     }
 
-    await supabase.from('compliance_documents').update({
-      ...fields,
-      worker_edits: Object.keys(edits).length > 0 ? edits : null,
-      worker_confirmed_at: new Date().toISOString(),
-      status: 'worker_confirmed',
-    }).eq('id', document_id);
+    // Allowlist fields before writing to DB
+    const sanitizedFields = pickCOIFields(fields);
+
+    await supabase
+      .from('compliance_documents')
+      .update({
+        ...sanitizedFields,
+        worker_edits: Object.keys(edits).length > 0 ? edits : null,
+        worker_confirmed_at: new Date().toISOString(),
+        status: 'worker_confirmed',
+      })
+      .eq('id', document_id);
 
     // Mark token used
-    await supabase.from('compliance_requests').update({ used_at: new Date().toISOString() })
+    await supabase
+      .from('compliance_requests')
+      .update({ used_at: new Date().toISOString() })
       .eq('token', req.params.token);
 
     res.json({ success: true });
@@ -205,6 +235,11 @@ router.post('/confirm/:token', async (req, res) => {
 // Admin queue — items awaiting review
 // ─────────────────────────────────────────────
 router.get('/review', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { data, error } = await supabase
     .from('compliance_documents')
     .select('*, employees(id, name, email)')
@@ -219,6 +254,11 @@ router.get('/review', async (req, res) => {
 // POST /api/compliance/review/:id/approve
 // ─────────────────────────────────────────────
 router.post('/review/:id/approve', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { id } = req.params;
   const { edited_fields } = req.body; // optional — if admin edited before approving
 
@@ -228,7 +268,8 @@ router.post('/review/:id/approve', async (req, res) => {
       admin_action: 'approved',
       status: 'approved',
     };
-    if (edited_fields) Object.assign(updateData, edited_fields);
+    // Allowlist any admin edits before merging
+    if (edited_fields) Object.assign(updateData, pickCOIFields(edited_fields));
 
     const { data: doc, error } = await supabase
       .from('compliance_documents')
@@ -240,10 +281,10 @@ router.post('/review/:id/approve', async (req, res) => {
     if (error) throw error;
 
     // Update employee record
-    await supabase.from('employees').update({
-      coi_expiry: doc.expiration_date,
-      coi_insurer: doc.insurer_name,
-    }).eq('id', doc.employee_id);
+    await supabase
+      .from('employees')
+      .update({ coi_expiry: doc.expiration_date, coi_insurer: doc.insurer_name })
+      .eq('id', doc.employee_id);
 
     // Notify worker
     const n = await getNotifier();
@@ -265,6 +306,11 @@ router.post('/review/:id/approve', async (req, res) => {
 // POST /api/compliance/review/:id/reject
 // ─────────────────────────────────────────────
 router.post('/review/:id/reject', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { id } = req.params;
 
   try {
