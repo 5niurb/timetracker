@@ -9,6 +9,7 @@
     "test": "node test/validation.test.js && node test/crypto.test.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@supabase/supabase-js": "^2.39.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
@@ -17,7 +18,6 @@
     "twilio": "^6.0.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
     "xlsx": "^0.18.5"
   }
 }
