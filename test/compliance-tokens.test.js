@@ -31,12 +31,13 @@ test('token is a non-empty string', () => {
 });
 
 test('expires_at is TOKEN_TTL_DAYS days in the future', () => {
-  const before = new Date();
+  const before = Date.now();
   const t = generateToken();
-  const after = new Date();
-  const diffDays = (t.expires_at - before) / (1000 * 60 * 60 * 24);
-  assert.ok(diffDays >= TOKEN_TTL_DAYS - 0.01 && diffDays <= TOKEN_TTL_DAYS + 0.01,
-    `expected ~${TOKEN_TTL_DAYS} days, got ${diffDays.toFixed(3)}`);
+  const after = Date.now();
+  const ttlMs = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+  const expMs = t.expires_at.getTime();
+  assert.ok(expMs >= before + ttlMs && expMs <= after + ttlMs,
+    `expected expires_at in [before+${TOKEN_TTL_DAYS}d, after+${TOKEN_TTL_DAYS}d]`);
 });
 
 console.log('\nToken expiry check:');
@@ -52,6 +53,10 @@ test('isTokenExpired returns true for past date', () => {
 
 test('isTokenExpired returns true for null', () => {
   assert.strictEqual(isTokenExpired(null), true);
+});
+
+test('isTokenExpired returns true for invalid date string', () => {
+  assert.strictEqual(isTokenExpired('not-a-date'), true);
 });
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
