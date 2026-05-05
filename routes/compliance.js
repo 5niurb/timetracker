@@ -441,17 +441,21 @@ router.post('/coi-inbound', emailUpload.single('file'), async (req, res) => {
     return res.json({ success: false, reason: 'sender_unrecognized' });
   }
 
-  try {
-    const storagePath = `compliance/${emp.id}/${Date.now()}-${filename}`;
-    const { error: uploadErr } = await supabase.storage
-      .from('onboarding-documents')
-      .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype });
+  const storagePath = `compliance/${emp.id}/${Date.now()}-${filename}`;
+  const { error: uploadErr } = await supabase.storage
+    .from('onboarding-documents')
+    .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype });
 
-    if (uploadErr) throw uploadErr;
+  if (uploadErr) {
+    console.error('coi-inbound upload error:', uploadErr.message);
+    return res.status(500).json({ error: 'Internal error' });
+  }
 
-    // Respond immediately; async extraction follows
-    res.json({ success: true });
+  // Respond immediately; async extraction follows
+  res.json({ success: true });
 
+  // Fire-and-forget: extract fields, store doc, send confirm link
+  (async () => {
     try {
       const { extractCOI } = await getExtractor();
       const fields = await extractCOI(storagePath);
@@ -490,10 +494,7 @@ router.post('/coi-inbound', emailUpload.single('file'), async (req, res) => {
     } catch (e) {
       console.error('coi-inbound async extraction error:', e.message);
     }
-  } catch (err) {
-    console.error('coi-inbound error:', err.message);
-    res.status(500).json({ error: 'Internal error' });
-  }
+  })();
 });
 
 module.exports = { router, init };
