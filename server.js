@@ -8,6 +8,7 @@ const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel }
 const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account, CLINICAL_TITLES } = require('./lib/onboarding-validation');
 const { encryptValue } = require('./lib/crypto');
 const { randomUUID } = require('crypto');
+const { router: complianceRouter, init: initCompliance } = require('./routes/compliance');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +48,9 @@ if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+initCompliance(supabase);
+app.use('/api/compliance', complianceRouter);
 
 // Service-role client for storage uploads (bypasses RLS on storage bucket)
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
