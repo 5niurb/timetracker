@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Certificate — Le Med Spa</title>
+  <style>
+    body { max-width: 480px; margin: 0 auto; padding: 20px 16px; font-family: -apple-system, sans-serif; background: #0f0f0f; color: #e8e8e8; }
+    h1 { font-size: 1.3rem; margin-bottom: 4px; }
+    .subtitle { color: #aaa; font-size: 0.9rem; margin-bottom: 24px; }
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; color: #888; font-size: 0.8rem; margin-bottom: 4px; margin-top: 12px; }
+    label:first-child { margin-top: 0; }
+    input { width: 100%; padding: 8px 10px; background: #111; border: 1px solid #333; border-radius: 6px; color: #e8e8e8; font-size: 0.95rem; box-sizing: border-box; }
+    input:focus { outline: none; border-color: #e8c46a; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    .doc-thumb { background: #111; border: 1px dashed #444; border-radius: 6px; padding: 16px; text-align: center; color: #666; font-size: 0.85rem; margin-bottom: 0; }
+    .doc-thumb a { color: #e8c46a; text-decoration: none; font-size: 0.8rem; }
+    .check-card { display: flex; gap: 10px; align-items: flex-start; }
+    .check-card input[type=checkbox] { margin-top: 2px; accent-color: #e8c46a; width: auto; flex-shrink: 0; }
+    .check-card span { color: #ccc; font-size: 0.9rem; }
+    button { width: 100%; padding: 14px; background: #e8c46a; color: #111; font-weight: 700; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .success { text-align: center; padding: 40px 20px; }
+    .success h2 { color: #7ec87e; }
+    .error-state { color: #c87e7e; text-align: center; padding: 40px 20px; }
+    #loading { text-align: center; padding: 60px 20px; color: #888; }
+  </style>
+</head>
+<body>
+
+<div id="loading">Loading your certificate details…</div>
+
+<div id="app" style="display:none">
+  <h1 id="greeting"></h1>
+  <p class="subtitle">We read your certificate — everything below look right?</p>
+
+  <div class="card">
+    <div class="doc-thumb" id="doc-thumb">
+      📄 <span id="doc-filename">Your uploaded document</span><br>
+      <a id="doc-link" href="#" target="_blank" style="display:none">Tap to view full document ↗</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <p style="color:#888;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 12px">Edit anything that looks off</p>
+
+    <label>Insurer</label>
+    <input id="f-insurer" type="text" autocomplete="off">
+
+    <label>Policy Number</label>
+    <input id="f-policy" type="text" autocomplete="off">
+
+    <label>Expiration Date</label>
+    <input id="f-expiry" type="date">
+
+    <div class="row">
+      <div>
+        <label>Per Occurrence</label>
+        <input id="f-occurrence" type="text" placeholder="$1,000,000">
+      </div>
+      <div>
+        <label>Aggregate</label>
+        <input id="f-aggregate" type="text" placeholder="$2,000,000">
+      </div>
+    </div>
+  </div>
+
+  <div class="card check-card">
+    <input type="checkbox" id="confirm-check">
+    <span>These details match my updated certificate of insurance.</span>
+  </div>
+
+  <button id="submit-btn" disabled>Looks good ✓</button>
+</div>
+
+<div id="success" class="success" style="display:none">
+  <h2>✓ All set!</h2>
+  <p style="color:#aaa">We've got your confirmation. Le Med Spa will review and you'll hear back shortly.</p>
+</div>
+
+<div id="error-state" class="error-state" style="display:none">
+  <h2>⚠ Link not valid</h2>
+  <p id="error-msg"></p>
+  <p style="color:#888;font-size:0.85rem">Questions? <a href="mailto:ops@lemedspa.com" style="color:#e8c46a">ops@lemedspa.com</a></p>
+</div>
+
+<script>
+(async function () {
+  const token = new URLSearchParams(location.search).get('token');
+
+  function show(id) {
+    ['loading', 'app', 'success', 'error-state'].forEach(i => {
+      document.getElementById(i).style.display = i === id ? '' : 'none';
+    });
+  }
+
+  if (!token) {
+    document.getElementById('error-msg').textContent = 'No confirmation token found in this link.';
+    show('error-state');
+    return;
+  }
+
+  let data;
+  try {
+    const res = await fetch(`/api/compliance/confirm/${token}`);
+    if (!res.ok) {
+      const j = await res.json();
+      document.getElementById('error-msg').textContent = j.error || 'This link is not valid.';
+      show('error-state');
+      return;
+    }
+    data = await res.json();
+  } catch (e) {
+    document.getElementById('error-msg').textContent = 'Could not load your details. Try again later.';
+    show('error-state');
+    return;
+  }
+
+  const firstName = (data.worker_name || '').split(' ')[0];
+  document.getElementById('greeting').textContent = `Hi ${firstName} 👋`;
+
+  const f = data.fields || {};
+  document.getElementById('f-insurer').value = f.insurer_name || '';
+  document.getElementById('f-policy').value = f.policy_number || '';
+  document.getElementById('f-expiry').value = f.expiration_date ? f.expiration_date.split('T')[0] : '';
+  document.getElementById('f-occurrence').value = f.per_occurrence ? `$${Number(f.per_occurrence).toLocaleString()}` : '';
+  document.getElementById('f-aggregate').value = f.aggregate ? `$${Number(f.aggregate).toLocaleString()}` : '';
+
+  if (data.storage_path) {
+    document.getElementById('doc-filename').textContent = data.storage_path.split('/').pop();
+    const link = document.getElementById('doc-link');
+    link.href = `/api/compliance/document/${token}`;
+    link.style.display = '';
+  }
+
+  show('app');
+
+  const check = document.getElementById('confirm-check');
+  const btn = document.getElementById('submit-btn');
+  check.addEventListener('change', () => { btn.disabled = !check.checked; });
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    const parseAmount = s => {
+      const n = parseFloat(String(s).replace(/[$,]/g, ''));
+      return isNaN(n) ? null : n;
+    };
+
+    const payload = {
+      document_id: data.document_id,
+      fields: {
+        insurer_name: document.getElementById('f-insurer').value.trim(),
+        policy_number: document.getElementById('f-policy').value.trim(),
+        expiration_date: document.getElementById('f-expiry').value,
+        per_occurrence: parseAmount(document.getElementById('f-occurrence').value),
+        aggregate: parseAmount(document.getElementById('f-aggregate').value),
+      },
+    };
+
+    const res = await fetch(`/api/compliance/confirm/${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      show('success');
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Looks good ✓';
+      alert('Something went wrong. Please try again or contact ops@lemedspa.com.');
+    }
+  });
+})();
+</script>
+</body>
+</html>

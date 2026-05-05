@@ -360,4 +360,60 @@ router.post('/review/:id/reject', async (req, res) => {
   }
 });
 
+// GET /api/compliance/document/:token — serves the raw file for worker to view
+router.get('/document/:token', async (req, res) => {
+  const request = await findValidRequest(res, req.params.token);
+  if (!request) return;
+
+  const { data: doc, error: docErr } = await supabase
+    .from('compliance_documents')
+    .select('storage_path')
+    .eq('employee_id', request.employee_id)
+    .eq('document_type', 'coi')
+    .order('created_at', { ascending: false })
+    .maybeSingle();
+
+  if (docErr || !doc?.storage_path) return res.status(404).json({ error: 'Document not found' });
+
+  const { data: fileData, error } = await supabase.storage
+    .from('onboarding-documents')
+    .download(doc.storage_path);
+
+  if (error) return res.status(500).json({ error: 'Could not retrieve document' });
+
+  const arrayBuffer = await fileData.arrayBuffer();
+  const ext = doc.storage_path.split('.').pop().toLowerCase();
+  const contentType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
+  res.setHeader('Content-Type', contentType);
+  res.send(Buffer.from(arrayBuffer));
+});
+
+// GET /api/compliance/document-admin/:doc_id — admin view of any document
+router.get('/document-admin/:doc_id', async (req, res) => {
+  const { password } = req.headers;
+  if (password !== adminPassword) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
+  const { data: doc, error: docErr } = await supabase
+    .from('compliance_documents')
+    .select('storage_path')
+    .eq('id', req.params.doc_id)
+    .maybeSingle();
+
+  if (docErr || !doc?.storage_path) return res.status(404).json({ error: 'Not found' });
+
+  const { data: fileData, error } = await supabase.storage
+    .from('onboarding-documents')
+    .download(doc.storage_path);
+
+  if (error) return res.status(500).json({ error: 'Could not retrieve document' });
+
+  const arrayBuffer = await fileData.arrayBuffer();
+  const ext = doc.storage_path.split('.').pop().toLowerCase();
+  const contentType = ext === 'pdf' ? 'application/pdf' : `image/${ext}`;
+  res.setHeader('Content-Type', contentType);
+  res.send(Buffer.from(arrayBuffer));
+});
+
 module.exports = { router, init };
