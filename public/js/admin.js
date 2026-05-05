@@ -2159,9 +2159,122 @@
           </tr>`;
           })
           .join('');
+
+        loadCOIReview();
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="10" style="color:#ff6b6b;text-align:center;padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
       }
+    }
+
+    async function loadCOIReview() {
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const res = await fetch('/api/compliance/review', { headers: { password } });
+      if (!res.ok) return;
+      const { items } = await res.json();
+
+      const count = document.getElementById('compliance-count');
+      const list = document.getElementById('compliance-list');
+      const empty = document.getElementById('compliance-empty');
+
+      if (items.length) {
+        count.textContent = `${items.length} pending`;
+        count.style.display = '';
+      } else {
+        count.style.display = 'none';
+      }
+      list.innerHTML = '';
+
+      if (!items.length) {
+        empty.style.display = '';
+        return;
+      }
+      empty.style.display = 'none';
+
+      for (const item of items) {
+        const workerEdits = item.worker_edits ? Object.entries(item.worker_edits) : [];
+        const editHtml = workerEdits.length
+          ? `<div style="background:#1a1500;border:1px solid #4a3a00;border-radius:6px;padding:10px;margin-top:10px;font-size:0.8rem">
+               <strong style="color:#e8c46a">⚠ Worker made ${workerEdits.length} edit${workerEdits.length > 1 ? 's' : ''}</strong>
+               ${workerEdits
+                 .map(
+                   ([k, v]) =>
+                     `<div style="color:#aaa;margin-top:4px">${k.replace(/_/g, ' ')}: <s style="color:#888">${escapeHtml(String(v.original || ''))}</s> → <span style="color:#e8e8e8">${escapeHtml(String(v.corrected || ''))}</span></div>`,
+                 )
+                 .join('')}
+             </div>`
+          : '';
+
+        const card = document.createElement('div');
+        card.style.cssText =
+          'background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:16px;margin-bottom:16px';
+        const itemId = String(item.id);
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+            <div>
+              <div style="font-weight:600;font-size:1rem"></div>
+              <div style="color:#888;font-size:0.8rem">COI · Confirmed <span class="confirmed-date"></span></div>
+            </div>
+            <a href="/api/compliance/document-admin/${escapeHtml(itemId)}" target="_blank"
+               style="color:#e8c46a;font-size:0.8rem;text-decoration:none">View PDF ↗</a>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85rem">
+            <div><span style="color:#888">Insurer</span><br><strong class="f-insurer">—</strong></div>
+            <div><span style="color:#888">Policy #</span><br><strong class="f-policy">—</strong></div>
+            <div><span style="color:#888">Expiry</span><br><strong class="f-expiry" style="color:#7ec87e">—</strong></div>
+            <div><span style="color:#888">Coverage</span><br><strong class="f-coverage">—</strong></div>
+          </div>
+
+          ${editHtml}
+
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <button onclick="approveDoc('${escapeHtml(itemId)}')"
+              style="flex:2;padding:10px;background:#7ec87e;color:#111;font-weight:700;border:none;border-radius:6px;cursor:pointer">
+              ✓ Approve &amp; Update Record
+            </button>
+            <button onclick="rejectDoc('${escapeHtml(itemId)}')"
+              style="flex:1;padding:10px;background:transparent;color:#c87e7e;border:1px solid #c87e7e;border-radius:6px;cursor:pointer">
+              ✕ Request New Doc
+            </button>
+          </div>
+        `;
+
+        // Set text content for user data (XSS safe)
+        card.querySelector('div > div > div:first-child').textContent = item.employees.name;
+        card.querySelector('.confirmed-date').textContent = new Date(
+          item.worker_confirmed_at,
+        ).toLocaleDateString();
+        card.querySelector('.f-insurer').textContent = item.insurer_name || '—';
+        card.querySelector('.f-policy').textContent = item.policy_number || '—';
+        card.querySelector('.f-expiry').textContent = item.expiration_date || '—';
+        card.querySelector('.f-coverage').textContent = `$${(item.per_occurrence || 0).toLocaleString()} / $${(item.aggregate || 0).toLocaleString()}`;
+
+        list.appendChild(card);
+      }
+    }
+
+    async function approveDoc(id) {
+      if (!confirm('Approve this certificate and update the employee record?')) return;
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const res = await fetch(`/api/compliance/review/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', password },
+        body: '{}',
+      });
+      if (res.ok) loadCOIReview();
+      else alert('Error approving. Try again.');
+    }
+
+    async function rejectDoc(id) {
+      if (!confirm('Reject this document and send worker a new upload link?')) return;
+      const password = sessionStorage.getItem('adminPasswordValue');
+      const res = await fetch(`/api/compliance/review/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', password },
+        body: '{}',
+      });
+      if (res.ok) loadCOIReview();
+      else alert('Error rejecting. Try again.');
     }
 
     // Check if already logged in
