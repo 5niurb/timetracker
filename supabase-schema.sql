@@ -279,11 +279,12 @@ ON CONFLICT (pin) DO NOTHING;
 -- ============ Migration 007: Compliance schema ============
 -- Added 2026-05-05: compliance document tracking workflow (COI, W9, contract)
 -- NOTE: employee_id uses INTEGER to match employees.id SERIAL PRIMARY KEY
+-- NOTE: Single-use enforcement for tokens is application-enforced in routes/compliance.js
 
 -- Token-based compliance requests (one per active link)
 CREATE TABLE IF NOT EXISTS compliance_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id integer REFERENCES employees(id) ON DELETE CASCADE,
+  employee_id integer NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   type text NOT NULL CHECK (type IN ('upload', 'esign')),
   document_type text NOT NULL CHECK (document_type IN ('coi', 'w9', 'contract')),
   token text UNIQUE NOT NULL DEFAULT gen_random_uuid()::text,
@@ -295,10 +296,12 @@ CREATE TABLE IF NOT EXISTS compliance_requests (
 CREATE INDEX IF NOT EXISTS idx_compliance_requests_token ON compliance_requests(token);
 CREATE INDEX IF NOT EXISTS idx_compliance_requests_employee ON compliance_requests(employee_id);
 
+ALTER TABLE compliance_requests ENABLE ROW LEVEL SECURITY;
+
 -- Document records (one per submitted document)
 CREATE TABLE IF NOT EXISTS compliance_documents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id integer REFERENCES employees(id) ON DELETE CASCADE,
+  employee_id integer NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   document_type text NOT NULL CHECK (document_type IN ('coi', 'w9', 'contract')),
   storage_path text,
 
@@ -328,6 +331,12 @@ CREATE TABLE IF NOT EXISTS compliance_documents (
 
 CREATE INDEX IF NOT EXISTS idx_compliance_docs_employee ON compliance_documents(employee_id);
 CREATE INDEX IF NOT EXISTS idx_compliance_docs_status ON compliance_documents(status);
+CREATE INDEX IF NOT EXISTS idx_compliance_docs_type ON compliance_documents(document_type);
+
+ALTER TABLE compliance_documents ENABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON compliance_requests TO anon, authenticated;
+GRANT ALL ON compliance_documents TO anon, authenticated;
 
 -- Add compliance columns to employees
 ALTER TABLE employees
