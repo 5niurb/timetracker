@@ -28,6 +28,13 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   process.exit(1);
 }
 
+// Admin password — required for all admin routes
+if (!process.env.ADMIN_PASSWORD) {
+  console.error('ERROR: ADMIN_PASSWORD environment variable is required');
+  console.error('Set it in Render environment variables and local .env');
+  process.exit(1);
+}
+
 // Encryption key — required for onboarding PII storage
 if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
   console.error('ERROR: PAYTRACK_ENCRYPTION_KEY environment variable is required');
@@ -49,7 +56,7 @@ if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-initCompliance(supabase, process.env.ADMIN_PASSWORD || 'LM$PayTrack#Admin2026!');
+initCompliance(supabase, process.env.ADMIN_PASSWORD);
 app.use('/api/compliance', complianceRouter);
 
 // Service-role client for storage uploads (bypasses RLS on storage bucket)
@@ -708,9 +715,7 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
 
 // ============ ADMIN ROUTES ============
 
-// Admin password - set via environment variable or use default
-// Generate a strong password from 1Password or similar vault for production
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'LM$PayTrack#Admin2026!';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // Verify admin password
 app.post('/api/admin/verify', (req, res) => {

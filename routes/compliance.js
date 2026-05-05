@@ -44,9 +44,13 @@ async function findValidRequest(res, token) {
     .select('*, employees(id, name, email, phone)')
     .eq('token', token)
     .is('used_at', null)
-    .single();
+    .maybeSingle();
 
-  if (error || !req) {
+  if (error) {
+    res.status(500).json({ error: 'Error looking up request.' });
+    return null;
+  }
+  if (!req) {
     res.status(404).json({ error: 'Link not found or already used.' });
     return null;
   }
@@ -127,12 +131,12 @@ router.post('/coi-received', async (req, res) => {
         confirm_url: `${BASE_URL}/compliance.html?token=${token}`,
       });
     } catch (err) {
-      console.error('COI extraction failed:', err.message);
+      console.error('COI extraction failed (doc.id=%s):', doc.id, err.message);
       await supabase
         .from('compliance_documents')
         .update({ status: 'pending' })
         .eq('id', doc.id)
-        .catch((e) => console.error('status reset failed:', e.message));
+        .catch((e) => console.error('status reset failed (doc.id=%s):', doc.id, e.message));
     }
   });
 });
@@ -189,12 +193,17 @@ router.post('/confirm/:token', async (req, res) => {
 
   try {
     // Load original AI-extracted values to detect edits
-    const { data: doc } = await supabase
+    const { data: doc, error: docFetchErr } = await supabase
       .from('compliance_documents')
       .select('ai_extracted')
       .eq('id', document_id)
       .eq('employee_id', request.employee_id) // cross-employee guard
       .single();
+
+    if (docFetchErr) {
+      console.error('confirm POST doc fetch error:', docFetchErr.message);
+      return res.status(500).json({ error: 'Error loading document for confirmation' });
+    }
 
     const ai = doc?.ai_extracted || {};
     const edits = {};
@@ -215,7 +224,8 @@ router.post('/confirm/:token', async (req, res) => {
         worker_confirmed_at: new Date().toISOString(),
         status: 'worker_confirmed',
       })
-      .eq('id', document_id);
+      .eq('id', document_id)
+      .eq('employee_id', request.employee_id);
 
     // Mark token used
     await supabase
