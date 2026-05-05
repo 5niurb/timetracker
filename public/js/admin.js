@@ -2168,7 +2168,12 @@
 
     async function loadCOIReview() {
       const password = sessionStorage.getItem('adminPasswordValue');
-      const res = await fetch('/api/compliance/review', { headers: { password } });
+      let res;
+      try {
+        res = await fetch('/api/compliance/review', { headers: { password } });
+      } catch {
+        return;
+      }
       if (!res.ok) return;
       const { items } = await res.json();
 
@@ -2256,25 +2261,33 @@
     async function approveDoc(id) {
       if (!confirm('Approve this certificate and update the employee record?')) return;
       const password = sessionStorage.getItem('adminPasswordValue');
-      const res = await fetch(`/api/compliance/review/${id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', password },
-        body: '{}',
-      });
-      if (res.ok) loadCOIReview();
-      else alert('Error approving. Try again.');
+      try {
+        const res = await fetch(`/api/compliance/review/${id}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', password },
+          body: '{}',
+        });
+        if (res.ok) loadCOIReview();
+        else alert('Error approving. Try again.');
+      } catch {
+        alert('Network error. Check your connection and try again.');
+      }
     }
 
     async function rejectDoc(id) {
       if (!confirm('Reject this document and send worker a new upload link?')) return;
       const password = sessionStorage.getItem('adminPasswordValue');
-      const res = await fetch(`/api/compliance/review/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', password },
-        body: '{}',
-      });
-      if (res.ok) loadCOIReview();
-      else alert('Error rejecting. Try again.');
+      try {
+        const res = await fetch(`/api/compliance/review/${id}/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', password },
+          body: '{}',
+        });
+        if (res.ok) loadCOIReview();
+        else alert('Error rejecting. Try again.');
+      } catch {
+        alert('Network error. Check your connection and try again.');
+      }
     }
 
     // Check if already logged in
