@@ -32,12 +32,14 @@ function tokenExpiresAt() {
 async function sendCOIReminders() {
   const thirtyDaysOut = new Date();
   thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysOutStr = thirtyDaysOut.toISOString().split('T')[0];
 
-  // Employees with COI expiring within 30 days OR no COI on file
+  // Employees with COI expiring within 30 days (lower-bounded by today) OR no COI on file
   const { data: employees, error } = await supabase
     .from('employees')
     .select('id, name, email, phone, coi_expiry')
-    .or(`coi_expiry.lte.${thirtyDaysOut.toISOString().split('T')[0]},coi_expiry.is.null`);
+    .or(`and(coi_expiry.gte.${today},coi_expiry.lte.${thirtyDaysOutStr}),coi_expiry.is.null`);
 
   if (error) throw error;
   if (!employees?.length) {
@@ -101,7 +103,9 @@ async function run() {
   console.log('Done.');
 }
 
-run().catch((e) => {
-  console.error('Scanner error:', e);
-  process.exit(1);
-});
+run()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error('Scanner error:', e);
+    process.exit(1);
+  });
