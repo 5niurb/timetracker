@@ -56,14 +56,14 @@ if (!process.env.PAYTRACK_ENCRYPTION_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-initCompliance(supabase, process.env.ADMIN_PASSWORD);
-app.use('/api/compliance', complianceRouter);
-
-// Service-role client for storage uploads (bypasses RLS on storage bucket)
+// Service-role client for storage uploads and compliance routes (bypasses RLS)
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : supabase; // fallback to anon if not set (dev only)
+
+initCompliance(supabaseAdmin, process.env.ADMIN_PASSWORD);
+app.use('/api/compliance', complianceRouter);
 
 // Multer: memory storage — files buffered in memory, then pushed to Supabase Storage
 const upload = multer({

@@ -71,6 +71,10 @@ function pickCOIFields(source) {
 // Called by Cloudflare Email Worker after PDF extracted
 // ─────────────────────────────────────────────
 router.post('/coi-received', async (req, res) => {
+  const secret = req.headers['x-email-worker-secret'];
+  if (secret !== process.env.EMAIL_WORKER_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
   const { employee_id, storage_path } = req.body;
   if (!employee_id || !storage_path) {
     return res.status(400).json({ error: 'employee_id and storage_path required' });
@@ -330,9 +334,10 @@ router.post('/review/:id/reject', async (req, res) => {
       .update({ admin_action: 'rejected', status: 'rejected' })
       .eq('id', id)
       .select('*, employees(id, name, email, phone, coi_expiry)')
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
 
     // Issue a new upload token and re-send Step 1
     const { token, expires_at } = generateToken();
