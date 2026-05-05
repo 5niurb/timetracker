@@ -416,4 +416,84 @@ router.get('/document-admin/:doc_id', async (req, res) => {
   res.send(Buffer.from(arrayBuffer));
 });
 
+const multer = require('multer');
+const emailUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+// POST /api/compliance/coi-inbound — called by Cloudflare Email Worker
+router.post('/coi-inbound', emailUpload.single('file'), async (req, res) => {
+  const secret = req.headers['x-email-worker-secret'];
+  if (secret !== process.env.EMAIL_WORKER_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { from_email, filename } = req.body;
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  // Match sender to employee by email
+  const { data: emp } = await supabase
+    .from('employees')
+    .select('id')
+    .ilike('email', from_email.trim())
+    .maybeSingle();
+
+  if (!emp) {
+    console.log(`COI email from unknown sender: ${from_email}`);
+    return res.json({ success: false, reason: 'sender_unrecognized' });
+  }
+
+  try {
+    const storagePath = `compliance/${emp.id}/${Date.now()}-${filename}`;
+    const { error: uploadErr } = await supabase.storage
+      .from('onboarding-documents')
+      .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype });
+
+    if (uploadErr) throw uploadErr;
+
+    // Respond immediately; async extraction follows
+    res.json({ success: true });
+
+    try {
+      const { extractCOI } = await getExtractor();
+      const fields = await extractCOI(storagePath);
+
+      await supabase.from('compliance_documents').insert({
+        employee_id: emp.id,
+        document_type: 'coi',
+        storage_path: storagePath,
+        ...fields,
+        ai_extracted: fields,
+        status: 'extracted',
+      });
+
+      const { token, expires_at } = generateToken();
+      await supabase.from('compliance_requests').insert({
+        employee_id: emp.id,
+        type: 'upload',
+        document_type: 'coi',
+        token,
+        expires_at,
+      });
+
+      const { data: fullEmp } = await supabase
+        .from('employees')
+        .select('name, email, phone')
+        .eq('id', emp.id)
+        .single();
+
+      const n = await getNotifier();
+      await n.sendCOIConfirmRequest({
+        to_email: fullEmp.email,
+        to_phone: fullEmp.phone,
+        worker_name: fullEmp.name,
+        confirm_url: `${BASE_URL}/compliance.html?token=${token}`,
+      });
+    } catch (e) {
+      console.error('coi-inbound async extraction error:', e.message);
+    }
+  } catch (err) {
+    console.error('coi-inbound error:', err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 module.exports = { router, init };
