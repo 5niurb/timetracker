@@ -3,6 +3,12 @@
     let allEmployees = [];
     let currentPeriodOffset = 0; // 0 = current period, -1 = previous, etc.
 
+    function formatHoursDisplay(decimalHours) {
+      const h = Math.floor(decimalHours);
+      const m = Math.round((decimalHours - h) * 60);
+      return `${h}:${String(m).padStart(2, '0')} / ${decimalHours.toFixed(2)}`;
+    }
+
     // Set default dates (LA timezone aware)
     function getLADate() {
       const now = new Date();
@@ -199,7 +205,7 @@
         const footer = document.getElementById('review-entries-footer');
 
         if (allEntries.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="10" class="empty-state">No entries found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No entries found</td></tr>';
           footer.style.display = 'none';
         } else {
           let totalHours = 0;
@@ -208,7 +214,30 @@
           let totalSalesComm = 0;
           let totalTips = 0;
           let totalCashTips = 0;
+          let totalPayouts = 0;
           let totalPayable = 0;
+
+          // Fetch payouts for the current period/employee filter
+          const period = getPayPeriodByOffset(currentPeriodOffset);
+          const startDate = formatDateForDB(period.start);
+          const endDate = formatDateForDB(period.end);
+          const employeeId = document.getElementById('filter-employee').value;
+          let payoutsByEmployee = {};
+          try {
+            const adminPassword = sessionStorage.getItem('adminPasswordValue') || '';
+            let payoutsUrl = `/api/admin/payments?start_date=${startDate}&end_date=${endDate}`;
+            if (employeeId) payoutsUrl += `&employee_id=${employeeId}`;
+            const payoutsResp = await fetch(payoutsUrl, { headers: { password: adminPassword } });
+            const payoutsData = await payoutsResp.json();
+            if (Array.isArray(payoutsData)) {
+              payoutsData.forEach(p => {
+                const key = `${p.employee_id}_${p.payment_date}`;
+                payoutsByEmployee[key] = (payoutsByEmployee[key] || 0) + parseFloat(p.amount || 0);
+              });
+            }
+          } catch (e) {
+            // Non-fatal — payouts column will show $0.00
+          }
 
           tbody.innerHTML = allEntries.map(entry => {
             const hours = parseFloat(entry.hours) || 0;
@@ -234,7 +263,9 @@
               });
             }
 
-            const dayTotal = wages + serviceComm + salesComm + tips - cashTips;
+            const payoutKey = `${entry.employee_id}_${entry.date}`;
+            const dayPayouts = payoutsByEmployee[payoutKey] || 0;
+            const dayTotal = wages + serviceComm + salesComm + tips - cashTips - dayPayouts;
 
             totalHours += hours;
             totalWages += wages;
@@ -242,6 +273,7 @@
             totalSalesComm += salesComm;
             totalTips += tips;
             totalCashTips += cashTips;
+            totalPayouts += dayPayouts;
             totalPayable += dayTotal;
 
             const hasDetails = (entry.clients && entry.clients.length > 0) || (entry.productSales && entry.productSales.length > 0);
@@ -250,12 +282,13 @@
               <tr>
                 <td><strong>${formatDate(entry.date)}</strong></td>
                 <td>${escapeHtml(entry.employee_name)}</td>
-                <td style="text-align: right;">${hours.toFixed(2)}</td>
+                <td style="text-align: right;">${formatHoursDisplay(hours)}</td>
                 <td style="text-align: right;">$${wages.toFixed(2)}</td>
                 <td style="text-align: right;">$${serviceComm.toFixed(2)}</td>
                 <td style="text-align: right;">$${salesComm.toFixed(2)}</td>
                 <td style="text-align: right;">$${tips.toFixed(2)}</td>
                 <td style="text-align: right; color: #ff6b6b;">${cashTips > 0 ? '-$' + cashTips.toFixed(2) : '$0.00'}</td>
+                <td style="text-align: right; color: #ff6b6b;">${dayPayouts > 0 ? '-$' + dayPayouts.toFixed(2) : '$0.00'}</td>
                 <td style="text-align: right; color: #6bff6b; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
                 <td class="actions">
                   ${hasDetails ? `<button class="btn-secondary" onclick="showEntryDetails(${entry.id})">Details</button>` : ''}
@@ -266,12 +299,13 @@
           }).join('');
 
           // Update footer totals
-          document.getElementById('review-total-hours').innerHTML = `<strong>${totalHours.toFixed(2)}</strong>`;
+          document.getElementById('review-total-hours').innerHTML = `<strong>${formatHoursDisplay(totalHours)}</strong>`;
           document.getElementById('review-total-wages').innerHTML = `<strong>$${totalWages.toFixed(2)}</strong>`;
           document.getElementById('review-total-service').innerHTML = `<strong>$${totalServiceComm.toFixed(2)}</strong>`;
           document.getElementById('review-total-sales').innerHTML = `<strong>$${totalSalesComm.toFixed(2)}</strong>`;
           document.getElementById('review-total-tips').innerHTML = `<strong>$${totalTips.toFixed(2)}</strong>`;
           document.getElementById('review-total-cash').innerHTML = `<strong>-$${totalCashTips.toFixed(2)}</strong>`;
+          document.getElementById('review-total-payouts').innerHTML = `<strong>-$${totalPayouts.toFixed(2)}</strong>`;
           document.getElementById('review-total-payable').innerHTML = `<strong>$${totalPayable.toFixed(2)}</strong>`;
           footer.style.display = '';
         }

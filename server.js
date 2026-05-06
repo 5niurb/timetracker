@@ -138,8 +138,14 @@ async function initDatabase() {
 
 // Pay period helpers imported from ./lib/pay-periods.js
 
+function formatHoursEmailDisplay(decimalHours) {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  return `${h}:${String(m).padStart(2, '0')} / ${decimalHours.toFixed(2)}`;
+}
+
 // Simple email sending function (using fetch to external email API)
-async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
+async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entries) {
   // Check if Resend API key is configured
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
@@ -147,6 +153,50 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
     console.log('[Email] No RESEND_API_KEY configured - email not sent');
     return { sent: false, reason: 'No API key configured' };
   }
+
+  const tdStyle = 'border: 1px solid #ddd; padding: 8px;';
+  const tdRight = 'border: 1px solid #ddd; padding: 8px; text-align: right;';
+
+  // Build daily entries detail table
+  let entriesTableRows = '';
+  if (entries && entries.length > 0) {
+    entries.forEach(entry => {
+      const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips - (entry.payouts || 0);
+      entriesTableRows += `
+        <tr>
+          <td style="${tdStyle}">${entry.date}</td>
+          <td style="${tdRight}">${formatHoursEmailDisplay(entry.hours)}</td>
+          <td style="${tdRight}">$${entry.wages.toFixed(2)}</td>
+          <td style="${tdRight}">$${entry.commissions.toFixed(2)}</td>
+          <td style="${tdRight}">$${entry.productCommissions.toFixed(2)}</td>
+          <td style="${tdRight}">$${entry.tips.toFixed(2)}</td>
+          <td style="${tdRight}; color: #cc0000;">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
+          <td style="${tdRight}; color: #cc0000;">${(entry.payouts || 0) > 0 ? '-$' + entry.payouts.toFixed(2) : '-'}</td>
+          <td style="${tdRight}; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const entriesTable = entries && entries.length > 0 ? `
+    <h3 style="margin-top: 32px; margin-bottom: 8px; font-size: 14px; color: #333;">Daily Entry Detail</h3>
+    <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;">
+      <thead>
+        <tr style="background: #f5f5f5;">
+          <th style="${tdStyle} text-align: left;">Date</th>
+          <th style="${tdRight} text-align: right;">Time/Hours Worked</th>
+          <th style="${tdRight} text-align: right;">Wages</th>
+          <th style="${tdRight} text-align: right;">Svc Comm</th>
+          <th style="${tdRight} text-align: right;">Sales Comm</th>
+          <th style="${tdRight} text-align: right;">Tips</th>
+          <th style="${tdRight} text-align: right;">Cash Tips</th>
+          <th style="${tdRight} text-align: right;">Payouts</th>
+          <th style="${tdRight} text-align: right;">Day Total</th>
+        </tr>
+      </thead>
+      <tbody>${entriesTableRows}</tbody>
+    </table>
+  ` : '';
 
   const emailBody = `
     <h2>LeMed Spa - Pay Period Invoice</h2>
@@ -159,7 +209,7 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
         <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Amount</th>
       </tr>
       <tr>
-        <td style="border: 1px solid #ddd; padding: 10px;">Hours Worked (${summary.totalHours.toFixed(2)} hrs @ $${employee.hourlyWage}/hr)</td>
+        <td style="border: 1px solid #ddd; padding: 10px;">Time/Hours Worked (${formatHoursEmailDisplay(summary.totalHours)} @ $${employee.hourlyWage}/hr)</td>
         <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalWages.toFixed(2)}</td>
       </tr>
       <tr>
@@ -178,11 +228,18 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary) {
         <td style="border: 1px solid #ddd; padding: 10px; color: #cc0000;">Less: Cash Tips Already Received</td>
         <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #cc0000;">-$${summary.totalCashTips.toFixed(2)}</td>
       </tr>
+      ${summary.totalPayouts > 0 ? `
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 10px; color: #cc0000;">Less: Payouts Already Made</td>
+        <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #cc0000;">-$${summary.totalPayouts.toFixed(2)}</td>
+      </tr>` : ''}
       <tr style="background: #e8f5e9;">
         <td style="border: 1px solid #ddd; padding: 10px;"><strong>TOTAL PAYABLE</strong></td>
         <td style="border: 1px solid #ddd; padding: 10px; text-align: right;"><strong>$${summary.totalPayable.toFixed(2)}</strong></td>
       </tr>
     </table>
+
+    ${entriesTable}
 
     <p style="color: #666; font-size: 12px;">Submitted via LM PayTrack</p>
   `;
@@ -553,12 +610,76 @@ app.post('/api/submit-invoice', async (req, res) => {
     return res.json({ success: false, message: 'Failed to create invoice' });
   }
 
+  // Re-fetch entries for the email detail table
+  const { data: emailEntries } = await supabaseAdmin
+    .from('time_entries')
+    .select('id, date, hours')
+    .eq('employee_id', employeeId)
+    .gte('date', periodStart)
+    .lte('date', periodEnd)
+    .order('date', { ascending: true });
+
+  // Fetch payouts for the period
+  const { data: emailPayouts } = await supabaseAdmin
+    .from('payments')
+    .select('payment_date, amount')
+    .eq('employee_id', employeeId)
+    .gte('payment_date', periodStart)
+    .lte('payment_date', periodEnd);
+
+  const payoutsByDate = {};
+  let totalPayouts = 0;
+  for (const p of (emailPayouts || [])) {
+    payoutsByDate[p.payment_date] = (payoutsByDate[p.payment_date] || 0) + parseFloat(p.amount || 0);
+    totalPayouts += parseFloat(p.amount || 0);
+  }
+
+  const detailedEntries = [];
+  for (const entry of (emailEntries || [])) {
+    const { data: clients } = await supabaseAdmin
+      .from('client_entries')
+      .select('amount_earned, tip_amount, tip_received_cash')
+      .eq('time_entry_id', entry.id);
+
+    const { data: sales } = await supabaseAdmin
+      .from('product_sales')
+      .select('commission_amount')
+      .eq('time_entry_id', entry.id);
+
+    let dayCommissions = 0;
+    let dayTips = 0;
+    let dayCashTips = 0;
+    for (const c of (clients || [])) {
+      dayCommissions += c.amount_earned || 0;
+      dayTips += c.tip_amount || 0;
+      if (c.tip_received_cash) dayCashTips += c.tip_amount || 0;
+    }
+    let dayProductCommissions = 0;
+    for (const s of (sales || [])) {
+      dayProductCommissions += s.commission_amount || 0;
+    }
+    const dayPayouts = payoutsByDate[entry.date] || 0;
+    const dayWages = entry.hours * (employee?.hourly_wage || 0);
+
+    detailedEntries.push({
+      date: entry.date,
+      hours: entry.hours,
+      wages: dayWages,
+      commissions: dayCommissions,
+      productCommissions: dayProductCommissions,
+      tips: dayTips,
+      cashTips: dayCashTips,
+      payouts: dayPayouts,
+    });
+  }
+
   // Try to send email
   const emailResult = await sendInvoiceEmail(
     { name: employee?.name, email: employee?.email, hourlyWage: employee?.hourly_wage || 0 },
     periodStart,
     periodEnd,
-    { totalHours, totalWages, totalCommissions, totalProductCommissions, totalTips, totalCashTips, totalPayable }
+    { totalHours, totalWages, totalCommissions, totalProductCommissions, totalTips, totalCashTips, totalPayouts, totalPayable },
+    detailedEntries
   );
 
   // Log invoice details
@@ -711,6 +832,26 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
       totalPayable: totalWages + totalCommissions + totalTips + totalProductCommissions - totalCashTips
     }
   });
+});
+
+// Get payouts for an employee for a pay period (employee-facing, no admin auth)
+app.get('/api/employee/payouts/:employeeId', async (req, res) => {
+  const { employeeId } = req.params;
+  const { periodStart, periodEnd } = req.query;
+
+  if (!periodStart || !periodEnd) {
+    return res.status(400).json({ success: false, message: 'periodStart and periodEnd required' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('payments')
+    .select('payment_date, amount')
+    .eq('employee_id', parseInt(employeeId))
+    .gte('payment_date', periodStart)
+    .lte('payment_date', periodEnd);
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json(data || []);
 });
 
 // ============ ADMIN ROUTES ============

@@ -10,6 +10,12 @@
     let salesCount = 0;
     let currentTab = 'entry';
 
+    function formatHoursDisplay(decimalHours) {
+      const h = Math.floor(decimalHours);
+      const m = Math.round((decimalHours - h) * 60);
+      return `${h}:${String(m).padStart(2, '0')} / ${decimalHours.toFixed(2)}`;
+    }
+
     // Get current date/time in Los Angeles timezone
     function getLADate() {
       const now = new Date();
@@ -149,19 +155,39 @@
           return new Date(b.date) - new Date(a.date);
         });
 
+        // Fetch payouts for this employee/period
+        let payoutsByDate = {};
+        let totalPayouts = 0;
+        try {
+          const payoutsResp = await fetch(`/api/employee/payouts/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`);
+          if (payoutsResp.ok) {
+            const payoutsData = await payoutsResp.json();
+            if (Array.isArray(payoutsData)) {
+              payoutsData.forEach(p => {
+                payoutsByDate[p.payment_date] = (payoutsByDate[p.payment_date] || 0) + parseFloat(p.amount || 0);
+                totalPayouts += parseFloat(p.amount || 0);
+              });
+            }
+          }
+        } catch (e) {
+          // Non-fatal — payouts column will show $0.00
+        }
+
         // Build rows
         let rows = '';
         sortedEntries.forEach(entry => {
-          const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips;
+          const dayPayouts = payoutsByDate[entry.date] || 0;
+          const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips - dayPayouts;
           rows += `
             <tr>
               <td>${formatDateShort(entry.date)}</td>
-              <td class="right">${entry.hours.toFixed(2)}</td>
+              <td class="right">${formatHoursDisplay(entry.hours)}</td>
               <td class="right">$${entry.wages.toFixed(2)}</td>
               <td class="right">$${entry.commissions.toFixed(2)}</td>
               <td class="right">$${entry.productCommissions.toFixed(2)}</td>
               <td class="right">$${entry.tips.toFixed(2)}</td>
               <td class="right cash-tips">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
+              <td class="right cash-tips">${dayPayouts > 0 ? '-$' + dayPayouts.toFixed(2) : '-'}</td>
               <td class="right" style="font-weight: 600;">$${dayTotal.toFixed(2)}</td>
               <td class="right"><button class="btn-delete-small" onclick="deleteReviewEntry(${entry.id}, '${entry.date}')">Delete</button></td>
             </tr>
@@ -171,13 +197,15 @@
 
         // Update footer totals
         const s = data.summary;
-        document.getElementById('review-total-hours').textContent = s.totalHours.toFixed(2);
+        const totalPayable = s.totalPayable - totalPayouts;
+        document.getElementById('review-total-hours').textContent = formatHoursDisplay(s.totalHours);
         document.getElementById('review-total-wages').textContent = '$' + s.totalWages.toFixed(2);
         document.getElementById('review-total-service').textContent = '$' + s.totalCommissions.toFixed(2);
         document.getElementById('review-total-sales').textContent = '$' + s.totalProductCommissions.toFixed(2);
         document.getElementById('review-total-tips').textContent = '$' + s.totalTips.toFixed(2);
         document.getElementById('review-total-cash').textContent = '-$' + s.totalCashTips.toFixed(2);
-        document.getElementById('review-total-payable').textContent = '$' + s.totalPayable.toFixed(2);
+        document.getElementById('review-total-payouts').textContent = '-$' + totalPayouts.toFixed(2);
+        document.getElementById('review-total-payable').textContent = '$' + totalPayable.toFixed(2);
         tfoot.style.display = 'table-footer-group';
 
       } catch (error) {

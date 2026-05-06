@@ -39,7 +39,7 @@
         <button class="tab active" onclick="showTab('review-entries')">Review Entries</button>
         <button class="tab" onclick="showTab('employees')">Team</button>
         <button class="tab" onclick="showTab('reports')">Report Entries</button>
-        <button class="tab" onclick="showTab('payments')">Payments</button>
+        <button class="tab" onclick="showTab('payments')">Payouts</button>
         <button class="tab" onclick="showTab('tax')">Tax</button>
         <button class="tab" onclick="showTab('compliance')">Compliance</button>
       </div>
@@ -73,12 +73,13 @@
                 <tr>
                   <th>Date</th>
                   <th>Team Member</th>
-                  <th style="text-align: right;">Hours</th>
+                  <th style="text-align: right;">Time/Hours Worked</th>
                   <th style="text-align: right;">Wages</th>
                   <th style="text-align: right;">Service Comm</th>
                   <th style="text-align: right;">Sales Comm</th>
                   <th style="text-align: right;">Tips</th>
                   <th style="text-align: right;">Cash Tips</th>
+                  <th style="text-align: right;">Payouts</th>
                   <th style="text-align: right;">Day Total</th>
                   <th>Actions</th>
                 </tr>
@@ -93,6 +94,7 @@
                   <td style="text-align: right;" id="review-total-sales"><strong>$0.00</strong></td>
                   <td style="text-align: right;" id="review-total-tips"><strong>$0.00</strong></td>
                   <td style="text-align: right; color: #ff6b6b;" id="review-total-cash"><strong>-$0.00</strong></td>
+                  <td style="text-align: right; color: #ff6b6b;" id="review-total-payouts"><strong>-$0.00</strong></td>
                   <td style="text-align: right; color: #6bff6b; font-size: 14px;" id="review-total-payable"><strong>$0.00</strong></td>
                   <td></td>
                 </tr>
@@ -175,11 +177,11 @@
         </div>
       </div>
 
-      <!-- Payments Tab -->
+      <!-- Payouts Tab -->
       <div id="tab-payments" class="tab-content" style="display: none;">
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin-bottom: 0;">Payments</h3>
+            <h3 style="margin-bottom: 0;">Payouts</h3>
             <button class="btn-success" onclick="openPaymentModal()" style="padding: 10px 24px;">+ Add Payment</button>
           </div>
           <div class="filter-bar" style="margin-top: 16px;">
