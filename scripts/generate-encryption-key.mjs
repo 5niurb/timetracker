@@ -4,7 +4,7 @@
  * Run: node scripts/generate-encryption-key.mjs
  * Copy the output to:
  *   1. Render env var: PAYTRACK_ENCRYPTION_KEY
- *   2. Local timetracker/.env for dev
+ *   2. Local paytrack/.env for dev
  * DO NOT commit the key to git.
  */
 

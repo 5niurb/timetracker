@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timetracker-v1';
+const CACHE_NAME = 'paytrack-v1';
 const urlsToCache = [
   '/',
   '/admin',

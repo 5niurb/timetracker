@@ -1,5 +1,5 @@
 node_modules/
-timetracker.db
+paytrack.db
 .DS_Store
 *.log
 .env
