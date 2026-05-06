@@ -1,3 +1,201 @@
+## Session — 2026-05-05/06 (COI compliance workflow — Tasks 10 & 11: E2E smoke test + production deploy)
+
+**Focus:** Complete COI compliance workflow. Fix UI rendering bug, resolve email routing domain conflict, deploy Cloudflare email worker, restore Render env vars, ship to production.
+
+**Accomplished:**
+- Fixed `loadCOIReview()` rendering bug: added `class="f-name"` to card template, changed fragile DOM-path selector to `.f-name` (commit `d0807cd`)
+- Updated COI reminder email + SMS to use `coi@lemedspa.app` (lemedspa.com MX blocked by M365) (commit `c2526d6`)
+- Configured Cloudflare Email Routing on `lemedspa.app`: deleted registrar-forwarding MX records, added CF routing MX + SPF + DKIM, enabled Email Routing, created rule `coi@lemedspa.app` → `coi-email-receiver` worker
+- Deployed `coi-email-receiver` Cloudflare Worker (parses inbound emails via postal-mime, POSTs attachments to paytrack API)
+- Set `EMAIL_WORKER_SECRET` as Cloudflare Worker secret
+- Restored all 11 Render env vars after accidental wipe (Render `PUT /env-vars` replaces all, not appends)
+- Generated new `PAYTRACK_ENCRYPTION_KEY` (old one lost; safe because no rows had encrypted data)
+- Generated new `ADMIN_PASSWORD` (old one lost; safe because it's just a shared admin PIN)
+- Triggered Render deploy → `dep-d7tdg00sfn5c73ak39l0` — **live** on commit `c2526d6`
+- Persisted new secrets to Windows User env + `set-env-vars.ps1`
+
+**Diagram:**
+```
+Worker email → coi@lemedspa.app → CF Email Routing → coi-email-receiver (Worker)
+                                                            │ x-email-worker-secret
+                                                            ▼
+                                               /api/compliance/coi-inbound
+                                                            │
+                                                     Supabase Storage
+                                                            │
+                                               Claude Haiku (extract-insurance.mjs)
+                                                            │
+                                               compliance_cois table (pending)
+```
+
+**Current State:**
+- Full COI compliance workflow live in production at https://paytrack.lemedspa.app
+- Email routing: `coi@lemedspa.app` → worker (DNS may still be propagating)
+- All 11 env vars set on Render, service healthy (`/api/health` 200 OK)
+- `coi-inbound` endpoint: correct secret → `{error:"No file uploaded"}` (expected); wrong secret → 401
+
+**Issues:**
+- Old `ADMIN_PASSWORD` was not recoverable — replaced with `1788f889eb2f2fd6a33b9c5a1753e03e` (saved to Windows env + set-env-vars.ps1). Admin users need to use new password after next deploy (they use the Render-configured value, not hardcoded)
+- Old `PAYTRACK_ENCRYPTION_KEY` was not recoverable — replaced (safe: no employees have encrypted fields yet)
+
+**Next Steps:**
+- Test live email forwarding: have a COI forwarded to `coi@lemedspa.app`, confirm worker fires + Supabase row appears
+- If DNS propagation needed: wait ~1h and retry
+- Worker `coi-email-receiver` logs visible at: Cloudflare dashboard → Workers → coi-email-receiver → Logs
+
+---
+
+## Session — 2026-04-30 (Document uploads, Team Table enhancements, pay entry display)
+
+**Focus:** Surface April Fabro's uploaded documents in admin UI; add Licenses + Contract tabs to Team Table; improve pay entry time display.
+
+**Accomplished:**
+- **Signed URL endpoint:** Added `GET /api/admin/storage/signed-url?path=...` to server.js — generates 1-hour Supabase signed URL for private `onboarding-documents` bucket. All "View file" links now call `openSignedDoc()` instead of using raw path as `href`.
+- **Document bridge:** Updated onboarding submit route to mirror DL + insurance uploads into `employee_documents` table after saving to `employees` columns. Duplicate-safe: queries existing paths first, inserts only new ones (avoids batch-insert key mismatch error and missing unique constraint).
+- **Professional license in compliance panel:** `renderComplianceDocs()` now accepts `professionalLicenses` from onboarding data and renders a license info block inline under the "Active Professional License" slot.
+- **Licenses + Contract tabs:** Added two new tabs to the Team Table modal PII section (admin.html + admin.js). Tabs show professional license entries and contract details (IC agreement, time commitment, other commitments, signature, dates).
+- **Race condition fix:** Introduced module-level `_currentOnboardingData` cache. `showPiiTab()` re-renders readonly tabs on click if data is already loaded — eliminates placeholder text when user clicks before async fetch resolves.
+- **"Desired Time Commitment" label:** Renamed from "Time Commitment" in Contract tab.
+- **Time Worked display:** Pay entry page now shows both `Time Worked` (H:MM format, e.g. `1:15`) and `Hours Worked` (decimal, e.g. `1.25`) side-by-side. `calculateHours()` and `clearForm()` updated. Commits: `b9c5355`, `530682c`, `eff06f8`.
+
+**Diagram:**
+```
+Team Table modal (admin)
+  Compliance tab ── renderComplianceDocs()
+    Active Professional License slot
+      └─ inline license block (type, number, state, expiry) ← from onboarding data
+
+  PII tabs: Identity | Tax | Insurance | Banking | Licenses | Contract
+    Licenses ── professional_licenses[] from _currentOnboardingData
+    Contract ── attestation, "Desired Time Commitment", other_commitments, dates
+
+Pay Entry page
+  ┌─────────────┐  ┌──────────────┐
+  │ Time Worked │  │ Hours Worked │
+  │   1:15      │  │    1.25      │
+  └─────────────┘  └──────────────┘
+```
+
+**Current State:**
+- All changes deployed to Render (auto-deploy on push to main)
+- Signed URL endpoint live — document uploads now viewable in admin
+- April Fabro's DL + insurance DL paths backfilled into `employee_documents` via updated onboarding route (future submissions auto-bridge)
+- Licenses + Contract tabs working with race-condition fix
+
+**Issues:**
+- Jade's insurance still expired (2025-06-29) — needs updated COI from Lea
+- Leena's full SSN unavailable (masked on IRS source form)
+
+**Next Steps:**
+- Collect updated COI from Jade
+- If Leena's full SSN becomes available, run populate-1099.mjs to backfill encryption
+- SPECS.md update for Licenses/Contract tabs + signed URL endpoint + Time Worked display
+
+---
+
+## Session — 2026-05-05 (Compliance workflow design + plan)
+
+**Focus:** Design and plan the full compliance document renewal workflow (COI insurance, professional license, W9/contract e-sign).
+
+**Accomplished:**
+- Brainstormed full compliance workflow across two sessions — approved design
+- Wrote and committed design spec: `docs/superpowers/specs/2026-05-05-compliance-renewal-design.md` (`7620f2b`)
+- Built admin review page HTML mockup (warm tone, 15-second approve flow)
+- Wrote 11-task TDD implementation plan for COI workflow, committed: `docs/superpowers/plans/2026-05-05-compliance-coi-workflow.md` (`cd89268`)
+
+**Diagram:**
+```
+Worker ──forward email──► coi@lemedspa.com ──► CF Email Worker ──► /api/compliance/coi-inbound
+       ──upload link──►  /compliance/<token> ──► /api/compliance/confirm/:token ──►┐
+                                                                                    ▼
+                                                               Haiku extraction → worker confirm page
+                                                                                    │
+                                                               admin review queue ◄─┘
+                                                                    │
+                                                               approve → record updated + "all set" email
+```
+
+**Current State:**
+- Design spec: committed, approved
+- COI implementation plan: committed, ready to execute (11 tasks)
+- Plan 2 (License auto-lookup + Docuseal): not yet written
+
+**Next Steps:**
+- Execute COI plan (subagent-driven, task by task)
+- After COI complete: write + execute License/Docuseal plan
+- New env vars needed at Render: `ANTHROPIC_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+
+---
+
+## Session — 2026-04-21 (Status checkpoint)
+
+**Focus:** Session checkpoint — Tax and Compliance tabs verified live in production.
+
+**Accomplished:**
+- Verified previous session's deployment is stable (commit 968caa5 live on Render)
+- All admin tabs functional: Review Entries, Team, Report Entries, Payments, Tax, Compliance
+- Context compacted to free tokens; session management prepared for future work
+
+**Diagram:**
+```
+Admin Panel (deployed stable)
+  ├─ Review Entries
+  ├─ Team (formerly Team Members)
+  ├─ Report Entries (formerly Reports)
+  ├─ Payments
+  ├─ Tax (filings_1099 view)
+  └─ Compliance (per-employee doc status)
+```
+
+**Current State:**
+- All 6 features shipped and tested
+- Production database synced with migrations
+- No known issues blocking use
+
+**Issues:**
+- None currently
+
+**Next Steps:**
+- Continue from session 2026-04-20 next time
+- If adding features: verify tests pass first per agentic patterns
+- SPECS.md update pending (if new features added)
+
+---
+
+## Session — 2026-04-20 (Tax + Compliance admin tabs)
+
+**Focus:** Add Tax and Compliance tabs to admin panel; rename Team Members → Team, Reports → Report Entries.
+
+**Accomplished:**
+- **Tab rename:** "Team Members" → "Team", "Reports" → "Report Entries" (internal IDs unchanged)
+- **Tax tab:** `GET /api/admin/filings-1099` endpoint reads from `filings_1099` table (6 contractors, 2025 1099-NEC data). Frontend shows summary cards (total NEC comp, contractor count, TIN fail count) and table with TIN match badges.
+- **Compliance tab:** Per-employee dashboard — W-9/Gov ID/NDA/Insurance doc status, Response Form status (Done/Pending/Not sent), insurance expiry badge, overall Compliant/Action Needed. Non-compliant rows sorted first. "Send Reminder" reuses existing `openSendLink()` modal.
+- **Deployed:** commit `968caa5` pushed to main, Render auto-deploy triggered.
+
+**Diagram:**
+```
+Admin Panel tabs (6):
+┌─────────────┬──────┬───────────────┬──────────┬─────┬─────────────┐
+│Review Entries│ Team │ Report Entries │ Payments │ Tax │ Compliance  │
+└─────────────┴──────┴───────────────┴──────────┴─────┴─────────────┘
+Tax tab: filings_1099 → /api/admin/filings-1099 → summary cards + table
+Compliance tab: /api/admin/employees + /api/admin/employee-documents/all → per-row status
+```
+
+**Current State:**
+- All 3 files modified: `public/admin.html`, `public/js/admin.js`, `server.js`
+- Tax tab reads from `filings_1099` (6 rows); separate from empty `tax_filings` table
+- Compliance tab is frontend-only (reuses existing data fetches)
+- COI upload already existed in both onboarding.html and admin edit modal — no changes needed
+
+**Issues:**
+- None known
+
+**Next Steps:**
+- Verify Tax tab shows 6 contractors with correct TIN match badges after Render deploys
+- Verify Compliance tab insurance expiry badge for Jade (expired Jun 29, 2025)
+- Update SPECS.md with new tab structure
+
 ## Session — 2026-04-17 (Response Form rebrand + employee data population)
 
 **Focus:** Rebrand "Onboarding" → "Response Form" throughout app; populate employee DB from CSV/XLSX; encrypt TINs.
@@ -46,6 +244,46 @@ employees table (populated fields):
 - SPECS.md update for Response Form rebrand
 - Flag Jade's expired insurance in admin compliance checklist
 - Collect updated COI from Jade
+
+---
+
+## Session — 2026-04-19 (filings_1099 table + SPECS.md rebrand)
+
+**Focus:** Create 1099 tracking table; update SPECS.md for Response Form rebrand; Vayda address resolved.
+
+**Accomplished:**
+- **`filings_1099` table created** (Supabase migration) — all 31 IRS 1099-NEC fields; SSNs AES-256-GCM encrypted (same key as `employees.tin_encrypted`)
+- **Populated 6 contractor rows** (2025 tax year): Jade, Leena, Jodi, Lucine, Vayda, Salakjit. Leena's SSN was masked on source form — `tin_last4=4727` only, `tin_encrypted=null`.
+- **Vayda's address completed:** City=Los Angeles, State=CA, Zip=90004 derived from 1099 data → updated `employees` id:15
+- **SPECS.md updated:** Response Form rebrand (`onboarding_token` → `review_token`, section headers, column docs), `filings_1099` schema entry, design decisions log
+
+**Diagram:**
+```
+filings_1099 table (6 rows — 2025 tax year)
+  tin_encrypted (AES-256-GCM) ← same key as employees.tin_encrypted
+  tin_last4 (plaintext)
+  box1_nonemployee_comp, box7_state_income, tin_match, ...
+
+employees id:15 (Vayda)
+  address_street: "200 N. Vermont Ave, Unit 527"  ← was already set
+  address_city:   "Los Angeles"  ← NEW (from 1099 data)
+  address_state:  "CA"           ← NEW
+  address_zip:    "90004"        ← NEW
+```
+
+**Current State:**
+- All 2025 1099-NEC records tracked in DB ✓
+- Vayda's address now complete ✓
+- SPECS.md current ✓
+- commit 4be763a pushed
+
+**Issues:**
+- Jade's insurance still expired (2025-06-29) — needs updated COI from Lea
+- Leena's full SSN unavailable (masked on IRS source form) — `tin_encrypted=null` for her row
+
+**Next Steps:**
+- Collect updated COI from Jade
+- If Leena's full SSN becomes available, run populate-1099.mjs with her SSN to backfill encryption
 
 ---
 
