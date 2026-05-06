@@ -2463,12 +2463,13 @@
     async function loadPlaidImports() {
       try {
         const resp = await adminFetch('/api/admin/payments?auto_imported=true&limit=30');
-        const data = await resp.json();
+        const raw = await resp.json();
         const tbody = document.getElementById('plaid-imports-tbody');
         const table = document.getElementById('plaid-imports-table');
         const empty = document.getElementById('plaid-imports-empty');
 
-        const items = (data.data || []).filter((p) => p.auto_imported);
+        // Route returns a bare array
+        const items = (Array.isArray(raw) ? raw : (raw.data || [])).filter((p) => p.auto_imported);
 
         if (!items.length) {
           table.style.display = 'none';

@@ -2100,6 +2100,8 @@ app.get('/api/admin/payments', async (req, res) => {
   if (req.query.employee_id) query = query.eq('employee_id', parseInt(req.query.employee_id));
   if (req.query.start_date) query = query.gte('payment_date', req.query.start_date);
   if (req.query.end_date) query = query.lte('payment_date', req.query.end_date);
+  if (req.query.auto_imported === 'true') query = query.eq('auto_imported', true);
+  if (req.query.limit) query = query.limit(parseInt(req.query.limit));
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ success: false, message: error.message });
