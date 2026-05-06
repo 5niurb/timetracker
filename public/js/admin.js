@@ -2216,7 +2216,7 @@
         card.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
             <div>
-              <div style="font-weight:600;font-size:1rem"></div>
+              <div class="f-name" style="font-weight:600;font-size:1rem"></div>
               <div style="color:#888;font-size:0.8rem">COI · Confirmed <span class="confirmed-date"></span></div>
             </div>
             <a href="/api/compliance/document-admin/${escapeHtml(itemId)}" target="_blank"
@@ -2245,7 +2245,7 @@
         `;
 
         // Set text content for user data (XSS safe)
-        card.querySelector('div > div > div:first-child').textContent = item.employees.name;
+        card.querySelector('.f-name').textContent = item.employees.name;
         card.querySelector('.confirmed-date').textContent = new Date(
           item.worker_confirmed_at,
         ).toLocaleDateString();
