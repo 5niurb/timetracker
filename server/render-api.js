@@ -20,7 +20,8 @@ async function updateRenderEnvVar(key, value) {
     throw new Error(`Render API list env-vars failed: ${listResp.status}`);
   }
 
-  const envVars = await listResp.json();
+  const listBody = await listResp.json();
+  const envVars = Array.isArray(listBody) ? listBody : (listBody.envVars || []);
   const existing = envVars.find((v) => v.envVar?.key === key);
 
   const url = existing
@@ -42,7 +43,8 @@ async function updateRenderEnvVar(key, value) {
 
   if (!updateResp.ok) {
     const text = await updateResp.text();
-    throw new Error(`Render API update env-var failed: ${updateResp.status} — ${text}`);
+    console.warn('Render API update env-var error body:', text);
+    throw new Error(`Render API update env-var failed: ${updateResp.status}`);
   }
 }
 

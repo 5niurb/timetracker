@@ -5,12 +5,13 @@ const { updateRenderEnvVar } = require('./render-api');
 
 // Build a Map from match-key (lowercase) → employee_id.
 // Uses zelle_name if set and non-empty, otherwise full name.
+// Keys shorter than 5 characters are skipped to prevent false-positive matches.
 function buildMatchMap(employees) {
   const map = new Map();
   for (const emp of employees) {
     const zelleKey = (emp.zelle_name || '').trim();
     const key = (zelleKey || emp.name || '').trim().toLowerCase();
-    if (key) map.set(key, emp.id);
+    if (key && key.length >= 5) map.set(key, emp.id);
   }
   return map;
 }
@@ -72,6 +73,10 @@ async function runSync(supabase) {
   if (empError) throw new Error('Failed to load employees: ' + empError.message);
 
   const matchMap = buildMatchMap(employees);
+
+  if (matchMap.size === 0) {
+    console.warn('Warning: no active employees with valid match keys — all transactions will be pending');
+  }
 
   // IMPORTANT: If syncTransactions throws mid-pagination, use the last persisted
   // cursor on retry — not the original cursor passed in.
