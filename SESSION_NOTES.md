@@ -1,3 +1,34 @@
+## Session — 2026-05-05 (Payouts tab, Time/Hours column, invoice email entries table)
+
+**Focus:** Three UI enhancements: Payouts tab in admin, Time/Hours Worked column format, Payouts deduction column, invoice email entry detail table.
+
+**Accomplished:**
+- Admin panel: "Payments" tab renamed → "Payouts" (button text + h3 header)
+- Admin + employee review tables: "Hours" → "Time/Hours Worked", formatted as `H:MM / decimal`
+- Admin + employee review tables: Payouts column added after Cash Tips (per-day deduction, red)
+- New endpoint: `GET /api/employee/payouts/:employeeId?periodStart=&periodEnd=` (no admin auth)
+- Admin payouts fetch uses `GET /api/admin/payments` with `sessionStorage.getItem('adminPasswordValue')` password header
+- Invoice email: full daily entry detail table appended below summary (Date, Time/Hours, Wages, Svc Comm, Sales Comm, Tips, Cash Tips, Payouts, Day Total)
+- Invoice email summary: "Less: Payouts Already Made" row (conditional on totalPayouts > 0)
+- `submit-invoice` route now re-fetches time_entries + payments from DB before sending email
+- Commit: `bc33979` — pushed to GitHub, Render auto-deploy triggered
+
+**Diagram:**
+```
+submit-invoice route
+  ├── re-fetch time_entries (date, hours, client_entries, product_sales)
+  ├── re-fetch payments (payouts by date)
+  └── sendInvoiceEmail(employee, period, summary+totalPayouts, detailedEntries)
+                                                       │
+                                              daily entry detail table in email
+```
+
+**Current State:** All 5 files committed and deployed. Production URL: https://paytrack.lemedspa.app
+
+**Next Steps:** Verify on production after Render deploy completes (~2-3 min from push).
+
+---
+
 ## Session — 2026-05-05/06 (COI compliance workflow — Tasks 10 & 11: E2E smoke test + production deploy)
 
 **Focus:** Complete COI compliance workflow. Fix UI rendering bug, resolve email routing domain conflict, deploy Cloudflare email worker, restore Render env vars, ship to production.
@@ -90,6 +121,53 @@ Pay Entry page
 - Collect updated COI from Jade
 - If Leena's full SSN becomes available, run populate-1099.mjs to backfill encryption
 - SPECS.md update for Licenses/Contract tabs + signed URL endpoint + Time Worked display
+
+---
+
+## Session — 2026-05-06 (Plaid–Chase bank integration, Tasks 1–10)
+
+**Focus:** Full Plaid–Chase bank sync integration: nightly transaction download, employee Zelle name matching, admin UI for pending/verified payments.
+
+**Accomplished:**
+- **Task 1 (DB):** `009_plaid.sql` migration — `zelle_name` on employees, `plaid_pending` table, `auto_imported` + `plaid_transaction_id` on payments
+- **Task 2 (Plaid client):** `server/plaid-client.js` — thin wrapper around Plaid Node SDK (link-token, exchange-token, syncTransactions, isConfigured)
+- **Task 3 (Match logic):** `server/plaid-sync.js` — `buildMatchMap()`, `matchTransaction()`, `classifyTransactions()`, `runSync()` with cursor-based pagination + Render env var persistence. `server/render-api.js` for env var write-back.
+- **Task 4 (API routes):** `routes/plaid.js` — 7 routes wired into `server.js`: link-token, exchange-token, sync, pending GET, pending/:id/assign, payments/:id/verify, payments/:id/reverse, pending/:id DELETE
+- **Task 5 (Admin HTML):** Bank Integration tab added to admin.html, Plaid CDN script in head, zelle_name field in employee edit modal
+- **Task 6 (Admin JS):** Full Bank Integration JS in admin.js — `openPlaidLink()`, `runPlaidSync()`, `loadBankIntegration()`, `loadPlaidPending()`, `loadPlaidImports()`, `plaidAssign/Discard/Verify/Reverse()`
+- **Task 7 (Filter):** `GET /api/admin/payments` — `auto_imported=true` + `limit` query params; `loadPlaidImports()` handles bare-array response
+- **Task 8 (Render env):** Set `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV=sandbox`, `RENDER_SERVICE_ID` via Render API
+- **Task 9 (launchd):** Created `~/Scripts/paytrack-plaid-sync.sh` + `com.lemed.paytrack-plaid-sync.plist` on Mac. Runs nightly at 11 PM Pacific. SMS on failure. `PAYTRACK_ADMIN_PASSWORD` added to Mac `~/.zshenv`.
+- **Task 10 (Deploy + Test):** Pushed to GitHub → Render live. Smoke tests pass (401 unauth, "bank not connected" with auth). 50 unit tests pass (crypto: 23, plaid-client: 6, plaid-sync: 21).
+
+**Diagram:**
+```
+Plaid Link (admin browser)          Chase bank (sandbox)
+  openPlaidLink() → link-token            │
+  Plaid.create() → OAuth flow      plaid/sync nightly
+        │ public_token                    │ cursor-based
+        ▼                                 ▼
+  /api/admin/plaid/exchange-token   /api/admin/plaid/sync
+        │ access_token → Render env       │
+        │                          matchTransaction()
+        │                          ├── matched → payments (auto_imported=true)
+        │                          └── unmatched → plaid_pending
+        └──────────────────────────────────────────────────────┐
+                                                               ▼
+                                               Admin: Bank Integration tab
+                                               Pending Review | Auto-Imports
+```
+
+**Current State:**
+- All 10 tasks complete and deployed. Production: https://paytrack.lemedspa.app
+- Bank Integration tab visible in admin (requires Plaid Link to connect Chase first)
+- Sandbox mode active — use `user_good`/`pass_good` in Plaid Link to test
+- Nightly launchd job: `com.lemed.paytrack-plaid-sync` — 11 PM Pacific, logs to `~/Logs/paytrack-plaid-sync.log`
+
+**Next Steps:**
+- Mike: open admin → Bank Integration tab → click "Connect Chase" → use sandbox credentials (`user_good`/`pass_good`) → click "Sync Now"
+- Verify sandbox transactions appear in Pending Review or Auto-Imports sections
+- When ready for production: update `PLAID_ENV=production` in Render + generate production access token via Link
 
 ---
 
