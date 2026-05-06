@@ -9,6 +9,7 @@ const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Ac
 const { encryptValue } = require('./lib/crypto');
 const { randomUUID } = require('crypto');
 const { router: complianceRouter, init: initCompliance } = require('./routes/compliance');
+const { router: plaidRouter, init: initPlaid } = require('./routes/plaid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -64,6 +65,16 @@ const supabaseAdmin = SUPABASE_SERVICE_ROLE_KEY
 
 initCompliance(supabaseAdmin, process.env.ADMIN_PASSWORD);
 app.use('/api/compliance', complianceRouter);
+
+// Plaid is optional — warn if not configured
+if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
+  console.warn('Warning: PLAID_CLIENT_ID or PLAID_SECRET not set — Bank Integration will be disabled');
+}
+if (!process.env.RENDER_SERVICE_ID) {
+  console.warn('Warning: RENDER_SERVICE_ID not set — Plaid cursor/token will not persist after sync');
+}
+initPlaid(supabaseAdmin, process.env.ADMIN_PASSWORD);
+app.use('/api/admin/plaid', plaidRouter);
 
 // Multer: memory storage — files buffered in memory, then pushed to Supabase Storage
 const upload = multer({
@@ -944,6 +955,7 @@ app.put('/api/admin/employees/:id', async (req, res) => {
     designation,
     contractorType,
     status,
+    zelleName,
   } = req.body;
 
   // Check if PIN already exists for another employee
@@ -973,6 +985,7 @@ app.put('/api/admin/employees/:id', async (req, res) => {
       designation: designation?.trim() || null,
       contractor_type: contractorType || null,
       status: status || 'active',
+      zelle_name: zelleName?.trim() || null,
     })
     .eq('id', parseInt(id));
 

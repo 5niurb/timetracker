@@ -1,0 +1,181 @@
+'use strict';
+
+const express = require('express');
+const router = express.Router();
+
+let supabase;
+let adminPassword;
+
+function init(supabaseClient, adminPwd) {
+  supabase = supabaseClient;
+  adminPassword = adminPwd;
+}
+
+function authCheck(req, res) {
+  if (req.headers.password !== adminPassword) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
+// POST /api/admin/plaid/link-token
+router.post('/link-token', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const { createLinkToken, isConfigured } = require('../server/plaid-client');
+    if (!isConfigured()) {
+      return res.status(400).json({ success: false, message: 'Plaid credentials not configured' });
+    }
+    const linkToken = await createLinkToken();
+    res.json({ success: true, linkToken });
+  } catch (e) {
+    console.error('[plaid] link-token error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/admin/plaid/exchange-token
+router.post('/exchange-token', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { publicToken } = req.body;
+  if (!publicToken) {
+    return res.status(400).json({ success: false, message: 'publicToken is required' });
+  }
+  try {
+    const { exchangePublicToken } = require('../server/plaid-client');
+    const { updateRenderEnvVar } = require('../server/render-api');
+    const { accessToken } = await exchangePublicToken(publicToken);
+    await updateRenderEnvVar('PLAID_ACCESS_TOKEN', accessToken);
+    process.env.PLAID_ACCESS_TOKEN = accessToken;
+    // Clear cursor so next sync fetches from scratch
+    process.env.PLAID_CURSOR = '';
+    await updateRenderEnvVar('PLAID_CURSOR', '').catch(() => {});
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[plaid] exchange-token error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// POST /api/admin/plaid/sync
+router.post('/sync', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const { runSync } = require('../server/plaid-sync');
+    const result = await runSync(supabase);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('[plaid] sync error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// GET /api/admin/plaid/pending
+router.get('/pending', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { data, error } = await supabase
+    .from('plaid_pending')
+    .select('*')
+    .order('transaction_date', { ascending: false });
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true, data });
+});
+
+// POST /api/admin/plaid/pending/:id/assign
+router.post('/pending/:id/assign', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { id } = req.params;
+  const { employeeId } = req.body;
+  if (!employeeId) {
+    return res.status(400).json({ success: false, message: 'employeeId is required' });
+  }
+
+  const { data: pending, error: fetchErr } = await supabase
+    .from('plaid_pending')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (fetchErr || !pending) {
+    return res.status(404).json({ success: false, message: 'Pending transaction not found' });
+  }
+
+  const { error: insertErr } = await supabase.from('payments').insert({
+    employee_id: parseInt(employeeId),
+    payment_date: pending.transaction_date,
+    amount: pending.amount,
+    notes: pending.description,
+    payment_type: 'direct_deposit',
+    source: 'plaid',
+    auto_imported: false,
+    plaid_transaction_id: pending.plaid_transaction_id,
+  });
+
+  if (insertErr) {
+    return res.status(400).json({ success: false, message: insertErr.message });
+  }
+
+  await supabase.from('plaid_pending').delete().eq('id', id);
+  res.json({ success: true });
+});
+
+// POST /api/admin/plaid/payments/:id/verify
+router.post('/payments/:id/verify', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { id } = req.params;
+  const { error } = await supabase
+    .from('payments')
+    .update({ auto_imported: false })
+    .eq('id', id)
+    .eq('auto_imported', true);
+
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
+// DELETE /api/admin/plaid/payments/:id/reverse
+router.delete('/payments/:id/reverse', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { id } = req.params;
+
+  const { data: payment, error: fetchErr } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('id', id)
+    .eq('auto_imported', true)
+    .single();
+
+  if (fetchErr || !payment) {
+    return res.status(404).json({ success: false, message: 'Auto-imported payment not found' });
+  }
+
+  const { error: pendingErr } = await supabase.from('plaid_pending').upsert(
+    {
+      plaid_transaction_id: payment.plaid_transaction_id,
+      transaction_date: payment.payment_date,
+      amount: payment.amount,
+      description: payment.notes,
+    },
+    { onConflict: 'plaid_transaction_id' },
+  );
+
+  if (pendingErr) {
+    return res.status(500).json({ success: false, message: pendingErr.message });
+  }
+
+  await supabase.from('payments').delete().eq('id', id);
+  res.json({ success: true });
+});
+
+// DELETE /api/admin/plaid/pending/:id
+router.delete('/pending/:id', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { id } = req.params;
+  const { error } = await supabase.from('plaid_pending').delete().eq('id', id);
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
+module.exports = { router, init };
