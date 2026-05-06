@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/admin.css">
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 </head>
 <body>
   <!-- Login Screen -->
@@ -42,6 +43,7 @@
         <button class="tab" onclick="showTab('payments')">Payouts</button>
         <button class="tab" onclick="showTab('tax')">Tax</button>
         <button class="tab" onclick="showTab('compliance')">Compliance</button>
+        <button class="tab" onclick="showTab('bank-integration')">Bank Integration</button>
       </div>
 
       <!-- Review Entries Tab -->
@@ -314,6 +316,75 @@
         </div>
         <div id="compliance-empty" style="display:none;text-align:center;padding:40px;color:#666">No pending reviews. ✓</div>
         <div id="compliance-list"></div>
+      </div>
+
+      <!-- Bank Integration Tab -->
+      <div id="tab-bank-integration" class="tab-content" style="display: none;">
+        <!-- Bank Connection -->
+        <div class="card">
+          <h3 style="margin-bottom:8px;">Bank Connection</h3>
+          <p style="font-size:12px;color:#666;margin:0 0 16px;">Connect your Chase checking account to auto-import Zelle payments.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <span id="bank-connection-status" style="font-size:14px;color:#666;">Status: Not connected</span>
+            <button class="btn-primary" onclick="openPlaidLink()" id="plaid-connect-btn">Connect Bank Account</button>
+          </div>
+        </div>
+
+        <!-- Sync -->
+        <div class="card">
+          <h3 style="margin-bottom:8px;">Sync Transactions</h3>
+          <p style="font-size:12px;color:#666;margin:0 0 16px;">Fetch new transactions and match to team members by Zelle name.</p>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <button class="btn-success" onclick="runPlaidSync()" id="plaid-sync-btn">Sync Now</button>
+            <span id="plaid-sync-status" style="font-size:13px;color:#666;"></span>
+          </div>
+        </div>
+
+        <!-- Pending Review -->
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;">Pending Review</h3>
+            <span id="plaid-pending-count" style="background:#e8c46a;color:#111;padding:3px 10px;border-radius:12px;font-weight:600;font-size:0.85rem;display:none;"></span>
+          </div>
+          <p style="font-size:12px;color:#666;margin:0 0 16px;">Transactions that couldn't be matched automatically — assign or discard.</p>
+          <div id="plaid-pending-empty" style="display:none;text-align:center;padding:24px;color:#666;">No pending transactions. ✓</div>
+          <div style="overflow-x:auto;">
+            <table id="plaid-pending-table" style="display:none;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Assign To</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="plaid-pending-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Auto-Imports -->
+        <div class="card">
+          <h3 style="margin-bottom:16px;">Recent Auto-Imports</h3>
+          <p style="font-size:12px;color:#666;margin:0 0 16px;">Payments imported automatically via Plaid. Verify or reverse.</p>
+          <div id="plaid-imports-empty" style="display:none;text-align:center;padding:24px;color:#666;">No auto-imported payments yet.</div>
+          <div style="overflow-x:auto;">
+            <table id="plaid-imports-table" style="display:none;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Team Member</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="plaid-imports-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -599,6 +670,11 @@
       <div class="form-group">
         <label>Comments</label>
         <input type="text" id="edit-emp-rate-notes">
+      </div>
+      <div class="form-group">
+        <label for="edit-emp-zelle-name">Zelle/ACH Name <span style="font-weight:300;color:#888;">(optional — for Plaid matching)</span></label>
+        <input type="text" id="edit-emp-zelle-name" placeholder="e.g. Jane S or Jodi ACH">
+        <small style="color:#888;font-size:11px;">Leave blank to match by full name. Set if Zelle truncates the name.</small>
       </div>
       <div class="alert error" id="edit-error"></div>
       <div class="modal-actions">

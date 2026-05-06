@@ -165,6 +165,7 @@
       if (tabId === 'payments') { populatePaymentsFilter(); loadPayments(); }
       if (tabId === 'tax') loadTaxFilings();
       if (tabId === 'compliance') loadComplianceDashboard();
+      if (tabId === 'bank-integration') loadBankIntegration();
     }
 
     async function loadEmployeesForFilter() {
@@ -757,6 +758,7 @@
       document.getElementById('edit-emp-hourly').value = emp.hourly_wage || '';
       document.getElementById('edit-emp-additional-pay-rate').value = emp.additional_pay_rate || '';
       document.getElementById('edit-emp-rate-notes').value = emp.rate_notes || '';
+      document.getElementById('edit-emp-zelle-name').value = emp.zelle_name || '';
       document.getElementById('edit-error').classList.remove('show');
       document.getElementById('edit-doc-status').textContent = '';
       document.getElementById('edit-doc-file').value = '';
@@ -1392,6 +1394,7 @@
       const hourlyWage = parseFloat(document.getElementById('edit-emp-hourly').value) || 0;
       const additionalPayRateVal = document.getElementById('edit-emp-additional-pay-rate').value.trim();
       const rateNotes = document.getElementById('edit-emp-rate-notes').value.trim();
+      const zelleName = document.getElementById('edit-emp-zelle-name').value.trim();
       const status = document.getElementById('edit-emp-status').value;
       const errorEl = document.getElementById('edit-error');
 
@@ -1424,6 +1427,7 @@
             hourlyWage,
             additionalPayRate: additionalPayRateVal ? parseFloat(additionalPayRateVal) : null,
             rateNotes,
+            zelleName,
             status,
           }),
         });
@@ -2321,6 +2325,241 @@
         else alert('Error rejecting. Try again.');
       } catch {
         alert('Network error. Check your connection and try again.');
+      }
+    }
+
+    // ============================================================
+    // Bank Integration — Plaid Link, sync, pending review, auto-imports
+    // ============================================================
+
+    function getAdminPassword() {
+      return sessionStorage.getItem('adminPasswordValue') || '';
+    }
+
+    function adminFetch(url, options = {}) {
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          password: getAdminPassword(),
+        },
+      });
+    }
+
+    async function openPlaidLink() {
+      const btn = document.getElementById('plaid-connect-btn');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      try {
+        const resp = await adminFetch('/api/admin/plaid/link-token', { method: 'POST' });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message || 'Failed to get Link token');
+        const handler = Plaid.create({
+          token: data.linkToken,
+          onSuccess: async (publicToken) => {
+            const exResp = await adminFetch('/api/admin/plaid/exchange-token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ publicToken }),
+            });
+            const exData = await exResp.json();
+            if (exData.success) {
+              document.getElementById('bank-connection-status').textContent = 'Connected ✓';
+              document.getElementById('bank-connection-status').style.color = '#6bff6b';
+              btn.textContent = 'Reconnect Bank';
+              btn.disabled = false;
+              loadBankIntegration();
+            } else {
+              alert('Connection failed: ' + (exData.message || 'Unknown error'));
+              btn.disabled = false;
+              btn.textContent = 'Connect Bank Account';
+            }
+          },
+          onExit: () => {
+            btn.disabled = false;
+            btn.textContent = 'Connect Bank Account';
+          },
+        });
+        handler.open();
+      } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Connect Bank Account';
+      }
+    }
+
+    async function runPlaidSync() {
+      const btn = document.getElementById('plaid-sync-btn');
+      const statusEl = document.getElementById('plaid-sync-status');
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      statusEl.textContent = '';
+      try {
+        const resp = await adminFetch('/api/admin/plaid/sync', { method: 'POST' });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message || 'Sync failed');
+        statusEl.textContent = `Done — ${data.matchedCount} imported, ${data.pendingCount} pending review`;
+        statusEl.style.color = '#6bff6b';
+        await loadBankIntegration();
+      } catch (e) {
+        statusEl.textContent = 'Error: ' + e.message;
+        statusEl.style.color = '#ff6b6b';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync Now';
+      }
+    }
+
+    async function loadBankIntegration() {
+      await Promise.all([loadPlaidPending(), loadPlaidImports()]);
+    }
+
+    async function loadPlaidPending() {
+      try {
+        const resp = await adminFetch('/api/admin/plaid/pending');
+        const data = await resp.json();
+        const tbody = document.getElementById('plaid-pending-tbody');
+        const table = document.getElementById('plaid-pending-table');
+        const empty = document.getElementById('plaid-pending-empty');
+        const countEl = document.getElementById('plaid-pending-count');
+
+        if (!data.success || !data.data?.length) {
+          table.style.display = 'none';
+          empty.style.display = 'block';
+          countEl.style.display = 'none';
+          return;
+        }
+
+        empty.style.display = 'none';
+        table.style.display = 'table';
+        countEl.textContent = data.data.length;
+        countEl.style.display = 'inline';
+
+        const employees = window._employeesCache || [];
+        tbody.innerHTML = data.data
+          .map(
+            (tx) => `<tr>
+            <td style="padding:6px 8px;">${tx.transaction_date}</td>
+            <td style="padding:6px 8px;text-align:right;">$${parseFloat(tx.amount).toFixed(2)}</td>
+            <td style="padding:6px 8px;color:#ccc;">${escapeHtml(tx.description || '')}</td>
+            <td style="padding:6px 8px;">
+              <select id="pending-assign-${tx.id}" style="width:140px;">
+                <option value="">-- Select --</option>
+                ${employees.filter((e) => e.status === 'active').map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}
+              </select>
+            </td>
+            <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
+              <button class="btn-primary" style="font-size:11px;padding:3px 10px;" onclick="plaidAssign('${tx.id}')">Assign</button>
+              <button class="btn-secondary" style="font-size:11px;padding:3px 10px;margin-left:4px;" onclick="plaidDiscard('${tx.id}')">Not a payout</button>
+            </td>
+          </tr>`,
+          )
+          .join('');
+      } catch (e) {
+        console.error('loadPlaidPending error:', e);
+      }
+    }
+
+    async function loadPlaidImports() {
+      try {
+        const resp = await adminFetch('/api/admin/payments?auto_imported=true&limit=30');
+        const data = await resp.json();
+        const tbody = document.getElementById('plaid-imports-tbody');
+        const table = document.getElementById('plaid-imports-table');
+        const empty = document.getElementById('plaid-imports-empty');
+
+        const items = (data.data || []).filter((p) => p.auto_imported);
+
+        if (!items.length) {
+          table.style.display = 'none';
+          empty.style.display = 'block';
+          return;
+        }
+
+        empty.style.display = 'none';
+        table.style.display = 'table';
+        const employees = window._employeesCache || [];
+
+        tbody.innerHTML = items
+          .map((p) => {
+            const emp = employees.find((e) => e.id === p.employee_id);
+            const empName = emp ? escapeHtml(emp.name) : `#${p.employee_id}`;
+            const badge = `<span style="color:#f0a500;font-size:11px;font-weight:700;">Unverified</span>
+              <button class="btn-primary" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidVerify(${p.id})">Verify ✓</button>`;
+            return `<tr>
+              <td style="padding:6px 8px;">${p.payment_date}</td>
+              <td style="padding:6px 8px;">${empName}</td>
+              <td style="padding:6px 8px;text-align:right;">$${parseFloat(p.amount).toFixed(2)}</td>
+              <td style="padding:6px 8px;color:#ccc;">${escapeHtml(p.notes || '')}</td>
+              <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
+                ${badge}
+                <button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidReverse(${p.id})">Reverse</button>
+              </td>
+            </tr>`;
+          })
+          .join('');
+      } catch (e) {
+        console.error('loadPlaidImports error:', e);
+      }
+    }
+
+    async function plaidAssign(pendingId) {
+      const empId = document.getElementById(`pending-assign-${pendingId}`)?.value;
+      if (!empId) {
+        alert('Please select an employee');
+        return;
+      }
+      try {
+        const resp = await adminFetch(`/api/admin/plaid/pending/${pendingId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employeeId: empId }),
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message);
+        loadPlaidPending();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function plaidDiscard(pendingId) {
+      if (!confirm('Discard this transaction? It will not be recorded as a payout.')) return;
+      try {
+        const resp = await adminFetch(`/api/admin/plaid/pending/${pendingId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message);
+        loadPlaidPending();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function plaidVerify(paymentId) {
+      try {
+        const resp = await adminFetch(`/api/admin/plaid/payments/${paymentId}/verify`, {
+          method: 'POST',
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message);
+        loadPlaidImports();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function plaidReverse(paymentId) {
+      if (!confirm('Reverse this auto-import? The payment will be deleted and returned to pending review.'))
+        return;
+      try {
+        const resp = await adminFetch(`/api/admin/plaid/payments/${paymentId}/reverse`, {
+          method: 'DELETE',
+        });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message);
+        loadBankIntegration();
+      } catch (e) {
+        alert('Error: ' + e.message);
       }
     }
 
