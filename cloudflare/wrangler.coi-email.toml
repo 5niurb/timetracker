@@ -10,4 +10,4 @@ PAYTRACK_API_URL = "https://paytrack.lemedspa.app"
 # NOTE: Email routing is NOT configured in wrangler.toml.
 # After deploying this worker, configure the Email Routing rule in the
 # Cloudflare dashboard: Email → Email Routing → Routing Rules → "Send to a Worker"
-# Point coi@lemedspa.com → coi-email-receiver
+# Point coi@lemedspa.app → coi-email-receiver
