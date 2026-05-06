@@ -12,8 +12,14 @@ function getClient() {
   if (!clientId || !secret) {
     throw new Error('PLAID_CLIENT_ID and PLAID_SECRET env vars are required');
   }
+  const basePath = PlaidEnvironments[env];
+  if (!basePath) {
+    throw new Error(
+      `Invalid PLAID_ENV "${env}". Valid values: ${Object.keys(PlaidEnvironments).join(', ')}`,
+    );
+  }
   const config = new Configuration({
-    basePath: PlaidEnvironments[env],
+    basePath,
     baseOptions: {
       headers: {
         'PLAID-CLIENT-ID': clientId,
@@ -52,6 +58,9 @@ async function exchangePublicToken(publicToken) {
 
 // Fetches all new/modified transactions since cursor.
 // Returns { added, modified, removed, nextCursor, hasMore }
+// IMPORTANT: If this throws mid-pagination, callers must use the last persisted
+// cursor on retry — not the original cursor passed in. Persist nextCursor to DB
+// after each successful call, not only after a full sync run completes.
 async function syncTransactions(accessToken, cursor = null) {
   const client = getClient();
   const allAdded = [];
