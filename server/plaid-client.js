@@ -3,12 +3,14 @@
 const { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } = require('plaid');
 
 let _client = null;
+let _clientKey = null;
 
 function getClient() {
-  if (_client) return _client;
   const clientId = process.env.PLAID_CLIENT_ID;
   const secret = process.env.PLAID_SECRET;
   const env = process.env.PLAID_ENV || 'sandbox';
+  const key = `${clientId}:${secret}:${env}`;
+  if (_client && _clientKey === key) return _client;
   if (!clientId || !secret) {
     throw new Error('PLAID_CLIENT_ID and PLAID_SECRET env vars are required');
   }
@@ -28,6 +30,7 @@ function getClient() {
     },
   });
   _client = new PlaidApi(config);
+  _clientKey = key;
   return _client;
 }
 
