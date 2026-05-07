@@ -164,10 +164,14 @@ Plaid Link (admin browser)          Chase bank (sandbox)
 - Sandbox mode active — use `user_good`/`pass_good` in Plaid Link to test
 - Nightly launchd job: `com.lemed.paytrack-plaid-sync` — 11 PM Pacific, logs to `~/Logs/paytrack-plaid-sync.log`
 
+**Post-session fixes:**
+- Updated `PLAID_ENV=production` + `PLAID_SECRET=80e8faa53101959d17896f73a1fe79` in Render env vars
+- Fixed Plaid client cache bug: singleton was keyed on nothing, so sandbox client persisted after env var update. Now keyed on `clientId:secret:env` — rebuilds automatically when credentials change. Commit `83af9be`.
+
 **Next Steps:**
-- Mike: open admin → Bank Integration tab → click "Connect Chase" → use sandbox credentials (`user_good`/`pass_good`) → click "Sync Now"
-- Verify sandbox transactions appear in Pending Review or Auto-Imports sections
-- When ready for production: update `PLAID_ENV=production` in Render + generate production access token via Link
+- Wait for Render deploy of `83af9be` (~2 min), then open admin → Bank Integration tab → "Connect Chase" → real Chase OAuth flow
+- After connecting, click "Sync Now" — real transactions will appear in Pending Review or Auto-Imports
+- Nightly launchd job (`com.lemed.paytrack-plaid-sync`, 11 PM Pacific) will run automatically going forward
 
 ---
 
