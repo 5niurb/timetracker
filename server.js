@@ -111,6 +111,106 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Invoice table image for MMS — fetched by Twilio when delivering the MMS
+app.get('/api/invoice-media/:invoiceId', async (req, res) => {
+  let sharp;
+  try {
+    sharp = require('sharp');
+  } catch {
+    return res.status(503).send('Image generation not available');
+  }
+
+  const { invoiceId } = req.params;
+
+  const { data: inv } = await supabaseAdmin
+    .from('invoices')
+    .select(
+      'employee_id, pay_period_start, pay_period_end, total_payable, total_hours, total_wages, total_commissions, total_product_commissions, total_tips, cash_tips_received',
+    )
+    .eq('id', invoiceId)
+    .single();
+  if (!inv) return res.status(404).send('Not found');
+
+  const { data: emp } = await supabaseAdmin
+    .from('employees')
+    .select('name, hourly_wage')
+    .eq('id', inv.employee_id)
+    .single();
+
+  const { data: timeEntries } = await supabaseAdmin
+    .from('time_entries')
+    .select('id, date, hours')
+    .eq('employee_id', inv.employee_id)
+    .gte('date', inv.pay_period_start)
+    .lte('date', inv.pay_period_end)
+    .order('date', { ascending: true });
+
+  const { data: rawPayouts } = await supabaseAdmin
+    .from('payments')
+    .select('payment_date, amount')
+    .eq('employee_id', inv.employee_id)
+    .gte('payment_date', inv.pay_period_start)
+    .lte('payment_date', inv.pay_period_end);
+
+  const payoutsByDate = {};
+  for (const p of rawPayouts || []) {
+    payoutsByDate[p.payment_date] =
+      (payoutsByDate[p.payment_date] || 0) + parseFloat(p.amount || 0);
+  }
+
+  const entries = [];
+  for (const entry of timeEntries || []) {
+    const { data: clients } = await supabaseAdmin
+      .from('client_entries')
+      .select('amount_earned, tip_amount, tip_received_cash')
+      .eq('time_entry_id', entry.id);
+    const { data: sales } = await supabaseAdmin
+      .from('product_sales')
+      .select('commission_amount')
+      .eq('time_entry_id', entry.id);
+
+    let dayCommissions = 0,
+      dayTips = 0,
+      dayCashTips = 0,
+      dayProductCommissions = 0;
+    for (const c of clients || []) {
+      dayCommissions += c.amount_earned || 0;
+      dayTips += c.tip_amount || 0;
+      if (c.tip_received_cash) dayCashTips += c.tip_amount || 0;
+    }
+    for (const s of sales || []) dayProductCommissions += s.commission_amount || 0;
+
+    entries.push({
+      date: entry.date,
+      hours: entry.hours,
+      wages: entry.hours * (emp?.hourly_wage || 0),
+      commissions: dayCommissions,
+      productCommissions: dayProductCommissions,
+      tips: dayTips,
+      cashTips: dayCashTips,
+      payouts: payoutsByDate[entry.date] || 0,
+    });
+  }
+
+  const svgStr = buildInvoiceImageSvg(
+    emp?.name || 'Employee',
+    inv.pay_period_start,
+    inv.pay_period_end,
+    { totalPayable: parseFloat(inv.total_payable || 0) },
+    entries,
+  );
+
+  try {
+    const png = await sharp(Buffer.from(svgStr)).png().toBuffer();
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(png);
+  } catch (err) {
+    console.error('[InvoiceMedia] sharp error:', err.message);
+    res.status(500).send('Image generation failed');
+  }
+});
+
 // Initialize database tables
 async function initDatabase() {
   console.log('Initializing Supabase database...');
@@ -153,6 +253,150 @@ function formatHoursEmailDisplay(decimalHours) {
   const h = Math.floor(decimalHours);
   const m = Math.round((decimalHours - h) * 60);
   return `${h}:${String(m).padStart(2, '0')} / ${decimalHours.toFixed(2)}`;
+}
+
+function formatHoursShort(decimalHours) {
+  const h = Math.floor(decimalHours);
+  const m = Math.round((decimalHours - h) * 60);
+  return `${h}h${m > 0 ? String(m).padStart(2, '0') + 'm' : ''}`;
+}
+
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Phone number for Lea (invoice review SMS recipient)
+const LEA_PHONE = process.env.LEA_PHONE_NUMBER || '+13105033934';
+
+function buildInvoiceImageSvg(employeeName, periodStart, periodEnd, summary, entries) {
+  const W = 760;
+  const MARGIN = 14;
+  const TW = W - MARGIN * 2;
+
+  const cols = [
+    { label: 'Date', w: 0.118 },
+    { label: 'Hours', w: 0.098 },
+    { label: 'Wages', w: 0.108 },
+    { label: 'Svc Comm', w: 0.112 },
+    { label: 'Sales Comm', w: 0.112 },
+    { label: 'Tips', w: 0.09 },
+    { label: '-Cash Tips', w: 0.108 },
+    { label: '-Payouts', w: 0.098 },
+    { label: 'Day Total', w: 0.156 },
+  ];
+
+  const ROW_H = 28;
+  const HEAD_H = 36;
+  const TITLE_H = 44;
+  const FOOT_H = 38;
+  const rows = entries || [];
+  const totalH = TITLE_H + HEAD_H + rows.length * ROW_H + FOOT_H + MARGIN;
+
+  const xs = [];
+  let cx = MARGIN;
+  for (const c of cols) {
+    xs.push(cx);
+    cx += c.w * TW;
+  }
+  xs.push(cx);
+
+  const ty = (rowY, h) => rowY + h * 0.67;
+
+  let svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${totalH}">
+<rect width="${W}" height="${totalH}" fill="white"/>
+`;
+
+  svg += `<text x="${W / 2}" y="28" font-size="13" fill="#222" font-weight="bold" text-anchor="middle" font-family="sans-serif">${escapeXml(employeeName)} — ${periodStart} to ${periodEnd}</text>\n`;
+
+  const hy = TITLE_H;
+  svg += `<rect x="${MARGIN}" y="${hy}" width="${TW}" height="${HEAD_H}" fill="#e8e8e8"/>\n`;
+  for (let i = 0; i < cols.length; i++) {
+    const tx = i === 0 ? xs[i] + 4 : xs[i + 1] - 4;
+    const anchor = i === 0 ? 'start' : 'end';
+    svg += `<text x="${tx}" y="${ty(hy, HEAD_H)}" font-size="10" fill="#333" font-weight="bold" text-anchor="${anchor}" font-family="sans-serif">${cols[i].label}</text>\n`;
+  }
+
+  let ry = TITLE_H + HEAD_H;
+  for (let r = 0; r < rows.length; r++) {
+    const e = rows[r];
+    const dayTotal =
+      e.wages + e.commissions + e.productCommissions + e.tips - e.cashTips - (e.payouts || 0);
+    const bg = r % 2 === 0 ? '#ffffff' : '#f7f7f7';
+    const vals = [
+      e.date,
+      formatHoursShort(e.hours),
+      '$' + e.wages.toFixed(2),
+      '$' + e.commissions.toFixed(2),
+      '$' + e.productCommissions.toFixed(2),
+      '$' + e.tips.toFixed(2),
+      e.cashTips > 0 ? '-$' + e.cashTips.toFixed(2) : '-',
+      (e.payouts || 0) > 0 ? '-$' + e.payouts.toFixed(2) : '-',
+      '$' + dayTotal.toFixed(2),
+    ];
+
+    svg += `<rect x="${MARGIN}" y="${ry}" width="${TW}" height="${ROW_H}" fill="${bg}"/>\n`;
+    for (let i = 0; i < cols.length; i++) {
+      const tx = i === 0 ? xs[i] + 4 : xs[i + 1] - 4;
+      const anchor = i === 0 ? 'start' : 'end';
+      const red = (i === 6 || i === 7) && vals[i] !== '-';
+      const bold = i === 8;
+      svg += `<text x="${tx}" y="${ty(ry, ROW_H)}" font-size="10" fill="${red ? '#cc0000' : '#222'}" font-weight="${bold ? 'bold' : 'normal'}" text-anchor="${anchor}" font-family="sans-serif">${escapeXml(vals[i])}</text>\n`;
+    }
+    svg += `<line x1="${MARGIN}" y1="${ry + ROW_H}" x2="${MARGIN + TW}" y2="${ry + ROW_H}" stroke="#e0e0e0" stroke-width="0.5"/>\n`;
+    ry += ROW_H;
+  }
+
+  svg += `<rect x="${MARGIN}" y="${ry}" width="${TW}" height="${FOOT_H}" fill="#d4edda"/>\n`;
+  svg += `<text x="${MARGIN + 4}" y="${ty(ry, FOOT_H)}" font-size="11" fill="#155724" font-weight="bold" font-family="sans-serif">TOTAL PAYABLE</text>\n`;
+  svg += `<text x="${MARGIN + TW - 4}" y="${ty(ry, FOOT_H)}" font-size="12" fill="#155724" font-weight="bold" text-anchor="end" font-family="sans-serif">$${summary.totalPayable.toFixed(2)}</text>\n`;
+
+  svg += `<rect x="${MARGIN}" y="${TITLE_H}" width="${TW}" height="${HEAD_H + rows.length * ROW_H + FOOT_H}" fill="none" stroke="#aaa" stroke-width="1"/>\n`;
+
+  for (let i = 1; i < cols.length; i++) {
+    svg += `<line x1="${xs[i].toFixed(1)}" y1="${TITLE_H}" x2="${xs[i].toFixed(1)}" y2="${ry + FOOT_H}" stroke="#ddd" stroke-width="0.5"/>\n`;
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+async function sendInvoiceSms(employeeName, periodStart, periodEnd, totalPayable, entries, invoiceId) {
+  const SID = process.env.TWILIO_ACCOUNT_SID;
+  const TOKEN = process.env.TWILIO_AUTH_TOKEN;
+  if (!SID || !TOKEN) {
+    console.log('[InvoiceSMS] Twilio not configured — skipping SMS');
+    return { sent: false, reason: 'Twilio not configured' };
+  }
+
+  const BASE_URL = process.env.RENDER_EXTERNAL_URL || 'https://paytrack.lemedspa.app';
+  const mediaUrl = `${BASE_URL}/api/invoice-media/${invoiceId}`;
+  const body = `Invoice submitted: ${employeeName} (${periodStart}–${periodEnd})\nTotal payable: $${totalPayable.toFixed(2)}`;
+
+  try {
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: 'Basic ' + Buffer.from(`${SID}:${TOKEN}`).toString('base64'),
+      },
+      body: new URLSearchParams({ From: '+12134442242', To: LEA_PHONE, Body: body, MediaUrl0: mediaUrl }),
+    });
+    const result = await res.json();
+    if (res.ok) {
+      console.log(`[InvoiceSMS] MMS sent to Lea, SID: ${result.sid}`);
+      return { sent: true };
+    }
+    console.error('[InvoiceSMS] Twilio error:', result);
+    return { sent: false, reason: result.message };
+  } catch (err) {
+    console.error('[InvoiceSMS] Error:', err.message);
+    return { sent: false, reason: err.message };
+  }
 }
 
 // Simple email sending function (using fetch to external email API)
@@ -693,6 +937,16 @@ app.post('/api/submit-invoice', async (req, res) => {
     detailedEntries
   );
 
+  // Try to send MMS to Lea with entries table image
+  const smsResult = await sendInvoiceSms(
+    employee?.name,
+    periodStart,
+    periodEnd,
+    totalPayable,
+    detailedEntries,
+    invoice.id,
+  );
+
   // Log invoice details
   console.log(`
 ╔════════════════════════════════════════════════════════════╗
@@ -711,6 +965,7 @@ app.post('/api/submit-invoice', async (req, res) => {
 ║  TOTAL PAYABLE: $${totalPayable.toFixed(2)}
 ║
 ║  Email: ${emailResult.sent ? 'SENT' : 'NOT SENT - ' + emailResult.reason}
+║  SMS:   ${smsResult.sent ? 'SENT to Lea' : 'NOT SENT - ' + smsResult.reason}
 ╚════════════════════════════════════════════════════════════╝
   `);
 

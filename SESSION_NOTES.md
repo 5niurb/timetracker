@@ -72,6 +72,37 @@ Worker email → coi@lemedspa.app → CF Email Routing → coi-email-receiver (W
 **Next Steps:**
 - Test live email forwarding: have a COI forwarded to `coi@lemedspa.app`, confirm worker fires + Supabase row appears
 - If DNS propagation needed: wait ~1h and retry
+
+---
+
+## Session — 2026-05-07 (Invoice MMS to Lea)
+
+**Focus:** When an employee submits an invoice for review, text Lea an MMS image of the daily entries table via Twilio.
+
+**Accomplished:**
+- Added `sharp` ^0.34.5 to dependencies (pre-built Linux x64 binaries — works on Render without compilation)
+- Added `buildInvoiceImageSvg()` — generates a 760px-wide SVG table: 9 columns (Date, Hours, Wages, Svc Comm, Sales Comm, Tips, -Cash Tips, -Payouts, Day Total), alternating row backgrounds, red for deduction columns, green footer with Total Payable
+- Added `sendInvoiceSms()` — POSTs to Twilio REST API with MMS `MediaUrl0` pointing to on-demand image endpoint
+- Added `GET /api/invoice-media/:invoiceId` — reconstructs entries from Supabase and serves PNG via sharp SVG→PNG; graceful 503 if sharp unavailable
+- Updated `POST /api/submit-invoice` handler to call `sendInvoiceSms()` after email and log SMS result
+- Lea's phone: `+13105033934` (env var `LEA_PHONE_NUMBER` with fallback)
+- Committed and deployed to Render via `git push origin main`
+
+**Diagram:**
+```
+submit-invoice
+  ├── sendInvoiceEmail(...)     existing
+  └── sendInvoiceSms(...)       NEW
+        └── Twilio MMS → +13105033934
+              MediaUrl0 = paytrack.lemedspa.app/api/invoice-media/:id
+                                    │
+                          GET /api/invoice-media/:id
+                            Supabase → SVG → sharp → PNG
+```
+
+**Current State:** Code committed and pushed. Render auto-deploy in progress (~2-3 min). Production URL: https://paytrack.lemedspa.app
+
+**Next Steps:** Verify Render deploy succeeds. Test by submitting an invoice — Lea should receive MMS with entries table image.
 - Worker `coi-email-receiver` logs visible at: Cloudflare dashboard → Workers → coi-email-receiver → Logs
 
 ---
@@ -121,6 +152,44 @@ Pay Entry page
 - Collect updated COI from Jade
 - If Leena's full SSN becomes available, run populate-1099.mjs to backfill encryption
 - SPECS.md update for Licenses/Contract tabs + signed URL endpoint + Time Worked display
+
+---
+
+## Session — 2026-05-06 (Plaid production OAuth + admin password)
+
+**Focus:** Get Plaid production Chase connection working; fix admin password; logo resize.
+
+**Accomplished:**
+- Switched Render env to `PLAID_ENV=production`, `PLAID_SECRET=80e8faa53101959d17896f73a1fe79`
+- Fixed Plaid OAuth redirect URI flow: `createLinkToken()` now passes `redirect_uri` in production; frontend stores link token in `sessionStorage`, detects `oauth_state_id` on return, re-opens Link with `receivedRedirectUri`. Commit `46a802d`.
+- Updated `ADMIN_PASSWORD` to `!@3thanEvelynEileen` via Render API
+- Resized LeMed logo to 1024×1024 PNG (0.17 MB) from 700 dpi source → saved to Downloads
+
+**Diagram:**
+```
+openPlaidLink() → POST /link-token (redirect_uri=paytrack.lemedspa.app/admin)
+  │ store token in sessionStorage
+  │ Plaid.create() → Chase OAuth → redirect to /admin?oauth_state_id=...
+  └─ checkOAuthReturn() detects oauth_state_id → re-open Link with receivedRedirectUri
+       │ onSuccess(publicToken)
+       ▼
+  POST /exchange-token → Render env PLAID_ACCESS_TOKEN saved
+```
+
+**Current State:**
+- Production Plaid env active. OAuth redirect flow wired correctly.
+- **Blocked:** Chase is "under review" in Plaid dashboard under OAuth Institutions — cannot connect until Plaid approves. No code changes needed once approved.
+- Admin password: `!@3thanEvelynEileen`
+- All 136 tests passing (113 + 23)
+
+**Issues:**
+- Chase OAuth institution approval pending in Plaid dashboard (no ETA)
+
+**Next Steps:**
+- Check Chase Plaid OAuth approval status: https://dashboard.plaid.com/activity/status/oauth-institutions
+- When Plaid approves Chase: go to Bank Integration tab → Connect Bank Account → Chase should connect cleanly
+- After connecting: click Sync Now to pull real transactions
+- Remember device authentication (Plaid may require device trust step on first production login)
 
 ---
 
