@@ -2346,6 +2346,59 @@
       });
     }
 
+    function buildPlaidHandler(linkToken, receivedRedirectUri) {
+      const btn = document.getElementById('plaid-connect-btn');
+      const config = {
+        token: linkToken,
+        onSuccess: async (publicToken) => {
+          btn.disabled = true;
+          btn.textContent = 'Connecting...';
+          // Clear oauth_state_id from URL so a refresh doesn't re-trigger
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+          const exResp = await adminFetch('/api/admin/plaid/exchange-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ publicToken }),
+          });
+          const exData = await exResp.json();
+          if (exData.success) {
+            document.getElementById('bank-connection-status').textContent = 'Connected ✓';
+            document.getElementById('bank-connection-status').style.color = '#6bff6b';
+            btn.textContent = 'Reconnect Bank';
+            btn.disabled = false;
+            loadBankIntegration();
+          } else {
+            alert('Connection failed: ' + (exData.message || 'Unknown error'));
+            btn.disabled = false;
+            btn.textContent = 'Connect Bank Account';
+          }
+        },
+        onExit: () => {
+          btn.disabled = false;
+          btn.textContent = 'Connect Bank Account';
+          // Clear oauth params from URL on exit too
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+        },
+      };
+      if (receivedRedirectUri) config.receivedRedirectUri = receivedRedirectUri;
+      return Plaid.create(config);
+    }
+
+    // On page load, check if we're returning from OAuth (Chase redirects back here)
+    (async function checkOAuthReturn() {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('oauth_state_id')) return;
+      // We're returning from OAuth — retrieve the stored link token and re-open Link
+      const storedToken = sessionStorage.getItem('plaid_link_token');
+      if (!storedToken) return;
+      sessionStorage.removeItem('plaid_link_token');
+      const receivedRedirectUri = window.location.href;
+      const handler = buildPlaidHandler(storedToken, receivedRedirectUri);
+      handler.open();
+    })();
+
     async function openPlaidLink() {
       const btn = document.getElementById('plaid-connect-btn');
       btn.disabled = true;
@@ -2354,32 +2407,9 @@
         const resp = await adminFetch('/api/admin/plaid/link-token', { method: 'POST' });
         const data = await resp.json();
         if (!data.success) throw new Error(data.message || 'Failed to get Link token');
-        const handler = Plaid.create({
-          token: data.linkToken,
-          onSuccess: async (publicToken) => {
-            const exResp = await adminFetch('/api/admin/plaid/exchange-token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ publicToken }),
-            });
-            const exData = await exResp.json();
-            if (exData.success) {
-              document.getElementById('bank-connection-status').textContent = 'Connected ✓';
-              document.getElementById('bank-connection-status').style.color = '#6bff6b';
-              btn.textContent = 'Reconnect Bank';
-              btn.disabled = false;
-              loadBankIntegration();
-            } else {
-              alert('Connection failed: ' + (exData.message || 'Unknown error'));
-              btn.disabled = false;
-              btn.textContent = 'Connect Bank Account';
-            }
-          },
-          onExit: () => {
-            btn.disabled = false;
-            btn.textContent = 'Connect Bank Account';
-          },
-        });
+        // Store token in sessionStorage so the OAuth return flow can retrieve it
+        sessionStorage.setItem('plaid_link_token', data.linkToken);
+        const handler = buildPlaidHandler(data.linkToken, null);
         handler.open();
       } catch (e) {
         alert('Error: ' + e.message);

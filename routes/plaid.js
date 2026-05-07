@@ -27,7 +27,10 @@ router.post('/link-token', async (req, res) => {
     if (!isConfigured()) {
       return res.status(400).json({ success: false, message: 'Plaid credentials not configured' });
     }
-    const linkToken = await createLinkToken();
+    // Production OAuth (Chase etc.) requires a redirect_uri whitelisted in Plaid dashboard
+    const env = process.env.PLAID_ENV || 'sandbox';
+    const redirectUri = env === 'production' ? 'https://paytrack.lemedspa.app/admin' : null;
+    const linkToken = await createLinkToken('paytrack-admin', redirectUri);
     res.json({ success: true, linkToken });
   } catch (e) {
     console.error('[plaid] link-token error:', e.message);

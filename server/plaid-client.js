@@ -38,15 +38,17 @@ function isConfigured() {
   return !!(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET);
 }
 
-async function createLinkToken(userId = 'paytrack-admin') {
+async function createLinkToken(userId = 'paytrack-admin', redirectUri = null) {
   const client = getClient();
-  const response = await client.linkTokenCreate({
+  const params = {
     user: { client_user_id: userId },
     client_name: 'LM PayTrack',
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: 'en',
-  });
+  };
+  if (redirectUri) params.redirect_uri = redirectUri;
+  const response = await client.linkTokenCreate(params);
   return response.data.link_token;
 }
 
