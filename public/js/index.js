@@ -10,6 +10,10 @@
     let salesCount = 0;
     let currentTab = 'entry';
 
+    function fmtAmt(val) {
+      return parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     function formatHoursDisplay(decimalHours) {
       const h = Math.floor(decimalHours);
       const m = Math.round((decimalHours - h) * 60);
@@ -182,13 +186,13 @@
             <tr>
               <td>${formatDateShort(entry.date)}</td>
               <td class="right">${formatHoursDisplay(entry.hours)}</td>
-              <td class="right">$${entry.wages.toFixed(2)}</td>
-              <td class="right">$${entry.commissions.toFixed(2)}</td>
-              <td class="right">$${entry.productCommissions.toFixed(2)}</td>
-              <td class="right">$${entry.tips.toFixed(2)}</td>
-              <td class="right cash-tips">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
-              <td class="right cash-tips">${dayPayouts > 0 ? '-$' + dayPayouts.toFixed(2) : '-'}</td>
-              <td class="right" style="font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+              <td class="right">$${fmtAmt(entry.wages)}</td>
+              <td class="right">$${fmtAmt(entry.commissions)}</td>
+              <td class="right">$${fmtAmt(entry.productCommissions)}</td>
+              <td class="right">$${fmtAmt(entry.tips)}</td>
+              <td class="right cash-tips">${entry.cashTips > 0 ? '-$' + fmtAmt(entry.cashTips) : '-'}</td>
+              <td class="right cash-tips">${dayPayouts > 0 ? '-$' + fmtAmt(dayPayouts) : '-'}</td>
+              <td class="right" style="font-weight: 600;">$${fmtAmt(dayTotal)}</td>
               <td class="right"><button class="btn-delete-small" onclick="deleteReviewEntry(${entry.id}, '${entry.date}')">Delete</button></td>
             </tr>
           `;
@@ -199,13 +203,13 @@
         const s = data.summary;
         const totalPayable = s.totalPayable - totalPayouts;
         document.getElementById('review-total-hours').textContent = formatHoursDisplay(s.totalHours);
-        document.getElementById('review-total-wages').textContent = '$' + s.totalWages.toFixed(2);
-        document.getElementById('review-total-service').textContent = '$' + s.totalCommissions.toFixed(2);
-        document.getElementById('review-total-sales').textContent = '$' + s.totalProductCommissions.toFixed(2);
-        document.getElementById('review-total-tips').textContent = '$' + s.totalTips.toFixed(2);
-        document.getElementById('review-total-cash').textContent = '-$' + s.totalCashTips.toFixed(2);
-        document.getElementById('review-total-payouts').textContent = '-$' + totalPayouts.toFixed(2);
-        document.getElementById('review-total-payable').textContent = '$' + totalPayable.toFixed(2);
+        document.getElementById('review-total-wages').textContent = '$' + fmtAmt(s.totalWages);
+        document.getElementById('review-total-service').textContent = '$' + fmtAmt(s.totalCommissions);
+        document.getElementById('review-total-sales').textContent = '$' + fmtAmt(s.totalProductCommissions);
+        document.getElementById('review-total-tips').textContent = '$' + fmtAmt(s.totalTips);
+        document.getElementById('review-total-cash').textContent = '-$' + fmtAmt(s.totalCashTips);
+        document.getElementById('review-total-payouts').textContent = '-$' + fmtAmt(totalPayouts);
+        document.getElementById('review-total-payable').textContent = '$' + fmtAmt(totalPayable);
         tfoot.style.display = 'table-footer-group';
 
       } catch (error) {
@@ -536,7 +540,7 @@
 
       // Update display
       const calcDisplay = document.getElementById(`calc-commission-${id}`);
-      calcDisplay.querySelector('.value').textContent = `$${commission.toFixed(2)}`;
+      calcDisplay.querySelector('.value').textContent = `$${fmtAmt(commission)}`;
 
       // Store value
       entry.querySelector('.product-commission').value = commission.toFixed(2);
@@ -742,10 +746,13 @@
         `${formatPeriodDate(startDate)} - ${formatPeriodDate(endDate)}, ${endDate.getFullYear()}`;
 
       document.getElementById('period-hours').textContent = currentPayPeriod.totalHours.toFixed(1);
-      document.getElementById('period-wages').textContent = `$${currentPayPeriod.totalWages.toFixed(0)}`;
-      document.getElementById('period-commissions').textContent = `$${(currentPayPeriod.totalCommissions + currentPayPeriod.totalProductCommissions).toFixed(0)}`;
-      document.getElementById('period-tips').textContent = `$${currentPayPeriod.totalTips.toFixed(0)}`;
-      document.getElementById('period-total').textContent = `$${currentPayPeriod.totalPayable.toFixed(2)}`;
+      document.getElementById('period-wages').textContent =
+        `$${parseFloat(currentPayPeriod.totalWages).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+      document.getElementById('period-commissions').textContent =
+        `$${parseFloat(currentPayPeriod.totalCommissions + currentPayPeriod.totalProductCommissions).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+      document.getElementById('period-tips').textContent =
+        `$${parseFloat(currentPayPeriod.totalTips).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+      document.getElementById('period-total').textContent = `$${fmtAmt(currentPayPeriod.totalPayable)}`;
 
       // Invoice status
       const statusEl = document.getElementById('invoice-status');
@@ -810,12 +817,12 @@
             <tr>
               <td>${formatDateShort(entry.date)}</td>
               <td style="text-align: right;">${entry.hours.toFixed(2)}</td>
-              <td style="text-align: right;">$${entry.wages.toFixed(2)}</td>
-              <td style="text-align: right;">$${entry.commissions.toFixed(2)}</td>
-              <td style="text-align: right;">$${entry.productCommissions.toFixed(2)}</td>
-              <td style="text-align: right;">$${entry.tips.toFixed(2)}</td>
-              <td style="text-align: right; color: #ff6b6b;">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
-              <td style="text-align: right; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+              <td style="text-align: right;">$${fmtAmt(entry.wages)}</td>
+              <td style="text-align: right;">$${fmtAmt(entry.commissions)}</td>
+              <td style="text-align: right;">$${fmtAmt(entry.productCommissions)}</td>
+              <td style="text-align: right;">$${fmtAmt(entry.tips)}</td>
+              <td style="text-align: right; color: #ff6b6b;">${entry.cashTips > 0 ? '-$' + fmtAmt(entry.cashTips) : '-'}</td>
+              <td style="text-align: right; font-weight: 600;">$${fmtAmt(dayTotal)}</td>
             </tr>
           `;
         });
@@ -850,12 +857,12 @@
                 <tr style="background: #1a1a1a;">
                   <td><strong>TOTALS</strong></td>
                   <td style="text-align: right;"><strong>${summary.totalHours.toFixed(2)}</strong></td>
-                  <td style="text-align: right;"><strong>$${summary.totalWages.toFixed(2)}</strong></td>
-                  <td style="text-align: right;"><strong>$${summary.totalCommissions.toFixed(2)}</strong></td>
-                  <td style="text-align: right;"><strong>$${summary.totalProductCommissions.toFixed(2)}</strong></td>
-                  <td style="text-align: right;"><strong>$${summary.totalTips.toFixed(2)}</strong></td>
-                  <td style="text-align: right; color: #ff6b6b;"><strong>-$${summary.totalCashTips.toFixed(2)}</strong></td>
-                  <td style="text-align: right; color: #6bff6b; font-size: 14px;"><strong>$${summary.totalPayable.toFixed(2)}</strong></td>
+                  <td style="text-align: right;"><strong>$${fmtAmt(summary.totalWages)}</strong></td>
+                  <td style="text-align: right;"><strong>$${fmtAmt(summary.totalCommissions)}</strong></td>
+                  <td style="text-align: right;"><strong>$${fmtAmt(summary.totalProductCommissions)}</strong></td>
+                  <td style="text-align: right;"><strong>$${fmtAmt(summary.totalTips)}</strong></td>
+                  <td style="text-align: right; color: #ff6b6b;"><strong>-$${fmtAmt(summary.totalCashTips)}</strong></td>
+                  <td style="text-align: right; color: #6bff6b; font-size: 14px;"><strong>$${fmtAmt(summary.totalPayable)}</strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -1000,7 +1007,7 @@
             <div class="entry-item">
               <div class="entry-date">${dateStr}</div>
               <div class="entry-details">${timeStr} (${entry.hours.toFixed(2)} hours)</div>
-              ${totalEarnings > 0 ? `<div class="entry-earnings">$${totalEarnings.toFixed(2)}</div>` : ''}
+              ${totalEarnings > 0 ? `<div class="entry-earnings">$${fmtAmt(totalEarnings)}</div>` : ''}
             </div>
           `;
         }).join('');

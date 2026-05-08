@@ -1,3 +1,40 @@
+## Session — 2026-05-08 (Plaid sync fix: payment_method, ACH/Zelle filter, comments, delete, UI)
+
+**Focus:** Fix Plaid sync errors after first successful bank sync; add ACH/Zelle filter, comments field, delete button.
+
+**Accomplished:**
+- Fixed `payment_type` → `payment_method` column error (was crashing assign flow)
+- Added `detectPaymentMethod()` to filter only ACH/Zelle transactions; all others silently skipped
+- Added `payment_method` column to `plaid_pending` table (Supabase DDL via Management API)
+- Added `comments TEXT` column to `payments` table (Supabase DDL)
+- Updated `plaid-sync.js`: ACH/Zelle filter + payment_method tagging in classifyTransactions
+- Updated `routes/plaid.js`: fixed column name, added comments support on assign, added DELETE /payments/:id
+- Updated `public/js/admin.js`: comments input per pending row, Delete button on imports, Verified badge
+- All 33 tests passing; committed `7c87f85` + `5dae4de`, both deployed to Render
+- Added Plaid credentials to `reference_credentials.md`, `set-env-vars.ps1`, `sync-mac-env.sh`
+
+**Diagram:**
+```
+Plaid sync flow (after fix):
+  Plaid transactions
+    → detectPaymentMethod() — zelle/ach → process, else skip
+    → matchTransaction() — matched → payments table
+                         — unmatched → plaid_pending table
+  Admin UI:
+    Pending row: [select employee] [notes input] [Assign] [Discard]
+    Imports row: [Verify ✓] [Reverse] [Delete]
+```
+
+**Current State:** Plaid sync working. ACH/Zelle only. Comments + delete functional. Both commits deployed.
+
+**Issues:** None known for Plaid. Prior lm-app security review issues still pending (see previous session).
+
+**Next Steps:**
+- Test assign flow end-to-end with a real pending transaction (verify comments saves correctly)
+- lm-app security review: app_metadata.scope persistence, trust proxy/XFF, dev OTP bypass
+
+---
+
 ## Session — 2026-05-08 (Payouts hang fix + Render env-var wipe recovery)
 
 **Focus:** Fix Payouts tab hang on cold start; fix Render API 405 errors for Chase/Plaid; recover from accidental env var wipe.

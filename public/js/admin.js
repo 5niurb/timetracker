@@ -2671,6 +2671,11 @@
       }
     }
 
+    // Expose modal functions globally for inline onclick attributes
+    window.openPaymentModal = openPaymentModal;
+    window.closePaymentModal = closePaymentModal;
+    window.savePayment = savePayment;
+
     // Check if already logged in
     if (sessionStorage.getItem('adminAuth')) {
       showScreen('admin-screen');
