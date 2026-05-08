@@ -5,6 +5,11 @@
 //
 // Render v1 API only supports bulk PUT /env-vars (replaces all vars).
 // POST and individual-key endpoints return 405. Pattern: fetch all, merge, PUT.
+//
+// CRITICAL: Dashboard-set env vars are NOT returned by GET /env-vars — only vars
+// set via this API are returned. All required vars must be set via API (not dashboard)
+// so the merge is complete. If vars go missing after a PUT, check that they were
+// set via API, not just the Render dashboard.
 async function updateRenderEnvVar(key, value) {
   const apiKey = process.env.RENDER_API_KEY;
   const serviceId = process.env.RENDER_SERVICE_ID;
