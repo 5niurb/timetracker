@@ -24,8 +24,9 @@ async function updateRenderEnvVar(key, value) {
   const envVars = Array.isArray(listBody) ? listBody : (listBody.envVars || []);
   const existing = envVars.find((v) => v.envVar?.key === key);
 
+  // Render API uses the key name as the URL segment, not a separate id field.
   const url = existing
-    ? `https://api.render.com/v1/services/${serviceId}/env-vars/${existing.envVar.id}`
+    ? `https://api.render.com/v1/services/${serviceId}/env-vars/${key}`
     : `https://api.render.com/v1/services/${serviceId}/env-vars`;
 
   const method = existing ? 'PUT' : 'POST';
