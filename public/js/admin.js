@@ -9,6 +9,10 @@
       return `${h}:${String(m).padStart(2, '0')} / ${decimalHours.toFixed(2)}`;
     }
 
+    function fmtAmt(val) {
+      return parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     // Set default dates (LA timezone aware)
     function getLADate() {
       const now = new Date();
@@ -284,13 +288,13 @@
                 <td><strong>${formatDate(entry.date)}</strong></td>
                 <td>${escapeHtml(entry.employee_name)}</td>
                 <td style="text-align: right;">${formatHoursDisplay(hours)}</td>
-                <td style="text-align: right;">$${wages.toFixed(2)}</td>
-                <td style="text-align: right;">$${serviceComm.toFixed(2)}</td>
-                <td style="text-align: right;">$${salesComm.toFixed(2)}</td>
-                <td style="text-align: right;">$${tips.toFixed(2)}</td>
-                <td style="text-align: right; color: #ff6b6b;">${cashTips > 0 ? '-$' + cashTips.toFixed(2) : '$0.00'}</td>
-                <td style="text-align: right; color: #ff6b6b;">${dayPayouts > 0 ? '-$' + dayPayouts.toFixed(2) : '$0.00'}</td>
-                <td style="text-align: right; color: #6bff6b; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
+                <td style="text-align: right;">$${fmtAmt(wages)}</td>
+                <td style="text-align: right;">$${fmtAmt(serviceComm)}</td>
+                <td style="text-align: right;">$${fmtAmt(salesComm)}</td>
+                <td style="text-align: right;">$${fmtAmt(tips)}</td>
+                <td style="text-align: right; color: #ff6b6b;">${cashTips > 0 ? '-$' + fmtAmt(cashTips) : '$0.00'}</td>
+                <td style="text-align: right; color: #ff6b6b;">${dayPayouts > 0 ? '-$' + fmtAmt(dayPayouts) : '$0.00'}</td>
+                <td style="text-align: right; color: #6bff6b; font-weight: 600;">$${fmtAmt(dayTotal)}</td>
                 <td class="actions">
                   ${hasDetails ? `<button class="btn-secondary" onclick="showEntryDetails(${entry.id})">Details</button>` : ''}
                   <button class="btn-danger" onclick="confirmDeleteEntry(${entry.id})">Delete</button>
@@ -301,13 +305,13 @@
 
           // Update footer totals
           document.getElementById('review-total-hours').innerHTML = `<strong>${formatHoursDisplay(totalHours)}</strong>`;
-          document.getElementById('review-total-wages').innerHTML = `<strong>$${totalWages.toFixed(2)}</strong>`;
-          document.getElementById('review-total-service').innerHTML = `<strong>$${totalServiceComm.toFixed(2)}</strong>`;
-          document.getElementById('review-total-sales').innerHTML = `<strong>$${totalSalesComm.toFixed(2)}</strong>`;
-          document.getElementById('review-total-tips').innerHTML = `<strong>$${totalTips.toFixed(2)}</strong>`;
-          document.getElementById('review-total-cash').innerHTML = `<strong>-$${totalCashTips.toFixed(2)}</strong>`;
-          document.getElementById('review-total-payouts').innerHTML = `<strong>-$${totalPayouts.toFixed(2)}</strong>`;
-          document.getElementById('review-total-payable').innerHTML = `<strong>$${totalPayable.toFixed(2)}</strong>`;
+          document.getElementById('review-total-wages').innerHTML = `<strong>$${fmtAmt(totalWages)}</strong>`;
+          document.getElementById('review-total-service').innerHTML = `<strong>$${fmtAmt(totalServiceComm)}</strong>`;
+          document.getElementById('review-total-sales').innerHTML = `<strong>$${fmtAmt(totalSalesComm)}</strong>`;
+          document.getElementById('review-total-tips').innerHTML = `<strong>$${fmtAmt(totalTips)}</strong>`;
+          document.getElementById('review-total-cash').innerHTML = `<strong>-$${fmtAmt(totalCashTips)}</strong>`;
+          document.getElementById('review-total-payouts').innerHTML = `<strong>-$${fmtAmt(totalPayouts)}</strong>`;
+          document.getElementById('review-total-payable').innerHTML = `<strong>$${fmtAmt(totalPayable)}</strong>`;
           footer.style.display = '';
         }
       } catch (error) {
@@ -344,8 +348,8 @@
                 <span><strong style="color: #999; font-size: 10px;">SERVICES:</strong> ${escapeHtml(c.procedure_name || '-')}</span>
               </div>
               <div class="patient-row">
-                <span>Earned: $${(c.amount_earned || 0).toFixed(2)}</span>
-                <span>Tip: $${(c.tip_amount || 0).toFixed(2)} ${tipStatus}</span>
+                <span>Earned: $${fmtAmt(c.amount_earned)}</span>
+                <span>Tip: $${fmtAmt(c.tip_amount)} ${tipStatus}</span>
               </div>
             </div>
           `;
@@ -362,10 +366,10 @@
             <div class="patient-detail">
               <div class="patient-row">
                 <span><strong>${escapeHtml(p.product_name)}</strong></span>
-                <span>Sale: $${(p.sale_amount || 0).toFixed(2)}</span>
+                <span>Sale: $${fmtAmt(p.sale_amount)}</span>
               </div>
               <div class="patient-row">
-                <span>Commission: $${(p.commission_amount || 0).toFixed(2)}</span>
+                <span>Commission: $${fmtAmt(p.commission_amount)}</span>
               </div>
             </div>
           `;
@@ -387,11 +391,11 @@
         ${salesHtml}
         <div style="margin-top: 16px; padding: 16px; background: #1a2a1a; border: 1px solid #2a4a2a;">
           <strong style="color: #6bff6b; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Earnings Breakdown:</strong><br><br>
-          <span style="color: #ccc;">Hourly Pay: $${hourlyEarnings.toFixed(2)}</span><br>
-          <span style="color: #ccc;">Service Earnings: $${serviceEarnings.toFixed(2)}</span><br>
-          <span style="color: #ccc;">Sales Commissions: $${salesCommissions.toFixed(2)}</span><br>
-          <span style="color: #ccc;">Tips: $${tips.toFixed(2)} ${tipsOwed > 0 ? `<span style="color: #ff6b6b;">(${tipsOwed.toFixed(2)} owed)</span>` : ''}</span><br><br>
-          <strong style="font-size: 18px; font-family: 'Cormorant Garamond', serif;">Total: $${totalEarnings.toFixed(2)}</strong>
+          <span style="color: #ccc;">Hourly Pay: $${fmtAmt(hourlyEarnings)}</span><br>
+          <span style="color: #ccc;">Service Earnings: $${fmtAmt(serviceEarnings)}</span><br>
+          <span style="color: #ccc;">Sales Commissions: $${fmtAmt(salesCommissions)}</span><br>
+          <span style="color: #ccc;">Tips: $${fmtAmt(tips)} ${tipsOwed > 0 ? `<span style="color: #ff6b6b;">(${fmtAmt(tipsOwed)} owed)</span>` : ''}</span><br><br>
+          <strong style="font-size: 18px; font-family: 'Cormorant Garamond', serif;">Total: $${fmtAmt(totalEarnings)}</strong>
         </div>
         ${entry.description ? `<div style="margin-top: 12px; color: #999;"><strong style="font-size: 11px; letter-spacing: 0.05em;">NOTES:</strong> ${escapeHtml(entry.description)}</div>` : ''}
       `;
@@ -1606,12 +1610,12 @@
               <tr>
                 <td><strong>${escapeHtml(name)}</strong></td>
                 <td>${data.hours.toFixed(1)}h</td>
-                <td>$${data.hourlyPay.toFixed(2)}</td>
-                <td>$${data.services.toFixed(2)}</td>
-                <td>$${data.sales.toFixed(2)}</td>
-                <td>$${data.tips.toFixed(2)}</td>
-                <td style="color: ${data.tipsOwed > 0 ? '#ff6b6b' : '#666'};">$${data.tipsOwed.toFixed(2)}</td>
-                <td><span class="earnings-total">$${total.toFixed(2)}</span></td>
+                <td>$${fmtAmt(data.hourlyPay)}</td>
+                <td>$${fmtAmt(data.services)}</td>
+                <td>$${fmtAmt(data.sales)}</td>
+                <td>$${fmtAmt(data.tips)}</td>
+                <td style="color: ${data.tipsOwed > 0 ? '#ff6b6b' : '#666'};">$${fmtAmt(data.tipsOwed)}</td>
+                <td><span class="earnings-total">$${fmtAmt(total)}</span></td>
               </tr>
             `;
           }).join('');
@@ -1853,7 +1857,7 @@
             <tr>
               <td style="font-size:12px;white-space:nowrap;">${date}</td>
               <td style="white-space:nowrap;"><strong>${escapeHtml(p.teammate_name)}</strong></td>
-              <td style="text-align:right;font-size:13px;color:#c9a84c;white-space:nowrap;"><strong>$${parseFloat(p.amount).toFixed(2)}</strong></td>
+              <td style="text-align:right;font-size:13px;color:#c9a84c;white-space:nowrap;"><strong>$${fmtAmt(p.amount)}</strong></td>
               <td style="font-size:11px;color:#888;white-space:nowrap;">${escapeHtml(p.payment_method || '')}</td>
               <td style="font-size:11px;color:#888;white-space:nowrap;">${escapeHtml(p.source || '')}</td>
               <td style="font-size:11px;color:#666;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(desc)}">${escapeHtml(desc) || '<span style="color:#444;">—</span>'}</td>
@@ -1866,7 +1870,7 @@
           })
           .join('');
 
-        totalEl.innerHTML = `<strong>$${total.toFixed(2)}</strong>`;
+        totalEl.innerHTML = `<strong>$${fmtAmt(total)}</strong>`;
         footer.style.display = '';
 
         // Summary by teammate when showing all
@@ -1879,7 +1883,7 @@
             .sort((a, b) => b[1] - a[1])
             .map(
               ([name, amt]) =>
-                `<div style="text-align:center;padding:8px 16px;"><div style="font-size:11px;color:#888;margin-bottom:2px;">${escapeHtml(name)}</div><div style="font-size:16px;color:#c9a84c;font-weight:600;">$${amt.toFixed(2)}</div></div>`,
+                `<div style="text-align:center;padding:8px 16px;"><div style="font-size:11px;color:#888;margin-bottom:2px;">${escapeHtml(name)}</div><div style="font-size:16px;color:#c9a84c;font-weight:600;">$${fmtAmt(amt)}</div></div>`,
             )
             .join('');
           summaryDiv.style.display = '';
@@ -1900,25 +1904,7 @@
       }
     }
 
-    async function openPaymentModal(payment) {
-      const overlay = document.getElementById('payment-modal-overlay');
-      const title = document.getElementById('payment-modal-title');
-      const empSel = document.getElementById('payment-employee-select');
-
-      // Lazily populate employee cache if not yet loaded (e.g., navigating directly to Payouts tab)
-      if (!window._employeesCache || window._employeesCache.length === 0) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 10000);
-          const res = await fetch('/api/admin/employees', { signal: ctrl.signal });
-          clearTimeout(timer);
-          if (res.ok) window._employeesCache = await res.json();
-        } catch (e) {
-          // non-fatal — dropdown will just be empty
-        }
-      }
-
-      // Populate employee dropdown
+    function populateEmployeeDropdown(empSel) {
       empSel.innerHTML = '<option value="">— Select team member —</option>';
       (window._employeesCache || allEmployees || [])
         .slice()
@@ -1929,11 +1915,20 @@
           opt.textContent = emp.name;
           empSel.appendChild(opt);
         });
+    }
 
+    async function openPaymentModal(payment) {
+      const overlay = document.getElementById('payment-modal-overlay');
+      const title = document.getElementById('payment-modal-title');
+      const empSel = document.getElementById('payment-employee-select');
+
+      // Show modal immediately — don't block on employee fetch
+      overlay.style.display = 'flex';
+
+      // Set form fields
       if (payment) {
         title.textContent = 'Edit Payment';
         document.getElementById('payment-editing-id').value = payment.id;
-        empSel.value = payment.employee_id || '';
         document.getElementById('payment-date-input').value = payment.payment_date;
         document.getElementById('payment-amount-input').value = parseFloat(payment.amount).toFixed(2);
         document.getElementById('payment-method-input').value = payment.payment_method || 'Zelle';
@@ -1942,7 +1937,6 @@
       } else {
         title.textContent = 'Add Payment';
         document.getElementById('payment-editing-id').value = '';
-        empSel.value = '';
         document.getElementById('payment-date-input').value = new Date().toISOString().slice(0, 10);
         document.getElementById('payment-amount-input').value = '';
         document.getElementById('payment-method-input').value = 'Zelle';
@@ -1950,7 +1944,23 @@
         document.getElementById('payment-notes-input').value = '';
       }
 
-      overlay.style.display = 'flex';
+      // Populate employee dropdown — use cache if available, fetch if not
+      if (window._employeesCache && window._employeesCache.length > 0) {
+        populateEmployeeDropdown(empSel);
+        if (payment) empSel.value = payment.employee_id || '';
+      } else {
+        empSel.innerHTML = '<option value="">Loading...</option>';
+        try {
+          const res = await fetch('/api/admin/employees');
+          if (res.ok) {
+            window._employeesCache = await res.json();
+          }
+        } catch (e) {
+          // leave cache empty; dropdown will show no options
+        }
+        populateEmployeeDropdown(empSel);
+        if (payment) empSel.value = payment.employee_id || '';
+      }
     }
 
     function closePaymentModal() {
@@ -2495,7 +2505,7 @@
           .map(
             (tx) => `<tr>
             <td style="padding:6px 8px;">${tx.transaction_date}</td>
-            <td style="padding:6px 8px;text-align:right;">$${parseFloat(tx.amount).toFixed(2)}</td>
+            <td style="padding:6px 8px;text-align:right;">$${fmtAmt(tx.amount)}</td>
             <td style="padding:6px 8px;color:#ccc;">${escapeHtml(tx.description || '')}</td>
             <td style="padding:6px 8px;">
               <select id="pending-assign-${tx.id}" style="width:140px;">
@@ -2548,7 +2558,7 @@
             return `<tr>
               <td style="padding:6px 8px;">${p.payment_date}</td>
               <td style="padding:6px 8px;">${empName}</td>
-              <td style="padding:6px 8px;text-align:right;">$${parseFloat(p.amount).toFixed(2)}</td>
+              <td style="padding:6px 8px;text-align:right;">$${fmtAmt(p.amount)}</td>
               <td style="padding:6px 8px;color:#ccc;">${escapeHtml(p.notes || '')}</td>
               <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
                 ${badge}

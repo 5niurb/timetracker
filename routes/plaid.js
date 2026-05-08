@@ -220,8 +220,8 @@ router.delete('/reset', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
     const { saveSetting } = require('../server/plaid-sync');
-    await supabase.from('payments').delete().eq('source', 'plaid');
-    await supabase.from('plaid_pending').delete().neq('id', 0);
+    await supabase.from('payments').delete().not('plaid_transaction_id', 'is', null);
+    await supabase.from('plaid_pending').delete().not('plaid_transaction_id', 'is', null);
     await saveSetting(supabase, 'plaid_cursor', '', 'PLAID_CURSOR');
     const { updateRenderEnvVar } = require('../server/render-api');
     await updateRenderEnvVar('PLAID_CURSOR', '').catch(() => {});
