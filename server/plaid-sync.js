@@ -27,12 +27,32 @@ function matchTransaction(description, map) {
   return null;
 }
 
+// Detect payment method from transaction description.
+// Returns 'zelle', 'ach', or null (not a payment we care about).
+function detectPaymentMethod(description) {
+  if (!description) return null;
+  const lower = description.toLowerCase();
+  if (lower.includes('zelle')) return 'zelle';
+  if (
+    lower.includes('ach') ||
+    lower.includes('direct dep') ||
+    lower.includes('payroll') ||
+    lower.includes('direct deposit')
+  )
+    return 'ach';
+  return null;
+}
+
 // Classify an array of Plaid transactions into matched + unmatched.
+// Only processes ACH and Zelle transactions — all others are skipped.
 function classifyTransactions(transactions, matchMap) {
   const matched = [];
   const unmatched = [];
 
   for (const tx of transactions) {
+    const method = detectPaymentMethod(tx.name);
+    if (!method) continue; // skip non-ACH/Zelle transactions
+
     const empId = matchTransaction(tx.name, matchMap);
     if (empId !== null) {
       matched.push({
@@ -41,6 +61,7 @@ function classifyTransactions(transactions, matchMap) {
         transaction_date: tx.date,
         amount: tx.amount,
         description: tx.name,
+        payment_method: method,
       });
     } else {
       unmatched.push({
@@ -48,6 +69,7 @@ function classifyTransactions(transactions, matchMap) {
         transaction_date: tx.date,
         amount: tx.amount,
         description: tx.name,
+        payment_method: method,
       });
     }
   }
@@ -91,7 +113,7 @@ async function runSync(supabase) {
         payment_date: tx.transaction_date,
         amount: tx.amount,
         notes: tx.description,
-        payment_type: 'direct_deposit',
+        payment_method: tx.payment_method,
         source: 'plaid',
         auto_imported: true,
         plaid_transaction_id: tx.plaid_transaction_id,
@@ -110,6 +132,7 @@ async function runSync(supabase) {
         transaction_date: tx.transaction_date,
         amount: tx.amount,
         description: tx.description,
+        payment_method: tx.payment_method,
       },
       { onConflict: 'plaid_transaction_id', ignoreDuplicates: true },
     );
@@ -136,4 +159,4 @@ async function runSync(supabase) {
   };
 }
 
-module.exports = { buildMatchMap, matchTransaction, classifyTransactions, runSync };
+module.exports = { buildMatchMap, matchTransaction, detectPaymentMethod, classifyTransactions, runSync };

@@ -105,12 +105,15 @@ router.post('/pending/:id/assign', async (req, res) => {
     return res.status(404).json({ success: false, message: 'Pending transaction not found' });
   }
 
+  const { comments } = req.body;
+
   const { error: insertErr } = await supabase.from('payments').insert({
     employee_id: parseInt(employeeId),
     payment_date: pending.transaction_date,
     amount: pending.amount,
     notes: pending.description,
-    payment_type: 'direct_deposit',
+    payment_method: pending.payment_method || 'ach',
+    comments: comments || null,
     source: 'plaid',
     auto_imported: false,
     plaid_transaction_id: pending.plaid_transaction_id,
@@ -177,6 +180,27 @@ router.delete('/pending/:id', async (req, res) => {
   if (!authCheck(req, res)) return;
   const { id } = req.params;
   const { error } = await supabase.from('plaid_pending').delete().eq('id', id);
+  if (error) return res.status(500).json({ success: false, message: error.message });
+  res.json({ success: true });
+});
+
+// DELETE /api/admin/plaid/payments/:id
+// Deletes a manually-assigned (non-auto-imported) payment record.
+router.delete('/payments/:id', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const { id } = req.params;
+
+  const { data: payment, error: fetchErr } = await supabase
+    .from('payments')
+    .select('id, auto_imported')
+    .eq('id', id)
+    .single();
+
+  if (fetchErr || !payment) {
+    return res.status(404).json({ success: false, message: 'Payment not found' });
+  }
+
+  const { error } = await supabase.from('payments').delete().eq('id', id);
   if (error) return res.status(500).json({ success: false, message: error.message });
   res.json({ success: true });
 });

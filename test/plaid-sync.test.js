@@ -86,24 +86,39 @@ async function main() {
     assert.strictEqual(result, null);
   });
 
+  console.log('\ndetectPaymentMethod():');
+  test('exported', () => assert.strictEqual(typeof m.detectPaymentMethod, 'function'));
+  test('detects zelle', () => assert.strictEqual(m.detectPaymentMethod('Zelle To Jane Smith'), 'zelle'));
+  test('detects zelle case-insensitive', () => assert.strictEqual(m.detectPaymentMethod('ZELLE PAYMENT'), 'zelle'));
+  test('detects ach keyword', () => assert.strictEqual(m.detectPaymentMethod('ACH PMT Jane Smith'), 'ach'));
+  test('detects direct dep', () => assert.strictEqual(m.detectPaymentMethod('DIRECT DEP Jane'), 'ach'));
+  test('detects payroll', () => assert.strictEqual(m.detectPaymentMethod('PAYROLL Jane Smith'), 'ach'));
+  test('detects direct deposit', () => assert.strictEqual(m.detectPaymentMethod('Basic Online Payroll Direct Deposit'), 'ach'));
+  test('returns null for unrelated transactions', () => assert.strictEqual(m.detectPaymentMethod('STARBUCKS COFFEE'), null));
+  test('returns null for null', () => assert.strictEqual(m.detectPaymentMethod(null), null));
+
   console.log('\nclassifyTransactions():');
   test('exported', () => assert.strictEqual(typeof m.classifyTransactions, 'function'));
 
   const transactions = [
     { transaction_id: 'tx1', date: '2026-05-01', amount: 100, name: 'Zelle Jane Smith' },
-    { transaction_id: 'tx2', date: '2026-05-02', amount: 200, name: 'Zelle Maria G' },
+    { transaction_id: 'tx2', date: '2026-05-02', amount: 200, name: 'Zelle Unknown Person' },
     { transaction_id: 'tx3', date: '2026-05-03', amount: 50, name: 'STARBUCKS' },
+    { transaction_id: 'tx4', date: '2026-05-04', amount: 500, name: 'ACH PMT Unknown Corp' },
   ];
 
   const { matched, unmatched } = m.classifyTransactions(transactions, map);
 
-  test('matched count correct', () => assert.strictEqual(matched.length, 2));
-  test('unmatched count correct', () => assert.strictEqual(unmatched.length, 1));
+  test('skips non-ACH/Zelle transactions', () => assert.strictEqual(matched.length + unmatched.length, 3)); // tx3 skipped
+  test('matched count correct', () => assert.strictEqual(matched.length, 1)); // tx1 only
+  test('unmatched count correct', () => assert.strictEqual(unmatched.length, 2)); // tx2 + tx4
   test('matched item has employee_id', () => assert.strictEqual(matched[0].employee_id, 1));
   test('matched item has plaid_transaction_id', () => assert.strictEqual(matched[0].plaid_transaction_id, 'tx1'));
   test('matched item has transaction_date', () => assert.strictEqual(matched[0].transaction_date, '2026-05-01'));
   test('matched item has amount', () => assert.strictEqual(matched[0].amount, 100));
-  test('unmatched item has plaid_transaction_id', () => assert.strictEqual(unmatched[0].plaid_transaction_id, 'tx3'));
+  test('matched item has payment_method zelle', () => assert.strictEqual(matched[0].payment_method, 'zelle'));
+  test('unmatched item has plaid_transaction_id', () => assert.strictEqual(unmatched[0].plaid_transaction_id, 'tx2'));
+  test('unmatched item has payment_method', () => assert.ok(unmatched[0].payment_method));
 
   console.log(`\n${'='.repeat(50)}`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
