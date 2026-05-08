@@ -2,6 +2,9 @@
 
 // Updates a Render service env var via the Render API.
 // Used to persist PLAID_ACCESS_TOKEN and PLAID_CURSOR after sync.
+//
+// Render v1 API only supports bulk PUT /env-vars (replaces all vars).
+// POST and individual-key endpoints return 405. Pattern: fetch all, merge, PUT.
 async function updateRenderEnvVar(key, value) {
   const apiKey = process.env.RENDER_API_KEY;
   const serviceId = process.env.RENDER_SERVICE_ID;
@@ -9,37 +12,31 @@ async function updateRenderEnvVar(key, value) {
     throw new Error('RENDER_API_KEY and RENDER_SERVICE_ID are required to update env vars');
   }
 
-  const listResp = await fetch(`https://api.render.com/v1/services/${serviceId}/env-vars`, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      Accept: 'application/json',
-    },
-  });
+  const base = `https://api.render.com/v1/services/${serviceId}/env-vars`;
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
 
+  const listResp = await fetch(base, { headers });
   if (!listResp.ok) {
     throw new Error(`Render API list env-vars failed: ${listResp.status}`);
   }
 
   const listBody = await listResp.json();
-  const envVars = Array.isArray(listBody) ? listBody : (listBody.envVars || []);
-  const existing = envVars.find((v) => v.envVar?.key === key);
+  const existing = Array.isArray(listBody) ? listBody : (listBody.envVars || []);
 
-  // Render API uses the key name as the URL segment, not a separate id field.
-  const url = existing
-    ? `https://api.render.com/v1/services/${serviceId}/env-vars/${key}`
-    : `https://api.render.com/v1/services/${serviceId}/env-vars`;
+  // Merge: replace the target key if present, otherwise append it.
+  const found = existing.some((v) => v.envVar?.key === key);
+  const merged = found
+    ? existing.map((v) => (v.envVar?.key === key ? { key, value } : { key: v.envVar.key, value: v.envVar.value }))
+    : [...existing.map((v) => ({ key: v.envVar.key, value: v.envVar.value })), { key, value }];
 
-  const method = existing ? 'PUT' : 'POST';
-  const body = existing ? { value } : { key, value };
-
-  const updateResp = await fetch(url, {
-    method,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(body),
+  const updateResp = await fetch(base, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(merged),
   });
 
   if (!updateResp.ok) {
