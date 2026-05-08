@@ -1,3 +1,41 @@
+## Session — 2026-05-08 (Payouts hang fix + Render env-var wipe recovery)
+
+**Focus:** Fix Payouts tab hang on cold start; fix Render API 405 errors for Chase/Plaid; recover from accidental env var wipe.
+
+**Accomplished:**
+- Fixed `loadPayments()` hang: added `AbortController` 15s timeout with user-visible "server waking up" message (commit `798eee3`)
+- Fixed empty team dropdown on Payouts tab: `openPaymentModal()` made async with lazy `_employeesCache` fetch
+- Fixed Render API 405 on Chase connect: rewrote `render-api.js` to use fetch-all → merge → bulk PUT pattern (commit `afe3f60`)
+- Root cause of `update_failed` deploys: Render bulk PUT wipes ALL env vars, including dashboard-set vars not returned by GET — accidentally wiped all env vars during debug cleanup
+- Restored all 10 required env vars via Render API: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, ADMIN_PASSWORD, PAYTRACK_ENCRYPTION_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, NODE_ENV
+- Added warning comment in `render-api.js` about dashboard vs API env var split (commit `74e4715`)
+- Final deploy `dep-d7up3l5ckfvc73bf8h7g` → **live** on commit `74e4715`
+
+**Diagram:**
+```
+Render env var architecture (after fix):
+  All vars now API-managed (not dashboard-only)
+  GET /env-vars → returns full list
+  updateRenderEnvVar(key, val):
+    GET all → merge one key → PUT all back   ← safe
+  
+  Old (broken): dashboard vars invisible to GET
+    PUT with partial array → silently wipes rest
+```
+
+**Current State:** paytrack live on commit `74e4715`. All env vars API-managed and verified. Chase/Plaid fix deployed.
+
+**Issues:**
+- RENDER_SERVICE_ID was not restored (not in set-env-vars.ps1) — Plaid cursor/token won't persist after sync. Need to add: `srv-d632r5m8alac73cbqubg`
+- lm-app security review issues from prior session still pending: (1) `app_metadata.scope` persistence in `/tailscale`,`/device`,`/pin/verify`, (2) trust proxy/XFF injection in `extractClientIp()`, (3) dev OTP bypass at `auth.js:151-159`
+
+**Next Steps:**
+- Add RENDER_SERVICE_ID back to Render env vars
+- Test Chase/Plaid OAuth end-to-end to confirm fix works
+- Address lm-app security review findings
+
+---
+
 ## Session — 2026-05-05 (Payouts tab, Time/Hours column, invoice email entries table)
 
 **Focus:** Three UI enhancements: Payouts tab in admin, Time/Hours Worked column format, Payouts deduction column, invoice email entry detail table.
@@ -72,6 +110,32 @@ Worker email → coi@lemedspa.app → CF Email Routing → coi-email-receiver (W
 **Next Steps:**
 - Test live email forwarding: have a COI forwarded to `coi@lemedspa.app`, confirm worker fires + Supabase row appears
 - If DNS propagation needed: wait ~1h and retry
+
+---
+
+## Session — 2026-05-07b (Plaid/Chase fix + lm-app passkey auth)
+
+**Focus:** Fix Plaid OAuth "Connection failed: RENDER_API_KEY and RENDER_SERVICE_ID are required" error; deploy lm-app passkey fixes.
+
+**Accomplished:**
+- Added `RENDER_API_KEY` to paytrack Render service env vars via Render API (PUT /v1/services/.../env-vars with full array — bare array, NOT wrapped object)
+- Verified all four Plaid-related vars present: `RENDER_API_KEY` YES, `RENDER_SERVICE_ID` YES, `PLAID_CLIENT_ID` YES, `PLAID_SECRET` YES
+- Triggered Render redeploy (dep-d7ujacbtqb8s73cki41g) → `live`
+- lm-app passkey auth shipped (commit 97de3a2): login hang fix, Windows device naming, inline rename UI
+
+**Diagram:**
+```
+Plaid OAuth flow:
+  /api/plaid/oauth-callback
+    └── updateRenderEnvVar('PLAID_ACCESS_TOKEN', token)   ← was failing
+          └── render-api.js → PUT /v1/services/:id/env-vars
+                  RENDER_API_KEY (now set) ✓
+                  RENDER_SERVICE_ID (was set) ✓
+```
+
+**Current State:** paytrack service live on Render with all required env vars. Chase bank add should work end-to-end.
+
+**Next Steps:** Test Chase/Plaid OAuth flow end-to-end (add bank → complete OAuth → verify PLAID_ACCESS_TOKEN persists).
 
 ---
 
