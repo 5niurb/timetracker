@@ -1908,7 +1908,10 @@
       // Lazily populate employee cache if not yet loaded (e.g., navigating directly to Payouts tab)
       if (!window._employeesCache || window._employeesCache.length === 0) {
         try {
-          const res = await fetch('/api/admin/employees');
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 10000);
+          const res = await fetch('/api/admin/employees', { signal: ctrl.signal });
+          clearTimeout(timer);
           if (res.ok) window._employeesCache = await res.json();
         } catch (e) {
           // non-fatal — dropdown will just be empty
@@ -2630,6 +2633,31 @@
         loadPlaidImports();
       } catch (e) {
         alert('Error: ' + e.message);
+      }
+    }
+
+    async function plaidReset() {
+      if (
+        !confirm(
+          'This will delete ALL Plaid-imported payments and pending transactions, and reset the sync cursor. This cannot be undone. Continue?',
+        )
+      )
+        return;
+      const btn = document.getElementById('plaid-reset-btn');
+      btn.disabled = true;
+      btn.textContent = 'Resetting...';
+      try {
+        const resp = await adminFetch('/api/admin/plaid/reset', { method: 'DELETE' });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message);
+        document.getElementById('plaid-sync-status').textContent = 'Reset complete — cursor cleared';
+        document.getElementById('plaid-sync-status').style.color = '#6bff6b';
+        await loadBankIntegration();
+      } catch (e) {
+        alert('Reset failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Reset All Data';
       }
     }
 

@@ -336,6 +336,7 @@
           <p style="font-size:12px;color:#666;margin:0 0 16px;">Fetch new transactions and match to team members by Zelle name.</p>
           <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
             <button class="btn-success" onclick="runPlaidSync()" id="plaid-sync-btn">Sync Now</button>
+            <button class="btn-danger" onclick="plaidReset()" id="plaid-reset-btn" style="font-size:12px;">Reset All Data</button>
             <span id="plaid-sync-status" style="font-size:13px;color:#666;"></span>
           </div>
         </div>
@@ -408,10 +409,11 @@
           <label>Method</label>
           <select id="payment-method-input">
             <option value="Zelle">Zelle</option>
+            <option value="Venmo">Venmo</option>
+            <option value="Cash">Cash</option>
             <option value="Payroll">Payroll</option>
             <option value="Check">Check</option>
             <option value="Wire">Wire</option>
-            <option value="Cash">Cash</option>
             <option value="Other">Other</option>
           </select>
         </div>

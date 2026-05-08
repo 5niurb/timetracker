@@ -48,11 +48,13 @@ router.post('/exchange-token', async (req, res) => {
   try {
     const { exchangePublicToken } = require('../server/plaid-client');
     const { updateRenderEnvVar } = require('../server/render-api');
+    const { saveSetting } = require('../server/plaid-sync');
     const { accessToken } = await exchangePublicToken(publicToken);
-    await updateRenderEnvVar('PLAID_ACCESS_TOKEN', accessToken);
-    process.env.PLAID_ACCESS_TOKEN = accessToken;
-    // Clear cursor so next sync fetches from scratch
-    process.env.PLAID_CURSOR = '';
+    // Persist to DB (durable across deploys) and env
+    await saveSetting(supabase, 'plaid_access_token', accessToken, 'PLAID_ACCESS_TOKEN');
+    await saveSetting(supabase, 'plaid_cursor', '', 'PLAID_CURSOR');
+    // Also push to Render env (best-effort)
+    await updateRenderEnvVar('PLAID_ACCESS_TOKEN', accessToken).catch(() => {});
     await updateRenderEnvVar('PLAID_CURSOR', '').catch(() => {});
     res.json({ success: true });
   } catch (e) {
@@ -107,8 +109,15 @@ router.post('/pending/:id/assign', async (req, res) => {
 
   const { comments } = req.body;
 
+  const { data: employee } = await supabase
+    .from('employees')
+    .select('name')
+    .eq('id', parseInt(employeeId))
+    .single();
+
   const { error: insertErr } = await supabase.from('payments').insert({
     employee_id: parseInt(employeeId),
+    teammate_name: employee ? employee.name : null,
     payment_date: pending.transaction_date,
     amount: pending.amount,
     notes: pending.description,
@@ -203,6 +212,24 @@ router.delete('/payments/:id', async (req, res) => {
   const { error } = await supabase.from('payments').delete().eq('id', id);
   if (error) return res.status(500).json({ success: false, message: error.message });
   res.json({ success: true });
+});
+
+// DELETE /api/admin/plaid/reset
+// Wipes all Plaid-imported payments and pending transactions, resets cursor.
+router.delete('/reset', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const { saveSetting } = require('../server/plaid-sync');
+    await supabase.from('payments').delete().eq('source', 'plaid');
+    await supabase.from('plaid_pending').delete().neq('id', 0);
+    await saveSetting(supabase, 'plaid_cursor', '', 'PLAID_CURSOR');
+    const { updateRenderEnvVar } = require('../server/render-api');
+    await updateRenderEnvVar('PLAID_CURSOR', '').catch(() => {});
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[plaid] reset error:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
 });
 
 module.exports = { router, init };

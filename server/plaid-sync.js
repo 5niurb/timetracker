@@ -37,26 +37,56 @@ function detectPaymentMethod(description) {
     lower.includes('ach') ||
     lower.includes('direct dep') ||
     lower.includes('payroll') ||
-    lower.includes('direct deposit')
+    lower.includes('direct deposit') ||
+    lower.includes('basic online payroll payment')
   )
     return 'ach';
   return null;
 }
 
+// Hardcoded overrides: transaction descriptions that map to a specific employee name.
+// Used for bank-specific payroll formats that don't include the employee name.
+const HARDCODED_MATCHES = [
+  // Chase "Basic Online Payroll Payment" to account ending 8792 = Jodi Kay
+  { pattern: /basic online payroll payment.{0,40}8792/i, name: 'Jodi Kay' },
+];
+
 // Classify an array of Plaid transactions into matched + unmatched.
-// Only processes ACH and Zelle transactions — all others are skipped.
+// Only processes debit (outgoing) ACH and Zelle transactions — all others are skipped.
+// matchMap maps lowercase name key → { id, name } (employee record).
 function classifyTransactions(transactions, matchMap) {
   const matched = [];
   const unmatched = [];
 
   for (const tx of transactions) {
+    // Plaid returns debits as positive amounts (money leaving the account).
+    // Skip credits (negative) and zero-value transactions.
+    if (tx.amount <= 0) continue;
+
     const method = detectPaymentMethod(tx.name);
     if (!method) continue; // skip non-ACH/Zelle transactions
 
+    // Check hardcoded rules first
+    const hardcoded = HARDCODED_MATCHES.find((rule) => rule.pattern.test(tx.name));
+    if (hardcoded) {
+      matched.push({
+        employee_name: hardcoded.name,
+        employee_id: null, // resolved by caller
+        plaid_transaction_id: tx.transaction_id,
+        transaction_date: tx.date,
+        amount: tx.amount,
+        description: tx.name,
+        payment_method: method,
+      });
+      continue;
+    }
+
     const empId = matchTransaction(tx.name, matchMap);
     if (empId !== null) {
+      const emp = [...matchMap.entries()].find(([, id]) => id === empId);
       matched.push({
         employee_id: empId,
+        employee_name: null, // resolved by caller from employee list
         plaid_transaction_id: tx.transaction_id,
         transaction_date: tx.date,
         amount: tx.amount,
@@ -77,11 +107,25 @@ function classifyTransactions(transactions, matchMap) {
   return { matched, unmatched };
 }
 
+// Load a value from app_settings, fallback to env var.
+async function loadSetting(supabase, key, envFallback) {
+  const { data } = await supabase.from('app_settings').select('value').eq('key', key).maybeSingle();
+  return (data && data.value) || process.env[envFallback] || null;
+}
+
+// Persist a value to app_settings and process.env.
+async function saveSetting(supabase, key, value, envKey) {
+  if (envKey) process.env[envKey] = value;
+  await supabase
+    .from('app_settings')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+}
+
 // Full sync: fetch from Plaid, match, upsert to DB, advance cursor.
 // Returns { matchedCount, pendingCount, newCursor, errors }
 async function runSync(supabase) {
-  const accessToken = process.env.PLAID_ACCESS_TOKEN;
-  const cursor = process.env.PLAID_CURSOR || null;
+  const accessToken = await loadSetting(supabase, 'plaid_access_token', 'PLAID_ACCESS_TOKEN');
+  const cursor = await loadSetting(supabase, 'plaid_cursor', 'PLAID_CURSOR');
 
   if (!accessToken) {
     throw new Error('Bank account not connected. Set PLAID_ACCESS_TOKEN via Link flow.');
@@ -93,6 +137,9 @@ async function runSync(supabase) {
     .eq('status', 'active');
 
   if (empError) throw new Error('Failed to load employees: ' + empError.message);
+
+  // Build a map of id → name for quick lookup
+  const employeeById = new Map(employees.map((e) => [e.id, e.name]));
 
   const matchMap = buildMatchMap(employees);
 
@@ -107,9 +154,23 @@ async function runSync(supabase) {
   const errors = [];
 
   for (const tx of matched) {
+    // Resolve employee_id for hardcoded matches (employee_id is null when matched by name only)
+    let empId = tx.employee_id;
+    let empName = tx.employee_name;
+    if (!empId && empName) {
+      // Find by name (case-insensitive)
+      const found = employees.find((e) => e.name.toLowerCase() === empName.toLowerCase());
+      if (found) {
+        empId = found.id;
+      }
+    } else if (empId && !empName) {
+      empName = employeeById.get(empId) || null;
+    }
+
     const { error } = await supabase.from('payments').upsert(
       {
-        employee_id: tx.employee_id,
+        employee_id: empId,
+        teammate_name: empName,
         payment_date: tx.transaction_date,
         amount: tx.amount,
         notes: tx.description,
@@ -141,13 +202,13 @@ async function runSync(supabase) {
     }
   }
 
-  // Advance cursor — non-fatal if Render API write fails
+  // Advance cursor — save to DB (durable) and try Render env (best-effort)
   if (nextCursor && nextCursor !== cursor) {
+    await saveSetting(supabase, 'plaid_cursor', nextCursor, 'PLAID_CURSOR');
     try {
       await updateRenderEnvVar('PLAID_CURSOR', nextCursor);
     } catch (e) {
-      console.warn('Warning: failed to update PLAID_CURSOR in Render:', e.message);
-      errors.push('Cursor update failed (non-fatal): ' + e.message);
+      console.warn('Warning: failed to update PLAID_CURSOR in Render (non-fatal):', e.message);
     }
   }
 
@@ -159,4 +220,4 @@ async function runSync(supabase) {
   };
 }
 
-module.exports = { buildMatchMap, matchTransaction, detectPaymentMethod, classifyTransactions, runSync };
+module.exports = { buildMatchMap, matchTransaction, detectPaymentMethod, classifyTransactions, runSync, loadSetting, saveSetting };
