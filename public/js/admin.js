@@ -2499,10 +2499,11 @@
                 <option value="">-- Select --</option>
                 ${employees.filter((e) => e.status === 'active').map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}
               </select>
+              <input type="text" id="pending-comments-${tx.id}" placeholder="Notes (optional)" style="width:140px;margin-top:4px;font-size:11px;padding:3px 6px;background:#0a0a0a;border:1px solid #333;color:#ccc;border-radius:3px;">
             </td>
             <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
               <button class="btn-primary" style="font-size:11px;padding:3px 10px;" onclick="plaidAssign('${tx.id}')">Assign</button>
-              <button class="btn-secondary" style="font-size:11px;padding:3px 10px;margin-left:4px;" onclick="plaidDiscard('${tx.id}')">Not a payout</button>
+              <button class="btn-secondary" style="font-size:11px;padding:3px 10px;margin-left:4px;" onclick="plaidDiscard('${tx.id}')">Discard</button>
             </td>
           </tr>`,
           )
@@ -2537,8 +2538,10 @@
           .map((p) => {
             const emp = employees.find((e) => e.id === p.employee_id);
             const empName = emp ? escapeHtml(emp.name) : `#${p.employee_id}`;
-            const badge = `<span style="color:#f0a500;font-size:11px;font-weight:700;">Unverified</span>
-              <button class="btn-primary" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidVerify(${p.id})">Verify ✓</button>`;
+            const badge = p.auto_imported
+              ? `<span style="color:#f0a500;font-size:11px;font-weight:700;">Unverified</span>
+              <button class="btn-primary" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidVerify(${p.id})">Verify ✓</button>`
+              : `<span style="color:#6bff6b;font-size:11px;font-weight:700;">Verified</span>`;
             return `<tr>
               <td style="padding:6px 8px;">${p.payment_date}</td>
               <td style="padding:6px 8px;">${empName}</td>
@@ -2546,7 +2549,8 @@
               <td style="padding:6px 8px;color:#ccc;">${escapeHtml(p.notes || '')}</td>
               <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
                 ${badge}
-                <button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidReverse(${p.id})">Reverse</button>
+                ${p.auto_imported ? `<button class="btn-secondary" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidReverse(${p.id})">Reverse</button>` : ''}
+                <button class="btn-danger" style="font-size:10px;padding:2px 8px;margin-left:6px;" onclick="plaidDelete(${p.id})">Delete</button>
               </td>
             </tr>`;
           })
@@ -2562,11 +2566,12 @@
         alert('Please select an employee');
         return;
       }
+      const comments = document.getElementById(`pending-comments-${pendingId}`)?.value?.trim() || null;
       try {
         const resp = await adminFetch(`/api/admin/plaid/pending/${pendingId}/assign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ employeeId: empId }),
+          body: JSON.stringify({ employeeId: empId, comments }),
         });
         const data = await resp.json();
         if (!data.success) throw new Error(data.message);
@@ -2611,6 +2616,18 @@
         const data = await resp.json();
         if (!data.success) throw new Error(data.message);
         loadBankIntegration();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function plaidDelete(paymentId) {
+      if (!confirm('Permanently delete this payment record?')) return;
+      try {
+        const resp = await adminFetch(`/api/admin/plaid/payments/${paymentId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message);
+        loadPlaidImports();
       } catch (e) {
         alert('Error: ' + e.message);
       }
