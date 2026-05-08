@@ -1814,8 +1814,11 @@
       if (endDate) params.push(`end_date=${endDate}`);
       if (params.length) url += '?' + params.join('&');
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       try {
-        const res = await fetch(url, { headers: { password } });
+        const res = await fetch(url, { headers: { password }, signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!res.ok) {
           const tbody = document.getElementById('payments-table');
           if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:#c9474f;">Error loading payments (${res.status})</td></tr>`;
@@ -1884,14 +1887,33 @@
           summaryDiv.style.display = 'none';
         }
       } catch (err) {
-        console.error('Error loading payments:', err);
+        clearTimeout(timeoutId);
+        const tbody = document.getElementById('payments-table');
+        if (err.name === 'AbortError') {
+          if (tbody)
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:#c9474f;">Request timed out — server may be waking up, please try again in a moment.</td></tr>`;
+        } else {
+          console.error('Error loading payments:', err);
+          if (tbody)
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:#c9474f;">Failed to load payments. Please refresh and try again.</td></tr>`;
+        }
       }
     }
 
-    function openPaymentModal(payment) {
+    async function openPaymentModal(payment) {
       const overlay = document.getElementById('payment-modal-overlay');
       const title = document.getElementById('payment-modal-title');
       const empSel = document.getElementById('payment-employee-select');
+
+      // Lazily populate employee cache if not yet loaded (e.g., navigating directly to Payouts tab)
+      if (!window._employeesCache || window._employeesCache.length === 0) {
+        try {
+          const res = await fetch('/api/admin/employees');
+          if (res.ok) window._employeesCache = await res.json();
+        } catch (e) {
+          // non-fatal — dropdown will just be empty
+        }
+      }
 
       // Populate employee dropdown
       empSel.innerHTML = '<option value="">— Select team member —</option>';
