@@ -865,6 +865,12 @@ app.get('/api/pay-period/:employeeId', async (req, res) => {
 app.post('/api/submit-invoice', async (req, res) => {
   const { employeeId, periodStart, periodEnd, totalHours, totalWages, totalCommissions, totalTips, totalCashTips, totalProductCommissions, totalPayable } = req.body;
 
+  const pin = req.headers['x-employee-pin'];
+  const validPin = await verifyEmployeePin(employeeId, pin);
+  if (!validPin) {
+    return res.status(401).json({ success: false, message: 'Invalid PIN' });
+  }
+
   // Check if already submitted
   const { data: existing } = await supabaseAdmin
     .from('invoices')
@@ -1040,6 +1046,12 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
   const { periodStart, periodEnd } = req.query;
 
+  const pin = req.headers['x-employee-pin'];
+  const validPin = await verifyEmployeePin(employeeId, pin);
+  if (!validPin) {
+    return res.status(401).json({ success: false, message: 'Invalid PIN' });
+  }
+
   const { data: employee, error: empError } = await supabaseAdmin
     .from('employees')
     .select('id, name, email, hourly_wage, pay_type')
@@ -1143,10 +1155,16 @@ app.get('/api/invoice-preview/:employeeId', async (req, res) => {
   });
 });
 
-// Get payouts for an employee for a pay period (employee-facing, no admin auth)
+// Get payouts for an employee for a pay period (employee-facing)
 app.get('/api/employee/payouts/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
   const { periodStart, periodEnd } = req.query;
+
+  const pin = req.headers['x-employee-pin'];
+  const validPin = await verifyEmployeePin(employeeId, pin);
+  if (!validPin) {
+    return res.status(401).json({ success: false, message: 'Invalid PIN' });
+  }
 
   if (!periodStart || !periodEnd) {
     return res.status(400).json({ success: false, message: 'periodStart and periodEnd required' });
@@ -1249,6 +1267,10 @@ app.post('/api/admin/employees', async (req, res) => {
 
 // Update employee
 app.put('/api/admin/employees/:id', async (req, res) => {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
   const { id } = req.params;
   const {
     name,
@@ -1306,6 +1328,10 @@ app.put('/api/admin/employees/:id', async (req, res) => {
 
 // Admin direct PII edit — no review token required
 app.put('/api/admin/employees/:id/pii', async (req, res) => {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
   const { id } = req.params;
   const allowed = [
     'first_name', 'last_name', 'middle_name', 'preferred_name', 'mobile_phone',
@@ -1346,6 +1372,10 @@ app.put('/api/admin/employees/:id/pii', async (req, res) => {
 
 // Delete employee
 app.delete('/api/admin/employees/:id', async (req, res) => {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
   const { id } = req.params;
 
   // Get time entries for this employee
