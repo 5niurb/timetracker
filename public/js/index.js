@@ -475,7 +475,7 @@
       try {
         const response = await fetch(`/api/time-entry/${entryId}`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-employee-pin': currentPin },
           body: JSON.stringify({ employeeId: currentEmployee.id })
         });
 
@@ -657,7 +657,7 @@
       try {
         await fetch(`/api/time-entry/${conflictEntryId}`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-employee-pin': currentPin },
           body: JSON.stringify({ employeeId: currentEmployee.id })
         });
       } catch (error) {
@@ -675,7 +675,7 @@
       try {
         const response = await fetch('/api/time-entry', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-employee-pin': currentPin },
           body: JSON.stringify(entryData)
         });
 
@@ -717,7 +717,9 @@
     // Pay Period
     async function loadPayPeriod() {
       try {
-        const response = await fetch(`/api/pay-period/${currentEmployee.id}?offset=${periodOffset}`);
+        const response = await fetch(`/api/pay-period/${currentEmployee.id}?offset=${periodOffset}`, {
+          headers: { 'x-employee-pin': currentPin }
+        });
         currentPayPeriod = await response.json();
 
         updatePayPeriodDisplay();
@@ -971,7 +973,9 @@
     // Load Entries
     async function loadEntries() {
       try {
-        const response = await fetch(`/api/time-entries/${currentEmployee.id}`);
+        const response = await fetch(`/api/time-entries/${currentEmployee.id}`, {
+          headers: { 'x-employee-pin': currentPin }
+        });
         const entries = await response.json();
 
         const container = document.getElementById('entries-list');

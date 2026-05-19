@@ -536,6 +536,19 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
 
 // ============ API ROUTES ============
 
+// Verify that the PIN in x-employee-pin header matches the given employeeId.
+// Returns true if valid, false otherwise.
+async function verifyEmployeePin(employeeId, pin) {
+  if (!pin || !employeeId) return false;
+  const { data } = await supabaseAdmin
+    .from('employees')
+    .select('id')
+    .eq('id', parseInt(employeeId))
+    .eq('pin', pin)
+    .single();
+  return !!data;
+}
+
 // Rate limiter for PIN verification — 10 attempts per 15 minutes per IP
 const pinRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -627,6 +640,11 @@ app.post('/api/check-conflict', async (req, res) => {
 app.delete('/api/time-entry/:id', async (req, res) => {
   const { id } = req.params;
   const { employeeId } = req.body;
+  const pin = req.headers['x-employee-pin'];
+
+  if (!(await verifyEmployeePin(employeeId, pin))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
 
   // Verify ownership
   const { data: entry } = await supabaseAdmin
@@ -651,6 +669,11 @@ app.delete('/api/time-entry/:id', async (req, res) => {
 // Submit time entry with client entries and product sales
 app.post('/api/time-entry', async (req, res) => {
   const { employeeId, date, startTime, endTime, breakMinutes, hours, description, clients, productSales } = req.body;
+  const pin = req.headers['x-employee-pin'];
+
+  if (!(await verifyEmployeePin(employeeId, pin))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
 
   const { data: timeEntry, error } = await supabaseAdmin
     .from('time_entries')
@@ -706,6 +729,11 @@ app.post('/api/time-entry', async (req, res) => {
 // Get time entries for an employee with client entries
 app.get('/api/time-entries/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
+  const pin = req.headers['x-employee-pin'];
+
+  if (!(await verifyEmployeePin(employeeId, pin))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
 
   const { data: entries, error } = await supabaseAdmin
     .from('time_entries')
@@ -741,6 +769,11 @@ app.get('/api/time-entries/:employeeId', async (req, res) => {
 app.get('/api/pay-period/:employeeId', async (req, res) => {
   const { employeeId } = req.params;
   const { offset } = req.query;
+  const pin = req.headers['x-employee-pin'];
+
+  if (!(await verifyEmployeePin(employeeId, pin))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
 
   const periodOffset = parseInt(offset) || 0;
   const period = getPayPeriodByOffset(periodOffset);
@@ -1336,6 +1369,11 @@ app.delete('/api/admin/employees/:id', async (req, res) => {
 
 // Get all time entries (admin view)
 app.get('/api/admin/time-entries', async (req, res) => {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { startDate, endDate, employeeId } = req.query;
 
   let query = supabaseAdmin
@@ -1412,6 +1450,11 @@ app.get('/api/admin/time-entries', async (req, res) => {
 
 // Delete time entry (admin)
 app.delete('/api/admin/time-entries/:id', async (req, res) => {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { id } = req.params;
 
   await supabaseAdmin.from('product_sales').delete().eq('time_entry_id', parseInt(id));
@@ -1423,6 +1466,11 @@ app.delete('/api/admin/time-entries/:id', async (req, res) => {
 
 // Get all invoices (admin)
 app.get('/api/admin/invoices', async (req, res) => {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { data: invoices, error } = await supabaseAdmin
     .from('invoices')
     .select(`
