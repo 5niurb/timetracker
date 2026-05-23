@@ -1,4 +1,6 @@
 @../CLAUDE.md
+@../AIT/memory/shared/reference_credentials_workspace.md
+@./.claude/memory/reference_credentials_paytrack.md
 
 # CLAUDE.md — paytrack (LM PayTrack)
 
