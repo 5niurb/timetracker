@@ -3,3 +3,8 @@ paytrack.db
 .DS_Store
 *.log
 .env
+
+# Build artifacts (cleaned by npm prebuild hook before each build)
+dist/
+build/
+.npm/

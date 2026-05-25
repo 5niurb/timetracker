@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 
 const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
 const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account, CLINICAL_TITLES } = require('./lib/onboarding-validation');
@@ -12,13 +13,54 @@ const { randomUUID } = require('crypto');
 const { router: complianceRouter, init: initCompliance } = require('./routes/compliance');
 const { router: plaidRouter, init: initPlaid } = require('./routes/plaid');
 
+// Timing-safe password comparison to prevent timing attacks
+const verifyAdminPassword = (provided, expected) => {
+  if (!provided || !expected) return false;
+  const providedBuf = Buffer.from(provided);
+  const expectedBuf = Buffer.from(expected);
+  try {
+    return crypto.timingSafeEqual(providedBuf, expectedBuf);
+  } catch {
+    return false;
+  }
+};
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+// CORS: restrict to known origins (lemedspa.app, api.lemedspa.app, localhost for dev)
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'https://paytrack.lemedspa.app',
+      'https://lemedspa.app',
+      'https://api.lemedspa.app',
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password'],
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Rate limiting for admin routes to prevent brute-force password attacks
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  keyGenerator: (req) => req.headers['x-admin-password'] || req.headers.password || req.ip,
+  skip: (req) => !req.path.startsWith('/api/admin') && !req.path.startsWith('/api/compliance') && !req.path.startsWith('/api/plaid'),
+  message: 'Too many admin requests, please try again later',
+});
+app.use(adminLimiter);
 
 // Supabase configuration
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -114,6 +156,12 @@ app.get('/api/health', (req, res) => {
 
 // Invoice table image for MMS — fetched by Twilio when delivering the MMS
 app.get('/api/invoice-media/:invoiceId', async (req, res) => {
+  // Require admin authentication before exposing employee PII and financial data
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (!password || !crypto.timingSafeEqual(Buffer.from(password), Buffer.from(adminPassword || ''))) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   let sharp;
   try {
     sharp = require('sharp');
@@ -1188,13 +1236,13 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 // Verify admin password
 app.post('/api/admin/verify', (req, res) => {
   const { password } = req.body;
-  res.json({ success: password === ADMIN_PASSWORD });
+  res.json({ success: verifyAdminPassword(password, ADMIN_PASSWORD) });
 });
 
 // Get all employees (includes onboarding status)
 app.get('/api/admin/employees', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.query.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -1209,8 +1257,8 @@ app.get('/api/admin/employees', async (req, res) => {
 
 // Add new employee — auto-generates review_token
 app.post('/api/admin/employees', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.body.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -1267,8 +1315,8 @@ app.post('/api/admin/employees', async (req, res) => {
 
 // Update employee
 app.put('/api/admin/employees/:id', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.headers.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   const { id } = req.params;
@@ -1328,8 +1376,8 @@ app.put('/api/admin/employees/:id', async (req, res) => {
 
 // Admin direct PII edit — no review token required
 app.put('/api/admin/employees/:id/pii', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.headers.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   const { id } = req.params;
@@ -1372,8 +1420,8 @@ app.put('/api/admin/employees/:id/pii', async (req, res) => {
 
 // Delete employee
 app.delete('/api/admin/employees/:id', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.headers.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
   const { id } = req.params;
@@ -1480,8 +1528,8 @@ app.get('/api/admin/time-entries', async (req, res) => {
 
 // Delete time entry (admin)
 app.delete('/api/admin/time-entries/:id', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.headers.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -1496,8 +1544,8 @@ app.delete('/api/admin/time-entries/:id', async (req, res) => {
 
 // Get all invoices (admin)
 app.get('/api/admin/invoices', async (req, res) => {
-  const password = req.headers['x-admin-password'] || req.headers.password;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
@@ -1528,8 +1576,8 @@ app.get('/admin', (req, res) => {
 
 // Admin: get PII/compliance details for an employee (masked — no *_encrypted columns)
 app.get('/api/admin/employees/:id/onboarding', async (req, res) => {
-  const { password } = req.headers;
-  if (password !== ADMIN_PASSWORD) {
+  const password = req.headers['x-admin-password'];
+  if (!verifyAdminPassword(password, ADMIN_PASSWORD)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 

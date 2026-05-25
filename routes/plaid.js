@@ -5,14 +5,17 @@ const router = express.Router();
 
 let supabase;
 let adminPassword;
+let verifyAdminPassword;
 
-function init(supabaseClient, adminPwd) {
+function init(supabaseClient, adminPwd, verifyFn) {
   supabase = supabaseClient;
   adminPassword = adminPwd;
+  verifyAdminPassword = verifyFn;
 }
 
 function authCheck(req, res) {
-  if (req.headers.password !== adminPassword) {
+  const password = req.headers['x-admin-password'] || req.headers.password;
+  if (!verifyAdminPassword || !verifyAdminPassword(password, adminPassword)) {
     res.status(401).json({ success: false, message: 'Unauthorized' });
     return false;
   }

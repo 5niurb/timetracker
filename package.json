@@ -4,6 +4,7 @@
   "description": "Employee time tracking PWA",
   "main": "server.js",
   "scripts": {
+    "prebuild": "node scripts/cleanup-build-artifacts.js",
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node test/validation.test.js && node test/crypto.test.js"
