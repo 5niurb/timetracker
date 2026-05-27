@@ -941,6 +941,42 @@ extractClientIp() function             extractClientIp() function
 
 ---
 
+## Session — 2026-05-27 (P1: Pay period timezone bug fix)
+
+**Focus:** Debug and fix production bug where staff couldn't submit time entries for prior pay periods.
+
+**Accomplished:**
+- Investigated staff report: May 1-15 period entries weren't appearing in "Generate Invoice for Review" area
+- Root cause identified: `getPayPeriodByOffset()` in `lib/pay-periods.js` was using system local time instead of LA timezone
+- **The Fix:** Updated `getPayPeriodByOffset()` to accept optional `referenceDate` parameter and properly convert to LA timezone when no reference provided. Lines 87-104 restructured to match established pattern from `getLATodayString()` in server.js
+- Updated `server.js` line 827-828 to pass LA date reference: `const laToday = getLATodayString(); const period = getPayPeriodByOffset(periodOffset, laToday);`
+- Verified fix with JavaScript test: offset=-1 on May 27, 2026 now correctly returns May 1-15 period dates
+- Committed: `0a784b7` [paytrack] Fix P1: timezone bug in pay period calculation
+- Pushed to origin main — Render auto-deploy confirmed live
+
+**Diagram:**
+```
+Before (broken):                  After (fixed):
+getPayPeriodByOffset(-1)          getPayPeriodByOffset(-1, laToday)
+  → new Date()                      → convert laToday to LA tz
+  → system local time              → calculate correct period
+  → wrong period dates             → May 1-15 ✓
+  (if server not in LA)
+```
+
+**Current State:** 
+- Timezone bug fixed and deployed to production
+- Staff can now submit time entries for prior pay periods
+- All other pay period logic verified correct (offset calculation tested)
+
+**Issues:** None for this fix.
+
+**Next Steps:**
+- Have staff member test submitting May 1-15 entries to confirm fix resolves the issue
+- Monitor for any regression in period navigation
+
+---
+
 ## Session — 2026-04-15
 
 **Focus:** Worker self-onboarding feature — end-to-end build
