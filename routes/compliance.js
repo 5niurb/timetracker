@@ -630,7 +630,9 @@ router.post('/esign-request', async (req, res) => {
       }
 
       // Docuseal template ID should be in env or config
-      const templateId = document_type === 'w9' ? process.env.DOCUSEAL_TEMPLATE_W9 : process.env.DOCUSEAL_TEMPLATE_CONTRACT;
+      const docusealTemplateW9 = process.env.DOCUSEAL_TEMPLATE_W9;
+      const docusealTemplateContract = process.env.DOCUSEAL_TEMPLATE_CONTRACT;
+      const templateId = document_type === 'w9' ? docusealTemplateW9 : docusealTemplateContract;
       if (!templateId) {
         console.error(`esign-request: DOCUSEAL_TEMPLATE_${document_type.toUpperCase()} not configured`);
         return;

@@ -163,7 +163,8 @@
         let payoutsByDate = {};
         let totalPayouts = 0;
         try {
-          const payoutsResp = await fetch(`/api/employee/payouts/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`);
+          const payoutsUrl = `/api/employee/payouts/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`;
+          const payoutsResp = await fetch(payoutsUrl);
           if (payoutsResp.ok) {
             const payoutsData = await payoutsResp.json();
             if (Array.isArray(payoutsData)) {
@@ -796,7 +797,8 @@
 
       try {
         // Fetch detailed invoice data
-        const response = await fetch(`/api/invoice-preview/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`);
+        const previewUrl = `/api/invoice-preview/${currentEmployee.id}?periodStart=${currentPayPeriod.periodStart}&periodEnd=${currentPayPeriod.periodEnd}`;
+        const response = await fetch(previewUrl);
         const data = await response.json();
 
         if (!data.entries || data.entries.length === 0) {

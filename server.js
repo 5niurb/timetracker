@@ -395,7 +395,9 @@ function buildInvoiceImageSvg(employeeName, periodStart, periodEnd, summary, ent
       const anchor = i === 0 ? 'start' : 'end';
       const red = (i === 6 || i === 7) && vals[i] !== '-';
       const bold = i === 8;
-      svg += `<text x="${tx}" y="${ty(ry, ROW_H)}" font-size="10" fill="${red ? '#cc0000' : '#222'}" font-weight="${bold ? 'bold' : 'normal'}" text-anchor="${anchor}" font-family="sans-serif">${escapeXml(vals[i])}</text>\n`;
+      const fill = red ? '#cc0000' : '#222';
+      const weight = bold ? 'bold' : 'normal';
+      svg += `<text x="${tx}" y="${ty(ry, ROW_H)}" font-size="10" fill="${fill}" font-weight="${weight}" text-anchor="${anchor}" font-family="sans-serif">${escapeXml(vals[i])}</text>\n`;
     }
     svg += `<line x1="${MARGIN}" y1="${ry + ROW_H}" x2="${MARGIN + TW}" y2="${ry + ROW_H}" stroke="#e0e0e0" stroke-width="0.5"/>\n`;
     ry += ROW_H;
@@ -1248,11 +1250,14 @@ app.get('/api/admin/employees', async (req, res) => {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
+  const employeeFields = [
+    'id', 'name', 'pin', 'email', 'phone', 'hourly_wage', 'additional_pay_rate',
+    'rate_notes', 'commission_rate', 'pay_type', 'designation', 'contractor_type',
+    'status', 'created_at', 'review_token', 'review_completed_at', 'zelle_name'
+  ].join(', ');
   const { data: employees, error } = await supabaseAdmin
     .from('employees')
-    .select(
-      'id, name, pin, email, phone, hourly_wage, additional_pay_rate, rate_notes, commission_rate, pay_type, designation, contractor_type, status, created_at, review_token, review_completed_at, zelle_name',
-    );
+    .select(employeeFields);
 
   res.json(employees || []);
 });
@@ -1693,7 +1698,12 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Twilio not configured' });
     }
 
-    const smsBody = `Hi ${firstName}, this is LeMed Spa. At initial onboarding and periodically thereafter, we may need you to provide or confirm certain tax, license, insurance, and payment information, by completing the form linked here: ${onboardingUrl} Questions? Reply to this email/text or text Mike at 310.621.8356 - Thanks!`;
+    const smsBody = [
+      `Hi ${firstName}, this is LeMed Spa. At initial onboarding and periodically,`,
+      `we may need you to provide or confirm tax, license, insurance, and payment info.`,
+      `Complete the form here: ${onboardingUrl}`,
+      `Questions? Text Mike at 310.621.8356 - Thanks!`
+    ].join(' ');
 
     // Normalize phone to E.164
     let toPhone = employee.phone.replace(/\D/g, '');
@@ -1742,8 +1752,9 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Resend not configured' });
     }
 
+    const containerStyle = "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; color: #333; line-height: 1.7;";
     const emailHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; color: #333; line-height: 1.7;">
+      <div style="${containerStyle}">
         <div style="border-bottom: 2px solid #c9a84c; padding-bottom: 16px; margin-bottom: 24px;">
           <h1 style="font-size: 20px; color: #222; margin: 0;">LeMed Spa</h1>
         </div>
