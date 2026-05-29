@@ -34,11 +34,23 @@ Request ──► gzip (lvl 6) ──► Cache-Control ──► route
 - Server boots with zero validation errors; all 188 tests pass.
 - `compression` + `ipKeyGenerator`/`rateLimit` named import confirmed against installed express-rate-limit v8.
 
+**Security-hardening round (commit 25f8102) — driven by an Explore audit + 2 Opus security reviews:**
+- Timing-safe admin auth everywhere: replaced 28 plain `password !== ADMIN_PASSWORD` comparisons (22 server.js + 6 compliance.js) with `verifyAdminPassword`. compliance.js gets verifyFn via init() → `isAdmin()` (fails closed).
+- **Fixed latent crash:** `GET /api/invoice-media/:invoiceId` referenced an undefined `adminPassword` var → ReferenceError 500 on every call (PII/financial route, used by Twilio MMS). Now uses `verifyAdminPassword(password, process.env.ADMIN_PASSWORD)`.
+- **Fixed latent auth break:** `initPlaid` was called without verifyFn → plaid `authCheck` denied ALL requests. Now wired; plaid admin routes work again.
+- Rate-limited `POST /api/change-pin` (was unthrottled 4-digit PIN brute-force given a known employeeId).
+- Auth'd `POST /api/check-conflict` (was unauthenticated; leaked work dates + hours). Frontend updated to send `x-employee-pin`.
+- Trimmed `verify-pin` response (dropped unused email/commission_rate).
+- `POST /api/time-entry`: generic error to client, full error logged server-side (was leaking raw Supabase error.message).
+- Also committed (separate, da1e99a): contractor-contact master kill-switch in compliance-notifications.mjs — was uncommitted from prior work; off until COMPLIANCE_CONTACT_ENABLED=true.
+
 **Issues:** None outstanding.
 
 **Next Steps:**
 - Verify on Render that `trust proxy: 1` matches the actual hop count (Render = 1 LB hop; correct).
+- Set `COMPLIANCE_CONTACT_ENABLED=true` in Render + launchd env ONLY when Mike gives go-live for contractor contact.
 - Manual end-to-end testing of Phase 2 compliance workflows (still outstanding from prior session).
+- Audit finding #7 (LOW, deferred): standardize admin header on `x-admin-password` only and drop the `password` fallback — left as-is because the live admin frontend currently sends `{ headers: { password } }` for compliance routes; changing both sides is a coordinated change for a future session.
 
 ---
 
