@@ -30,7 +30,7 @@ Shared with lm-app and lemedia — same project but separate tables/schemas.
 
 ## Plaid (bank account linking)
 
-- **Env vars:** `PLAID_CLIENT_ID` = `69fbbdaf8a7a05000d309947`, `PLAID_SECRET` = `80e8faa53101959d17896f73a1fe79`, `PLAID_ENV` = `production`
+- **Env vars:** `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV` = `production` (key values in env scripts only — `sync-mac-env.local.sh` / `set-env-vars.ps1` — not stored here)
 - **Location:** Render env vars (service `srv-d632r5m8alac73cbqubg`), local `.env` for dev
 - **Used by:** `paytrack/routes/plaid.js`, `paytrack/server/plaid-client.js` — bank account linking via OAuth (Chase, etc.)
 - **Pre-authorized:** Query transactions, create link tokens, exchange public tokens
@@ -39,7 +39,7 @@ Shared with lm-app and lemedia — same project but separate tables/schemas.
 
 ## Render (paytrack deployment)
 
-- **Env var:** `RENDER_API_KEY` = `rnd_shx6CiwhNgEa8ZGfzvpdiR23f5zJ`
+- **Env var:** `RENDER_API_KEY` (value in env scripts only, not stored here)
 - **Service:** paytrack API deployed on Render.com (auto-deploys on push to main)
 - **Pre-authorized:** Query services/deploys, trigger manual deploys, query env vars/logs
 - **Ask-first:** Deleting services, modifying production env vars, suspending services
@@ -66,9 +66,18 @@ Shared with lm-app and lemedia — same project but separate tables/schemas.
 - **Ask-first:** Rotating the key (irreversible if existing rows not re-encrypted first)
 - **Last verified:** 2026-04-15 (set in Render env vars, 70+23 tests pass)
 
+## ⚠️ Compliance Contact Kill-Switch (CONTRACTOR CONTACT OFF)
+
+- **Env var:** `COMPLIANCE_CONTACT_ENABLED` — **currently UNSET = OFF.**
+- **What it gates:** ALL contractor-facing email + SMS in `lib/compliance-notifications.mjs` (COI reminders, license renewal, e-sign, confirmations — every `send*` function). `contactAllowed()` suppresses unless the value is exactly the string `"true"`. Fails safe.
+- **Why OFF:** Per Mike 2026-05-29 — **NO contact to contractors until he gives explicit "go live."** Do NOT set this to `true` without Mike's go-ahead.
+- **Second layer:** the nightly Mac launchd job `com.lemed.compliance-scanner` was **unloaded/disabled** 2026-05-29 (it was also crash-looping on missing `SUPABASE_URL` in launchd env, so it had never actually sent anything). To re-enable later: `launchctl load ~/Library/LaunchAgents/com.lemed.compliance-scanner.plist` AND fix its env loading.
+- **TO GO LIVE (only on Mike's say-so):** (1) set `COMPLIANCE_CONTACT_ENABLED=true` in Render env (service `srv-d632r5m8alac73cbqubg`) + `paytrack/.env`; (2) resolve the FROM-number question (screenshot context: contractor SMS from the 213 test number "looks odd" — confirm `TWILIO_PHONE_NUMBER` is the main business line); (3) re-enable the launchd job + fix its `.env` loading.
+- **Last verified:** 2026-05-29 (kill-switch added commit `da1e99a`, manually tested both suppress + allow paths; launchd job unloaded)
+
 ## Cron Secret
 
-- **Env var:** `CRON_SECRET` = `9e67ea4d103c33e5a03a37759bccc7f2`
+- **Env var:** `CRON_SECRET` (value in env scripts + Render env, not stored here)
 - **Purpose:** Authenticates cron/scheduler HTTP calls to paytrack API endpoints (Authorization header)
 - **Used by:** pg_cron jobs that trigger paytrack sync/batch operations
 - **Pre-authorized:** Use in cron job commands, read from env vars
