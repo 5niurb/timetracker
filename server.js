@@ -5,6 +5,7 @@ const path = require('path');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
+const compression = require('compression');
 
 const {
   getPayPeriod,
@@ -41,6 +42,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+// Compression: gzip static assets and API responses (60-70% payload reduction)
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress responses with this request header
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6, // balanced compression level (1-9, 6 is default)
+}));
+
 // CORS: restrict to known origins (lemedspa.app, api.lemedspa.app, localhost for dev)
 app.use(cors({
   origin: (origin, callback) => {
@@ -62,7 +75,30 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password'],
 }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Cache control headers for static assets
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d', // 1 day cache for static assets
+  etag: true,  // Enable ETags for cache validation
+}));
+
+// Cache control middleware for API responses
+app.use('/api/', (req, res, next) => {
+  // Set cache headers based on request method and path
+  if (req.method === 'GET') {
+    // Cache GET requests for 5 minutes (reduce repeated queries)
+    const cacheMaxAge = req.path.includes('/pay-period') || req.path.includes('/entries')
+      ? 5 * 60 // 5 minutes for time-sensitive data
+      : 10 * 60; // 10 minutes for less volatile data
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+  } else {
+    // Don't cache POST/PUT/DELETE responses
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+});
 
 // Rate limiting for admin routes to prevent brute-force password attacks
 const adminLimiter = rateLimit({
