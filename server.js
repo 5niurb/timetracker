@@ -6,8 +6,19 @@ const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 
-const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel } = require('./lib/pay-periods');
-const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account, CLINICAL_TITLES } = require('./lib/onboarding-validation');
+const {
+  getPayPeriod,
+  formatDateForDB,
+  getPayPeriodByOffset,
+  getPayPeriodLabel
+} = require('./lib/pay-periods');
+const {
+  validateOnboarding,
+  extractLast4SSN,
+  extractLast4Routing,
+  extractLast4Account,
+  CLINICAL_TITLES
+} = require('./lib/onboarding-validation');
 const { encryptValue } = require('./lib/crypto');
 const { randomUUID } = require('crypto');
 const debug = require('./lib/debug');
@@ -58,7 +69,11 @@ const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 attempts per window
   keyGenerator: (req) => req.headers['x-admin-password'] || req.headers.password || req.ip,
-  skip: (req) => !req.path.startsWith('/api/admin') && !req.path.startsWith('/api/compliance') && !req.path.startsWith('/api/plaid'),
+  skip: (req) => {
+    return !req.path.startsWith('/api/admin')
+      && !req.path.startsWith('/api/compliance')
+      && !req.path.startsWith('/api/plaid');
+  },
   message: 'Too many admin requests, please try again later',
 });
 app.use(adminLimiter);
@@ -174,9 +189,18 @@ app.get('/api/invoice-media/:invoiceId', async (req, res) => {
 
   const { data: inv } = await supabaseAdmin
     .from('invoices')
-    .select(
-      'employee_id, pay_period_start, pay_period_end, total_payable, total_hours, total_wages, total_commissions, total_product_commissions, total_tips, cash_tips_received',
-    )
+    .select([
+      'employee_id',
+      'pay_period_start',
+      'pay_period_end',
+      'total_payable',
+      'total_hours',
+      'total_wages',
+      'total_commissions',
+      'total_product_commissions',
+      'total_tips',
+      'cash_tips_received'
+    ].join(', '))
     .eq('id', invoiceId)
     .single();
   if (!inv) return res.status(404).send('Not found');
@@ -361,14 +385,19 @@ function buildInvoiceImageSvg(employeeName, periodStart, periodEnd, summary, ent
 <rect width="${W}" height="${totalH}" fill="white"/>
 `;
 
-  svg += `<text x="${W / 2}" y="28" font-size="13" fill="#222" font-weight="bold" text-anchor="middle" font-family="sans-serif">${escapeXml(employeeName)} — ${periodStart} to ${periodEnd}</text>\n`;
+  const titleTy = 28;
+  const titleAttrs = 'font-size="13" fill="#222" font-weight="bold" text-anchor="middle"';
+  const titleContent = `${escapeXml(employeeName)} — ${periodStart} to ${periodEnd}`;
+  svg += `<text x="${W / 2}" y="${titleTy}" ${titleAttrs} font-family="sans-serif">${titleContent}</text>\n`;
 
   const hy = TITLE_H;
+  const headAttrs = 'font-size="10" fill="#333" font-weight="bold"';
   svg += `<rect x="${MARGIN}" y="${hy}" width="${TW}" height="${HEAD_H}" fill="#e8e8e8"/>\n`;
   for (let i = 0; i < cols.length; i++) {
     const tx = i === 0 ? xs[i] + 4 : xs[i + 1] - 4;
     const anchor = i === 0 ? 'start' : 'end';
-    svg += `<text x="${tx}" y="${ty(hy, HEAD_H)}" font-size="10" fill="#333" font-weight="bold" text-anchor="${anchor}" font-family="sans-serif">${cols[i].label}</text>\n`;
+    svg += `<text x="${tx}" y="${ty(hy, HEAD_H)}" ${headAttrs} text-anchor="${anchor}"`;
+    svg += ` font-family="sans-serif">${cols[i].label}</text>\n`;
   }
 
   let ry = TITLE_H + HEAD_H;
@@ -397,20 +426,30 @@ function buildInvoiceImageSvg(employeeName, periodStart, periodEnd, summary, ent
       const bold = i === 8;
       const fill = red ? '#cc0000' : '#222';
       const weight = bold ? 'bold' : 'normal';
-      svg += `<text x="${tx}" y="${ty(ry, ROW_H)}" font-size="10" fill="${fill}" font-weight="${weight}" text-anchor="${anchor}" font-family="sans-serif">${escapeXml(vals[i])}</text>\n`;
+      const rowAttrs = `font-size="10" fill="${fill}" font-weight="${weight}"`;
+      svg += `<text x="${tx}" y="${ty(ry, ROW_H)}" ${rowAttrs} text-anchor="${anchor}"`;
+      svg += ` font-family="sans-serif">${escapeXml(vals[i])}</text>\n`;
     }
-    svg += `<line x1="${MARGIN}" y1="${ry + ROW_H}" x2="${MARGIN + TW}" y2="${ry + ROW_H}" stroke="#e0e0e0" stroke-width="0.5"/>\n`;
+    svg += `<line x1="${MARGIN}" y1="${ry + ROW_H}" x2="${MARGIN + TW}" y2="${ry + ROW_H}"`;
+    svg += ` stroke="#e0e0e0" stroke-width="0.5"/>\n`;
     ry += ROW_H;
   }
 
   svg += `<rect x="${MARGIN}" y="${ry}" width="${TW}" height="${FOOT_H}" fill="#d4edda"/>\n`;
-  svg += `<text x="${MARGIN + 4}" y="${ty(ry, FOOT_H)}" font-size="11" fill="#155724" font-weight="bold" font-family="sans-serif">TOTAL PAYABLE</text>\n`;
-  svg += `<text x="${MARGIN + TW - 4}" y="${ty(ry, FOOT_H)}" font-size="12" fill="#155724" font-weight="bold" text-anchor="end" font-family="sans-serif">$${summary.totalPayable.toFixed(2)}</text>\n`;
+  const footAttrs = 'fill="#155724" font-weight="bold" font-family="sans-serif"';
+  svg += `<text x="${MARGIN + 4}" y="${ty(ry, FOOT_H)}" font-size="11" ${footAttrs}>TOTAL PAYABLE</text>\n`;
+  const totalStr = summary.totalPayable.toFixed(2);
+  svg += `<text x="${MARGIN + TW - 4}" y="${ty(ry, FOOT_H)}" font-size="12" ${footAttrs}`;
+  svg += ` text-anchor="end">$${totalStr}</text>\n`;
 
-  svg += `<rect x="${MARGIN}" y="${TITLE_H}" width="${TW}" height="${HEAD_H + rows.length * ROW_H + FOOT_H}" fill="none" stroke="#aaa" stroke-width="1"/>\n`;
+  const borderH = HEAD_H + rows.length * ROW_H + FOOT_H;
+  svg += `<rect x="${MARGIN}" y="${TITLE_H}" width="${TW}" height="${borderH}"`;
+  svg += ` fill="none" stroke="#aaa" stroke-width="1"/>\n`;
 
   for (let i = 1; i < cols.length; i++) {
-    svg += `<line x1="${xs[i].toFixed(1)}" y1="${TITLE_H}" x2="${xs[i].toFixed(1)}" y2="${ry + FOOT_H}" stroke="#ddd" stroke-width="0.5"/>\n`;
+    const xi = xs[i].toFixed(1);
+    svg += `<line x1="${xi}" y1="${TITLE_H}" x2="${xi}" y2="${ry + FOOT_H}"`;
+    svg += ` stroke="#ddd" stroke-width="0.5"/>\n`;
   }
 
   svg += '</svg>';
@@ -427,7 +466,9 @@ async function sendInvoiceSms(employeeName, periodStart, periodEnd, totalPayable
 
   const BASE_URL = process.env.RENDER_EXTERNAL_URL || 'https://paytrack.lemedspa.app';
   const mediaUrl = `${BASE_URL}/api/invoice-media/${invoiceId}`;
-  const body = `Invoice submitted: ${employeeName} (${periodStart}–${periodEnd})\nTotal payable: $${totalPayable.toFixed(2)}`;
+  const totalStr = totalPayable.toFixed(2);
+  const body = `Invoice submitted: ${employeeName} (${periodStart}–${periodEnd})\n` +
+    `Total payable: $${totalStr}`;
 
   try {
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
@@ -468,7 +509,10 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
   let entriesTableRows = '';
   if (entries && entries.length > 0) {
     entries.forEach(entry => {
-      const dayTotal = entry.wages + entry.commissions + entry.productCommissions + entry.tips - entry.cashTips - (entry.payouts || 0);
+      const dayTotal = entry.wages + entry.commissions + entry.productCommissions +
+        entry.tips - entry.cashTips - (entry.payouts || 0);
+      const cashTipsStr = entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-';
+      const payoutsStr = (entry.payouts || 0) > 0 ? '-$' + entry.payouts.toFixed(2) : '-';
       entriesTableRows += `
         <tr>
           <td style="${tdStyle}">${entry.date}</td>
@@ -477,17 +521,18 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
           <td style="${tdRight}">$${entry.commissions.toFixed(2)}</td>
           <td style="${tdRight}">$${entry.productCommissions.toFixed(2)}</td>
           <td style="${tdRight}">$${entry.tips.toFixed(2)}</td>
-          <td style="${tdRight}; color: #cc0000;">${entry.cashTips > 0 ? '-$' + entry.cashTips.toFixed(2) : '-'}</td>
-          <td style="${tdRight}; color: #cc0000;">${(entry.payouts || 0) > 0 ? '-$' + entry.payouts.toFixed(2) : '-'}</td>
+          <td style="${tdRight}; color: #cc0000;">${cashTipsStr}</td>
+          <td style="${tdRight}; color: #cc0000;">${payoutsStr}</td>
           <td style="${tdRight}; font-weight: 600;">$${dayTotal.toFixed(2)}</td>
         </tr>
       `;
     });
   }
 
+  const tableStyle = 'border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;';
   const entriesTable = entries && entries.length > 0 ? `
     <h3 style="margin-top: 32px; margin-bottom: 8px; font-size: 14px; color: #333;">Daily Entry Detail</h3>
-    <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 12px;">
+    <table style="${tableStyle}">
       <thead>
         <tr style="background: #f5f5f5;">
           <th style="${tdStyle} text-align: left;">Date</th>
@@ -505,6 +550,19 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
     </table>
   ` : '';
 
+  const cellStyle = 'border: 1px solid #ddd; padding: 10px;';
+  const cellRightStyle = cellStyle + ' text-align: right;';
+  const cellRedStyle = cellStyle + ' color: #cc0000;';
+  const cellRedRightStyle = cellRightStyle + ' color: #cc0000;';
+  const hoursLabel = formatHoursEmailDisplay(summary.totalHours);
+  const hourlyWageStr = employee.hourlyWage;
+  const timeWorkedLabel = `Time/Hours Worked (${hoursLabel} @ $${hourlyWageStr}/hr)`;
+  const payoutsRow = summary.totalPayouts > 0 ? `
+      <tr>
+        <td style="${cellRedStyle}">Less: Payouts Already Made</td>
+        <td style="${cellRedRightStyle}">-$${summary.totalPayouts.toFixed(2)}</td>
+      </tr>` : '';
+
   const emailBody = `
     <h2>LeMed Spa - Pay Period Invoice</h2>
     <p><strong>Employee:</strong> ${employee.name}</p>
@@ -512,37 +570,33 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
 
     <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
       <tr style="background: #f5f5f5;">
-        <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Description</th>
-        <th style="border: 1px solid #ddd; padding: 10px; text-align: right;">Amount</th>
+        <th style="${cellStyle} text-align: left;">Description</th>
+        <th style="${cellRightStyle}">Amount</th>
       </tr>
       <tr>
-        <td style="border: 1px solid #ddd; padding: 10px;">Time/Hours Worked (${formatHoursEmailDisplay(summary.totalHours)} @ $${employee.hourlyWage}/hr)</td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalWages.toFixed(2)}</td>
+        <td style="${cellStyle}">${timeWorkedLabel}</td>
+        <td style="${cellRightStyle}">$${summary.totalWages.toFixed(2)}</td>
       </tr>
       <tr>
-        <td style="border: 1px solid #ddd; padding: 10px;">Service Commissions</td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalCommissions.toFixed(2)}</td>
+        <td style="${cellStyle}">Service Commissions</td>
+        <td style="${cellRightStyle}">$${summary.totalCommissions.toFixed(2)}</td>
       </tr>
       <tr>
-        <td style="border: 1px solid #ddd; padding: 10px;">Sales Commissions</td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalProductCommissions.toFixed(2)}</td>
+        <td style="${cellStyle}">Sales Commissions</td>
+        <td style="${cellRightStyle}">$${summary.totalProductCommissions.toFixed(2)}</td>
       </tr>
       <tr>
-        <td style="border: 1px solid #ddd; padding: 10px;">Tips</td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">$${summary.totalTips.toFixed(2)}</td>
+        <td style="${cellStyle}">Tips</td>
+        <td style="${cellRightStyle}">$${summary.totalTips.toFixed(2)}</td>
       </tr>
       <tr>
-        <td style="border: 1px solid #ddd; padding: 10px; color: #cc0000;">Less: Cash Tips Already Received</td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #cc0000;">-$${summary.totalCashTips.toFixed(2)}</td>
+        <td style="${cellRedStyle}">Less: Cash Tips Already Received</td>
+        <td style="${cellRedRightStyle}">-$${summary.totalCashTips.toFixed(2)}</td>
       </tr>
-      ${summary.totalPayouts > 0 ? `
-      <tr>
-        <td style="border: 1px solid #ddd; padding: 10px; color: #cc0000;">Less: Payouts Already Made</td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #cc0000;">-$${summary.totalPayouts.toFixed(2)}</td>
-      </tr>` : ''}
+      ${payoutsRow}
       <tr style="background: #e8f5e9;">
-        <td style="border: 1px solid #ddd; padding: 10px;"><strong>TOTAL PAYABLE</strong></td>
-        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;"><strong>$${summary.totalPayable.toFixed(2)}</strong></td>
+        <td style="${cellStyle}"><strong>TOTAL PAYABLE</strong></td>
+        <td style="${cellRightStyle}"><strong>$${summary.totalPayable.toFixed(2)}</strong></td>
       </tr>
     </table>
 
@@ -915,7 +969,18 @@ app.get('/api/pay-period/:employeeId', async (req, res) => {
 
 // Submit invoice
 app.post('/api/submit-invoice', async (req, res) => {
-  const { employeeId, periodStart, periodEnd, totalHours, totalWages, totalCommissions, totalTips, totalCashTips, totalProductCommissions, totalPayable } = req.body;
+  const {
+    employeeId,
+    periodStart,
+    periodEnd,
+    totalHours,
+    totalWages,
+    totalCommissions,
+    totalTips,
+    totalCashTips,
+    totalProductCommissions,
+    totalPayable
+  } = req.body;
 
   const pin = req.headers['x-employee-pin'];
   const validPin = await verifyEmployeePin(employeeId, pin);
@@ -1030,11 +1095,26 @@ app.post('/api/submit-invoice', async (req, res) => {
   }
 
   // Try to send email
+  const employeeData = {
+    name: employee?.name,
+    email: employee?.email,
+    hourlyWage: employee?.hourly_wage || 0
+  };
+  const summaryData = {
+    totalHours,
+    totalWages,
+    totalCommissions,
+    totalProductCommissions,
+    totalTips,
+    totalCashTips,
+    totalPayouts,
+    totalPayable
+  };
   const emailResult = await sendInvoiceEmail(
-    { name: employee?.name, email: employee?.email, hourlyWage: employee?.hourly_wage || 0 },
+    employeeData,
     periodStart,
     periodEnd,
-    { totalHours, totalWages, totalCommissions, totalProductCommissions, totalTips, totalCashTips, totalPayouts, totalPayable },
+    summaryData,
     detailedEntries
   );
 
