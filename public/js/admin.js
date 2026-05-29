@@ -445,6 +445,10 @@
           tbody.innerHTML = sorted
             .map((emp) => {
               const inactive = emp.status === 'inactive';
+              const buttonBaseStyle = 'background:none;border:none;font-size:17px;cursor:pointer;padding:4px 6px;';
+              const editBtnStyle = buttonBaseStyle + 'color:#c9a84c;';
+              const delBtnStyle = buttonBaseStyle + 'color:#c9474f;';
+              const empNameEsc = escapeHtml(emp.name);
 
               // Response Form cell — blank for inactive
               let onboardingCell;
@@ -504,8 +508,8 @@
                 <td style="font-size:11px;line-height:1.6;">${onboardingCell}</td>
                 <td style="text-align:center;">${complianceCell}</td>
                 <td class="actions" style="white-space:nowrap;">
-                  <button title="Edit" onclick="editEmployee(${emp.id})" style="background:none;border:none;color:#c9a84c;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Edit ${escapeHtml(emp.name)}"><span style="display:inline-block;transform:rotate(-45deg);">✏</span></button>
-                  <button title="Delete" onclick="confirmDeleteEmployee(${emp.id}, '${escapeHtml(emp.name)}')" style="background:none;border:none;color:#c9474f;font-size:17px;cursor:pointer;padding:4px 6px;" aria-label="Delete ${escapeHtml(emp.name)}">✕</button>
+                  <button title="Edit" onclick="editEmployee(${emp.id})" style="${editBtnStyle}" aria-label="Edit ${empNameEsc}"><span style="display:inline-block;transform:rotate(-45deg);">✏</span></button>
+                  <button title="Delete" onclick="confirmDeleteEmployee(${emp.id}, '${empNameEsc}')" style="${delBtnStyle}" aria-label="Delete ${empNameEsc}">×</button>
                 </td>
               </tr>
             `;
@@ -689,10 +693,44 @@
 
       if (type === 'sms') {
         label = 'Text Message Preview (from 213-444-2242)';
-        preview = `Hi ${firstName}, this is LeMed Spa. Please complete your response form at the link below. The form collects your tax, license, insurance, and payment details — it takes about 10 minutes.\n\n${link}\n\nQuestions? Reply to this text or call 818-463-3772.`;
+        preview = [
+          `Hi ${firstName}, this is LeMed Spa. Please complete your response form at the`,
+          'link below. The form collects your tax, license, insurance, and payment',
+          'details — it takes about 10 minutes.',
+          '',
+          link,
+          '',
+          'Questions? Reply to this text or call 818-463-3772.'
+        ].join('\n');
       } else {
         label = 'Email Preview (from ops@lemedspa.com)';
-        preview = `Subject: LeMed Spa — Response Form\nTo: ${emp?.email || window._preformEmployeeEmail || '(no email on file)'}\nCC: lea@lemedspa.com\n\n---\n\nHi ${firstName} — Welcome to the LeMed Spa family!\n\nPlease complete our response form, which collects your contact info, insurance coverage, payment preferences, and other info needed to get you properly set up in our systems. It also requires you to upload your government ID and license/insurance info.\n\nAccess it via this link:\n${link}\n\nIf you have any questions, please let Lea know or just reply here.\n\nWe look forward to working with you!\n\nRegards,\n\nAccounts | Operations\naccounts@lemedspa.com | ops@lemedspa.com`;
+        const toEmail = emp?.email || window._preformEmployeeEmail || '(no email on file)';
+        preview = [
+          'Subject: LeMed Spa — Response Form',
+          `To: ${toEmail}`,
+          'CC: lea@lemedspa.com',
+          '',
+          '---',
+          '',
+          `Hi ${firstName} — Welcome to the LeMed Spa family!`,
+          '',
+          'Please complete our response form, which collects your contact info,',
+          'insurance coverage, payment preferences, and other info needed to get you',
+          'properly set up in our systems. It also requires you to upload your',
+          'government ID and license/insurance info.',
+          '',
+          'Access it via this link:',
+          link,
+          '',
+          'If you have any questions, please let Lea know or just reply here.',
+          '',
+          'We look forward to working with you!',
+          '',
+          'Regards,',
+          '',
+          'Accounts | Operations',
+          'accounts@lemedspa.com | ops@lemedspa.com'
+        ].join('\n');
       }
 
       document.getElementById('send-preview-label').textContent = label;
@@ -1712,6 +1750,10 @@
           return `<tr><td colspan="2" style="padding:16px 0 4px;color:#c9a84c;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;border-bottom:1px solid #222;">${title}</td></tr>`;
         }
 
+        const tdStyle = 'color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;';
+        const linkTdStyle = 'color:#ccc;font-size:13px;padding:6px 0;';
+        const linkStyle = 'color:#c9a84c;';
+
         // Format professional licenses array for display
         let profLicensesHtml = '';
         if (o.professional_licenses && o.professional_licenses.length > 0) {
@@ -1722,10 +1764,17 @@
             profLicensesHtml += row(`License ${i + 1} Status`, lic.status);
             profLicensesHtml += row(`License ${i + 1} Expires`, lic.expiration);
             if (lic.license_url) {
-              profLicensesHtml += `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">License ${i + 1} URL</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="${escapeHtml(lic.license_url)}" target="_blank" style="color:#c9a84c;">${escapeHtml(lic.license_url)}</a></td></tr>`;
+              const licUrlHtml = `<tr><td style="${tdStyle}">License ${i + 1} URL</td><td style="${linkTdStyle}"><a href="${escapeHtml(lic.license_url)}" target="_blank" style="${linkStyle}">${escapeHtml(lic.license_url)}</a></td></tr>`;
+              profLicensesHtml += licUrlHtml;
             }
           });
         }
+        const dlUploadRow = o.driver_license_upload_path
+          ? `<tr><td style="${tdStyle}">DL Upload</td><td style="${linkTdStyle}"><a href="#" onclick="openSignedDoc(event,'${escapeHtml(o.driver_license_upload_path)}')" style="${linkStyle}">View file</a></td></tr>`
+          : '';
+        const insUploadRow = o.insurance_upload_path
+          ? `<tr><td style="${tdStyle}">Insurance Cert</td><td style="${linkTdStyle}"><a href="#" onclick="openSignedDoc(event,'${escapeHtml(o.insurance_upload_path)}')" style="${linkStyle}">View file</a></td></tr>`
+          : '';
 
         const html = `
           <table style="width:100%;border-collapse:collapse;margin-top:8px;">
@@ -1746,7 +1795,7 @@
             ${section("Driver's License")}
             ${row("DL Number", o.driver_license_number)}
             ${row("DL State", o.driver_license_state)}
-            ${o.driver_license_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">DL Upload</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="#" onclick="openSignedDoc(event,'${escapeHtml(o.driver_license_upload_path)}')" style="color:#c9a84c;">View file</a></td></tr>` : ''}
+            ${dlUploadRow}
             ${section('Professional Licenses')}
             ${profLicensesHtml || '<tr><td colspan="2" style="color:#555;font-size:12px;padding:6px 0;">None provided</td></tr>'}
             ${o.certifications ? `${section('Certifications')}${row('Certifications', o.certifications)}` : ''}
@@ -1754,7 +1803,7 @@
             ${row('Insurance Co.', o.insurance_company)}
             ${row('Policy #', o.insurance_policy_number)}
             ${row('Insurance Expires', o.insurance_expiration)}
-            ${o.insurance_upload_path ? `<tr><td style="color:#888;font-size:11px;padding:6px 12px 6px 0;white-space:nowrap;vertical-align:top;">Insurance Cert</td><td style="color:#ccc;font-size:13px;padding:6px 0;"><a href="#" onclick="openSignedDoc(event,'${escapeHtml(o.insurance_upload_path)}')" style="color:#c9a84c;">View file</a></td></tr>` : ''}
+            ${insUploadRow}
             ${section('Banking')}
             ${row('Bank Name', o.bank_name)}
             ${row('Account Owner', o.bank_account_owner_name)}
@@ -2052,11 +2101,18 @@
         // Summary cards
         const totalComp = filings.reduce((s, f) => s + parseFloat(f.box1_nonemployee_comp || 0), 0);
         const tinFailed = filings.filter(f => f.tin_match === 'Failed').length;
-        document.getElementById('tax-summary-content').innerHTML = `
-          <div><div style="font-size:22px;font-weight:700;color:#c9a84c;">$${totalComp.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div><div style="font-size:11px;color:#666;margin-top:2px;">Total NEC Compensation</div></div>
-          <div><div style="font-size:22px;font-weight:700;color:#e0d8c8;">${filings.length}</div><div style="font-size:11px;color:#666;margin-top:2px;">Contractors</div></div>
-          ${tinFailed ? `<div><div style="font-size:22px;font-weight:700;color:#ff6b6b;">${tinFailed}</div><div style="font-size:11px;color:#666;margin-top:2px;">TIN Match Failed</div></div>` : ''}
+        const cardValueStyle = 'font-size:22px;font-weight:700;';
+        const cardLabelStyle = 'font-size:11px;color:#666;margin-top:2px;';
+        const totalCompFormatted = totalComp.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        const summaryCards = `
+          <div><div style="${cardValueStyle}color:#c9a84c;">$${totalCompFormatted}</div><div style="${cardLabelStyle}">Total NEC Compensation</div></div>
+          <div><div style="${cardValueStyle}color:#e0d8c8;">${filings.length}</div><div style="${cardLabelStyle}">Contractors</div></div>
+          ${tinFailed ? `<div><div style="${cardValueStyle}color:#ff6b6b;">${tinFailed}</div><div style="${cardLabelStyle}">TIN Match Failed</div></div>` : ''}
         `;
+        document.getElementById('tax-summary-content').innerHTML = summaryCards;
         document.getElementById('tax-summary-cards').style.display = 'block';
 
         // Table rows
