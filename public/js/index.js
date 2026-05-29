@@ -1062,5 +1062,7 @@
 
     // Service Worker Registration
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed'));
+      navigator.serviceWorker.register('/sw.js').catch(err => {
+        // Service worker registration failed - non-critical for PWA fallback
+      });
     }

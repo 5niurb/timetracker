@@ -10,6 +10,7 @@ const { getPayPeriod, formatDateForDB, getPayPeriodByOffset, getPayPeriodLabel }
 const { validateOnboarding, extractLast4SSN, extractLast4Routing, extractLast4Account, CLINICAL_TITLES } = require('./lib/onboarding-validation');
 const { encryptValue } = require('./lib/crypto');
 const { randomUUID } = require('crypto');
+const debug = require('./lib/debug');
 const { router: complianceRouter, init: initCompliance } = require('./routes/compliance');
 const { router: plaidRouter, init: initPlaid } = require('./routes/plaid');
 
@@ -140,12 +141,12 @@ function setupKeepAlive() {
     setInterval(async () => {
       try {
         const response = await fetch(`${SELF_URL}/api/health`);
-        console.log(`[Keep-alive] Ping at ${new Date().toISOString()}: ${response.ok ? 'OK' : 'Failed'}`);
+        debug.log(`[Keep-alive] Ping at ${new Date().toISOString()}: ${response.ok ? 'OK' : 'Failed'}`);
       } catch (err) {
-        console.log(`[Keep-alive] Ping failed: ${err.message}`);
+        debug.log(`[Keep-alive] Ping failed: ${err.message}`);
       }
     }, 14 * 60 * 1000); // Every 14 minutes
-    console.log('[Keep-alive] Scheduled ping every 14 minutes');
+    debug.log('[Keep-alive] Scheduled ping every 14 minutes');
   }
 }
 
@@ -262,13 +263,13 @@ app.get('/api/invoice-media/:invoiceId', async (req, res) => {
 
 // Initialize database tables
 async function initDatabase() {
-  console.log('Initializing Supabase database...');
+  debug.log('Initializing Supabase database...');
 
   // Create employees table
   const { error: empError } = await supabaseAdmin.rpc('create_employees_table_if_not_exists');
   if (empError && !empError.message.includes('already exists')) {
     // Table might already exist, that's fine
-    console.log('Employees table check:', empError?.message || 'OK');
+    debug.log('Employees table check:', empError?.message || 'OK');
   }
 
   // Check if we have any employees
@@ -289,11 +290,11 @@ async function initDatabase() {
       });
 
     if (!insertError) {
-      console.log('Created sample employee with PIN: 1234');
+      debug.log('Created sample employee with PIN: 1234');
     }
   }
 
-  console.log('Database initialization complete');
+  debug.log('Database initialization complete');
 }
 
 // Pay period helpers imported from ./lib/pay-periods.js
@@ -418,7 +419,7 @@ async function sendInvoiceSms(employeeName, periodStart, periodEnd, totalPayable
   const SID = process.env.TWILIO_ACCOUNT_SID;
   const TOKEN = process.env.TWILIO_AUTH_TOKEN;
   if (!SID || !TOKEN) {
-    console.log('[InvoiceSMS] Twilio not configured — skipping SMS');
+    debug.log('[InvoiceSMS] Twilio not configured — skipping SMS');
     return { sent: false, reason: 'Twilio not configured' };
   }
 
@@ -437,7 +438,7 @@ async function sendInvoiceSms(employeeName, periodStart, periodEnd, totalPayable
     });
     const result = await res.json();
     if (res.ok) {
-      console.log(`[InvoiceSMS] MMS sent to Lea, SID: ${result.sid}`);
+      debug.log(`[InvoiceSMS] MMS sent to Lea, SID: ${result.sid}`);
       return { sent: true };
     }
     console.error('[InvoiceSMS] Twilio error:', result);
@@ -454,7 +455,7 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
   if (!RESEND_API_KEY) {
-    console.log('[Email] No RESEND_API_KEY configured - email not sent');
+    debug.log('[Email] No RESEND_API_KEY configured - email not sent');
     return { sent: false, reason: 'No API key configured' };
   }
 
@@ -570,7 +571,7 @@ async function sendInvoiceEmail(employee, periodStart, periodEnd, summary, entri
     const result = await response.json();
 
     if (response.ok) {
-      console.log('[Email] Invoice sent successfully:', result.id);
+      debug.log('[Email] Invoice sent successfully:', result.id);
       return { sent: true, id: result.id };
     } else {
       console.error('[Email] Failed to send:', result);
@@ -1046,7 +1047,7 @@ app.post('/api/submit-invoice', async (req, res) => {
   );
 
   // Log invoice details
-  console.log(`
+  debug.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                    INVOICE SUBMITTED                       ║
 ╠════════════════════════════════════════════════════════════╣
@@ -1719,7 +1720,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
       const result = await twilioRes.json();
 
       if (twilioRes.ok) {
-        console.log(`[SendLink] SMS sent to ${toPhone} for employee ${id}, SID: ${result.sid}`);
+        debug.log(`[SendLink] SMS sent to ${toPhone} for employee ${id}, SID: ${result.sid}`);
         return res.json({ success: true, message: `Text sent to ${employee.phone}` });
       } else {
         console.error('[SendLink] Twilio error:', result);
@@ -1779,7 +1780,7 @@ app.post('/api/admin/employees/:id/send-link', async (req, res) => {
       const result = await emailRes.json();
 
       if (emailRes.ok) {
-        console.log(`[SendLink] Email sent to ${employee.email} for employee ${id}, ID: ${result.id}`);
+        debug.log(`[SendLink] Email sent to ${employee.email} for employee ${id}, ID: ${result.id}`);
         return res.json({ success: true, message: `Email sent to ${employee.email}` });
       } else {
         console.error('[SendLink] Resend error:', result);
@@ -2060,7 +2061,7 @@ app.post('/api/onboarding/:token', async (req, res) => {
     }
   }
 
-  console.log(`[Review] Submitted for employee ${employee.id} (${employee.name})`);
+  debug.log(`[Review] Submitted for employee ${employee.id} (${employee.name})`);
 
   res.json({ success: true, message: 'Info confirmed. Thank you!' });
 });

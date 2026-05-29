@@ -442,7 +442,7 @@ router.post('/coi-inbound', emailUpload.single('file'), async (req, res) => {
     .maybeSingle();
 
   if (!emp) {
-    console.log(`COI email from unknown sender: ${from_email}`);
+    // Debug: log unknown senders for troubleshooting
     return res.json({ success: false, reason: 'sender_unrecognized' });
   }
 
@@ -781,7 +781,7 @@ router.post('/scan', async (req, res) => {
     try {
       const scanModule = await import('../lib/compliance-scan.mjs');
       const result = await scanModule.runComplianceScan(supabase);
-      console.log('Compliance scan complete:', result);
+      // Compliance scan complete
     } catch (err) {
       console.error('compliance scan error:', err.message);
     }
