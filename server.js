@@ -33,6 +33,7 @@ const {
   CLINICAL_TITLES
 } = require('./lib/onboarding-validation');
 const { encryptValue } = require('./lib/crypto');
+const { buildHealth } = require('./lib/health');
 const { randomUUID } = require('crypto');
 const debug = require('./lib/debug');
 const { router: complianceRouter, init: initCompliance } = require('./routes/compliance');
@@ -206,57 +207,24 @@ const upload = multer({
 });
 
 // Keep-alive ping to prevent Render spin down
-const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-function setupKeepAlive() {
-  if (process.env.NODE_ENV === 'production') {
-    setInterval(async () => {
-      try {
-        const response = await fetch(`${SELF_URL}/api/health`);
-        debug.log(`[Keep-alive] Ping at ${new Date().toISOString()}: ${response.ok ? 'OK' : 'Failed'}`);
-      } catch (err) {
-        debug.log(`[Keep-alive] Ping failed: ${err.message}`);
-      }
-    }, 14 * 60 * 1000); // Every 14 minutes
-    debug.log('[Keep-alive] Scheduled ping every 14 minutes');
-  }
-}
+// (Removed setupKeepAlive — it existed to prevent Render free-tier spin-down by
+// self-pinging every 14 min. paytrack is now always-on on Fly (min_machines_running=1),
+// so there's nothing to keep awake; on Fly SELF_URL fell back to localhost anyway.)
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   // Lightweight liveness + dependency check. Monitoring uses this to tell
   // "app process alive" from "page renders" and to catch Supabase-layer outages
   // (the 502 class of failure) before users do. ?deep=0 skips the DB probe.
-  const health = {
-    status: 'ok',
+  // Logic lives in lib/health.js (unit-tested in test/health.test.js).
+  const { health, httpStatus } = await buildHealth({
+    deep: req.query.deep !== '0',
     uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
-  };
-
-  if (req.query.deep !== '0') {
-    let timerId;
-    try {
-      // Cheap connectivity probe — HEAD-style count, 3s budget so a hung DB
-      // can't hang the health check itself.
-      const probe = supabase.from('employees').select('id', { count: 'exact', head: true });
-      const timeout = new Promise((_, reject) => {
-        timerId = setTimeout(() => reject(new Error('supabase probe timeout')), 3000);
-      });
-      const { error } = await Promise.race([probe, timeout]);
-      health.supabase = error ? 'error' : 'ok';
-      if (error) health.status = 'degraded';
-    } catch (err) {
-      health.supabase = 'error';
-      health.status = 'degraded';
-      health.supabaseError = err.message;
-    } finally {
-      // Clear the timeout timer when the probe wins the race (prevents a slow
-      // accumulation of live timers across health-check pings).
-      clearTimeout(timerId);
-    }
-  }
-
-  res.status(health.status === 'ok' ? 200 : 503).json(health);
+    // Cheap connectivity probe — HEAD-style count; lib/health caps it at 3s.
+    probe: () => supabase.from('employees').select('id', { count: 'exact', head: true }),
+  });
+  res.status(httpStatus).json(health);
 });
 
 // Bare /health alias (no /api prefix) for platform/uptime checks that hit root paths.
@@ -2897,7 +2865,6 @@ process.on('uncaughtException', (err) => {
 
 async function start() {
   await initDatabase();
-  setupKeepAlive();
 
   app.listen(PORT, () => {
     console.log(`
